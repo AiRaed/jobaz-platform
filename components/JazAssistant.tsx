@@ -13,6 +13,7 @@ import { scrollAndHighlight } from '@/lib/jaz-ui'
 import { NextStepLoadingCard } from '@/components/NextStepLoadingCard'
 import { useNextStepLoadingStore, generateRequestId } from '@/lib/next-step-loading-store'
 import { getBaseCvAnyScope } from '@/lib/cv-storage'
+import { getCurrentUserIdSync, getUserScopedKeySync } from '@/lib/user-storage'
 
 export type JazLanguage = 'EN' | 'AR' | 'FA' | 'KU' | 'ES' | 'PL'
 
@@ -1998,6 +1999,11 @@ export default function JazAssistant({}: JazAssistantProps) {
             return bTime - aTime
           })[0]
         : null
+
+      // Get CVs key and read from localStorage
+      const userId = getCurrentUserIdSync()
+      const cvsKey = userId ? getUserScopedKeySync('cvs', userId) : 'jobaz-cvs'
+      const rawCvs: string | null = typeof window !== 'undefined' ? localStorage.getItem(cvsKey) : null
 
       // Calculate CV score if CV exists
       let cvScore: number | null = null

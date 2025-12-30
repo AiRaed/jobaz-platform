@@ -41,7 +41,7 @@ export function getAiAccess(): AiAccessInfo {
             valid: true,
             expiresAt,
             remainingMs,
-            source: 'stripe',
+            source: 'donation',
             trialAvailable: false,
             trialUsed: undefined,
           }
@@ -71,7 +71,7 @@ export function getAiAccess(): AiAccessInfo {
 /**
  * Set AI access for 24 hours from now
  */
-export function setAiAccess(source: string = 'stripe'): void {
+export function setAiAccess(source: string = 'donation'): void {
   if (typeof window === 'undefined') return
 
   try {

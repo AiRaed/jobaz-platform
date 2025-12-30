@@ -2,7 +2,6 @@
 
 import { Sparkles, CreditCard, Lock } from 'lucide-react'
 import { Button } from '@/components/button'
-import { startCheckout } from '@/lib/checkout'
 import { LAUNCH_PRICE_GBP } from '@/lib/funnelConfig'
 import { useState } from 'react'
 
@@ -12,24 +11,12 @@ interface PreviewBlurOverlayProps {
 }
 
 export function PreviewBlurOverlay({ onUnlock, showButton = false }: PreviewBlurOverlayProps) {
-  const [checkoutLoading, setCheckoutLoading] = useState(false)
   const priceLabel = `£${LAUNCH_PRICE_GBP.toFixed(2)}`
 
-  const handlePayClick = async (e: React.MouseEvent) => {
+  const handleDonateClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setCheckoutLoading(true)
-    try {
-      const success = await startCheckout()
-      // If checkout succeeded, redirect will happen in startCheckout
-      // If it failed (returned false), reset loading state
-      if (!success) {
-        setCheckoutLoading(false)
-      }
-    } catch (error) {
-      console.error('Checkout error:', error)
-      setCheckoutLoading(false)
-    }
+    window.open('https://buymeacoffee.com/jobaz.support', '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -50,20 +37,19 @@ export function PreviewBlurOverlay({ onUnlock, showButton = false }: PreviewBlur
             Unlock AI for 24h — {priceLabel}
           </p>
           <div className="space-y-2">
-            <Button
-              variant="primary"
-              size="md"
-              onClick={handlePayClick}
-              disabled={checkoutLoading}
-              isLoading={checkoutLoading}
-              className="w-full pointer-events-auto"
-              aria-label={`Unlock AI for 24h — ${priceLabel}`}
+            <a
+              href="https://buymeacoffee.com/jobaz.support"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleDonateClick}
+              className="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-semibold text-sm shadow-lg hover:scale-105 transition-all pointer-events-auto"
+              aria-label="Support JobAZ — Keep it free for everyone"
             >
               <Lock className="w-4 h-4 mr-2" />
-              Pay with Stripe — {priceLabel}
-            </Button>
+              Support JobAZ — Keep it free
+            </a>
             <p className="text-gray-500 dark:text-gray-400 text-xs">
-              Secure checkout by Stripe
+              Donations help keep JobAZ free for everyone
             </p>
           </div>
         </div>

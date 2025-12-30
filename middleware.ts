@@ -77,9 +77,7 @@ export async function middleware(request: NextRequest) {
     '/job-finder',
     '/job-setup',
     '/preview',
-    '/upgrade',
-    '/success',
-    '/cancel'
+    '/upgrade'
   ]
   const isProtectedRoute = protectedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
 

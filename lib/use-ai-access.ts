@@ -82,7 +82,7 @@ export function useAiAccess(): UseAiAccessReturn {
   }, [accessInfo.valid, updateAccessInfo])
 
   // Wrapper functions
-  const setAccess = useCallback((source: string = 'stripe') => {
+  const setAccess = useCallback((source: string = 'donation') => {
     try {
       setAiAccess(source)
       updateAccessInfo()

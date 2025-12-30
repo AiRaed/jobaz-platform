@@ -1,7 +1,6 @@
 'use client'
 
 import { LAUNCH_PRICE_GBP, detectFunnelLanguage } from '@/lib/funnelConfig'
-import { startCheckout } from '@/lib/checkout'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -25,17 +24,8 @@ export function PreviewPaywallModal({ isOpen, variant }: PreviewPaywallModalProp
 
   const isRtl = lang === 'ar'
 
-  const handlePayClick = async () => {
-    try {
-      const success = await startCheckout()
-      // If checkout succeeded, redirect will happen in startCheckout
-      // If it failed (returned false), we don't need to do anything as error is handled in startCheckout
-      if (!success) {
-        // Error already shown via alert in startCheckout
-      }
-    } catch (error) {
-      console.error('Checkout error:', error)
-    }
+  const handleDonateClick = () => {
+    window.open('https://buymeacoffee.com/jobaz.support', '_blank', 'noopener,noreferrer')
   }
 
   // New content as per requirements
@@ -45,8 +35,8 @@ export function PreviewPaywallModal({ isOpen, variant }: PreviewPaywallModalProp
     'Save your edits anytime',
     'Instant unlock for 24 hours — one-time payment, no subscription',
   ]
-  const buttonText = `Pay £${LAUNCH_PRICE_GBP.toFixed(2)} & Unlock 24h Access`
-  const trustLine = 'Secure checkout by Stripe'
+  const buttonText = `Support JobAZ — Keep it free for everyone`
+  const trustLine = 'Donations help keep JobAZ free for everyone'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 md:px-0">
@@ -77,13 +67,15 @@ export function PreviewPaywallModal({ isOpen, variant }: PreviewPaywallModalProp
           ))}
         </ul>
 
-        <button
-          type="button"
-          onClick={handlePayClick}
+        <a
+          href="https://buymeacoffee.com/jobaz.support"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={handleDonateClick}
           className="w-full inline-flex items-center justify-center px-4 py-3 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-semibold text-[1.15rem] md:text-[1.15rem] shadow-lg hover:scale-105 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-accent"
         >
           {buttonText}
-        </button>
+        </a>
 
         <p className="mt-2 text-sm text-center text-gray-500 dark:text-gray-400">
           {trustLine}

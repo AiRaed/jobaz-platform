@@ -4,29 +4,13 @@ import { Button } from "@/components/ui/button"
 import { Sparkles } from "lucide-react"
 import Link from "next/link"
 import { useAiAccess } from "@/lib/use-ai-access"
-import { startCheckout } from "@/lib/checkout"
-import { LAUNCH_PRICE_GBP } from "@/lib/funnelConfig"
-import { useState } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 export function Header() {
   const { valid, remainingFormatted } = useAiAccess()
-  const [checkoutLoading, setCheckoutLoading] = useState(false)
-  const priceLabel = `£${LAUNCH_PRICE_GBP.toFixed(2)}`
 
-  const handleCheckout = async () => {
-    setCheckoutLoading(true)
-    try {
-      const success = await startCheckout()
-      // If checkout succeeded, redirect will happen in startCheckout
-      // If it failed (returned false), reset loading state
-      if (!success) {
-        setCheckoutLoading(false)
-      }
-    } catch (error) {
-      console.error('Checkout error:', error)
-      setCheckoutLoading(false)
-    }
+  const handleDonateClick = () => {
+    window.open('https://buymeacoffee.com/jobaz.support', '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -49,22 +33,16 @@ export function Header() {
               <span className="text-xs text-gray-500 dark:text-gray-400">left</span>
             </div>
           ) : (
-            <Button
-  variant="default"
-  size="sm"
-  onClick={handleCheckout}
-  disabled={checkoutLoading}
->
-  {checkoutLoading ? (
-    <>Processing…</>
-  ) : (
-    <>
-      <Sparkles className="w-4 h-4 mr-2" />
-      Unlock AI — {priceLabel}
-    </>
-  )}
-</Button>
-
+            <a
+              href="https://buymeacoffee.com/jobaz.support"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleDonateClick}
+              className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-semibold text-sm shadow-lg hover:scale-105 transition-all"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Support JobAZ
+            </a>
           )}
           <ThemeToggle />
         </div>

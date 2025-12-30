@@ -13,6 +13,7 @@ import { useJazStore } from '@/lib/jaz-store'
 import ApplyAssistantPanel from '@/components/apply/ApplyAssistantPanel'
 import { getCurrentUserIdSync, getUserScopedKeySync, initUserStorageCache } from '@/lib/user-storage'
 import { useNextStepLoadingStore, generateRequestId } from '@/lib/next-step-loading-store'
+import { getBaseCvAnyScope } from '@/lib/cv-storage'
 
 type DescriptionBlock =
   | { type: 'paragraph'; text: string }
@@ -1032,53 +1033,34 @@ export default function JobDetailsPage() {
         }
       }
 
-      // Read CVs from V2 storage (user-scoped) - same logic as Dashboard
+      // Use shared helper to get CV from any scope
       let cvSummary: string | null = null
       
-      const cvsKey = getUserKey('cvs')
-      const rawCvs = localStorage.getItem(cvsKey)
-      if (rawCvs) {
-        try {
-          const cvs = JSON.parse(rawCvs)
-          if (Array.isArray(cvs) && cvs.length > 0) {
-            let targetCv = null
-            
-            // If cvId is specified, find that CV
-            if (cvId) {
-              targetCv = cvs.find((cv: any) => cv.id === cvId)
+      // If cvId is specified, try to find that specific CV first
+      if (cvId) {
+        const userId = getCurrentUserIdSync()
+        const cvsKey = userId ? getUserScopedKeySync('cvs', userId) : 'jobaz-cvs'
+        const rawCvs = localStorage.getItem(cvsKey)
+        if (rawCvs) {
+          try {
+            const cvs = JSON.parse(rawCvs)
+            if (Array.isArray(cvs) && cvs.length > 0) {
+              const targetCv = cvs.find((cv: any) => cv.id === cvId)
+              if (targetCv && targetCv.summary && targetCv.summary.trim()) {
+                cvSummary = targetCv.summary.trim()
+              }
             }
-            
-            // If no cvId or CV not found, get the latest CV (by savedAt timestamp)
-            if (!targetCv) {
-              targetCv = cvs.reduce((latest, current) => {
-                const latestTime = latest?.savedAt ? new Date(latest.savedAt).getTime() : 0
-                const currentTime = current?.savedAt ? new Date(current.savedAt).getTime() : 0
-                return currentTime > latestTime ? current : latest
-              }, cvs[cvs.length - 1])
-            }
-            
-            // Get summary from the found CV
-            if (targetCv && targetCv.summary && targetCv.summary.trim()) {
-              cvSummary = targetCv.summary.trim()
-            }
+          } catch (error) {
+            console.error('Error parsing CVs for cvId:', error)
           }
-        } catch (error) {
-          console.error('Error parsing V2 CVs:', error)
         }
       }
       
-      // Fallback to old storage only if V2 storage is empty (user-scoped)
+      // If no cvId or CV not found by cvId, use shared helper
       if (!cvSummary) {
-        const hasCVKey = getUserKey('hasCV')
-        const baseCvKey = getUserKey('baseCv')
-        const hasCV = localStorage.getItem(hasCVKey) === 'true'
-        const rawCv = localStorage.getItem(baseCvKey)
-        
-        if (hasCV && rawCv) {
-          const baseCv: SavedCV = JSON.parse(rawCv)
-          if (baseCv.summary && baseCv.summary.trim()) {
-            cvSummary = baseCv.summary.trim()
-          }
+        const { hasCv, cv } = getBaseCvAnyScope()
+        if (hasCv && cv && cv.summary && cv.summary.trim()) {
+          cvSummary = cv.summary.trim()
         }
       }
 

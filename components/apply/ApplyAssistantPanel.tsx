@@ -7,6 +7,7 @@ import { useTranslationSettings } from '@/contexts/TranslationSettingsContext'
 import { useJazStore } from '@/lib/jaz-store'
 import { NextStepLoadingCard } from '@/components/NextStepLoadingCard'
 import { useNextStepLoadingStore, generateRequestId } from '@/lib/next-step-loading-store'
+import { getBaseCvAnyScope } from '@/lib/cv-storage'
 
 interface ApplyAssistantPanelProps {
   jobId: string
@@ -189,50 +190,21 @@ export default function ApplyAssistantPanel({
     // Only load from localStorage if props not provided
     if (!propCvSummary) {
       try {
-        // Try CV Builder V2 storage first
-        const rawCvs = localStorage.getItem('jobaz-cvs')
-        if (rawCvs) {
-          const cvs = JSON.parse(rawCvs)
-          if (Array.isArray(cvs) && cvs.length > 0) {
-            // Get the latest CV
-            const latestCv = cvs.reduce((latest, current) => {
-              const latestTime = latest?.savedAt ? new Date(latest.savedAt).getTime() : 0
-              const currentTime = current?.savedAt ? new Date(current.savedAt).getTime() : 0
-              return currentTime > latestTime ? current : latest
-            }, cvs[cvs.length - 1])
-
-            if (latestCv) {
-              cvSummary = latestCv.summary || ''
-              cvSkills = Array.isArray(latestCv.skills) ? latestCv.skills : []
-              
-              // Convert experience format
-              if (Array.isArray(latestCv.experience)) {
-                cvExperience = latestCv.experience.map((exp: any) => ({
-                  title: exp.jobTitle || exp.title,
-                  company: exp.company,
-                  duration: exp.startDate && exp.endDate ? `${exp.startDate} - ${exp.endDate}` : undefined,
-                  description: Array.isArray(exp.bullets) ? exp.bullets.join('\n') : exp.description || '',
-                }))
-              }
-            }
-          }
-        }
-
-        // Fallback to old storage
-        if (!cvSummary) {
-          const hasCV = localStorage.getItem('jobaz_hasCV') === 'true'
-          const rawCv = localStorage.getItem('jobaz_baseCv')
-          if (hasCV && rawCv) {
-            const baseCv = JSON.parse(rawCv)
-            cvSummary = baseCv.summary || ''
-            cvSkills = Array.isArray(baseCv.skills) ? baseCv.skills : []
-            if (Array.isArray(baseCv.experience)) {
-              cvExperience = baseCv.experience.map((exp: any) => ({
-                title: exp.role || exp.title,
-                company: exp.company,
-                description: exp.description || '',
-              }))
-            }
+        // Use shared helper to get CV from any scope
+        const { hasCv, cv } = getBaseCvAnyScope()
+        
+        if (hasCv && cv) {
+          cvSummary = cv.summary || ''
+          cvSkills = Array.isArray(cv.skills) ? cv.skills : []
+          
+          // Convert experience format (handle both V2 and legacy formats)
+          if (Array.isArray(cv.experience)) {
+            cvExperience = cv.experience.map((exp: any) => ({
+              title: exp.jobTitle || exp.title || exp.role,
+              company: exp.company,
+              duration: exp.startDate && exp.endDate ? `${exp.startDate} - ${exp.endDate}` : undefined,
+              description: Array.isArray(exp.bullets) ? exp.bullets.join('\n') : exp.description || '',
+            }))
           }
         }
       } catch (e) {

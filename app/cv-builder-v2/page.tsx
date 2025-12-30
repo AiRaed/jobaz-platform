@@ -500,6 +500,27 @@ export default function CvBuilderV2Page() {
       // Save back to localStorage (user-scoped)
       localStorage.setItem(cvsKey, JSON.stringify(existingCvs))
 
+      // Also save legacy flags (hasCV + baseCv) using the same scope logic
+      const userId = getCurrentUserIdSync()
+      const hasCvKey = userId ? getUserScopedKeySync('hasCV', userId) : 'jobaz_hasCV'
+      const baseCvKey = userId ? getUserScopedKeySync('baseCv', userId) : 'jobaz_baseCv'
+      
+      // Set hasCV flag
+      localStorage.setItem(hasCvKey, 'true')
+      
+      // Set baseCv (minimal object with essential fields from latest CV)
+      const baseCv = {
+        fullName: cvToSave.personalInfo?.fullName || '',
+        email: cvToSave.personalInfo?.email || '',
+        phone: cvToSave.personalInfo?.phone || '',
+        city: cvToSave.personalInfo?.location || '',
+        summary: cvToSave.summary || '',
+        skills: cvToSave.skills || [],
+        experience: cvToSave.experience || [],
+        education: cvToSave.education || [],
+      }
+      localStorage.setItem(baseCvKey, JSON.stringify(baseCv))
+
       // Dispatch custom event to notify dashboard of CV save
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('jobaz-cv-saved'))

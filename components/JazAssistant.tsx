@@ -12,6 +12,7 @@ import { getAppliedJobs } from '@/lib/applied-jobs-storage'
 import { scrollAndHighlight } from '@/lib/jaz-ui'
 import { NextStepLoadingCard } from '@/components/NextStepLoadingCard'
 import { useNextStepLoadingStore, generateRequestId } from '@/lib/next-step-loading-store'
+import { getBaseCvAnyScope } from '@/lib/cv-storage'
 
 export type JazLanguage = 'EN' | 'AR' | 'FA' | 'KU' | 'ES' | 'PL'
 
@@ -568,30 +569,8 @@ export default function JazAssistant({}: JazAssistantProps) {
         }
       }
 
-      // Check if user has base CV
-      let hasBaseCV = false
-      try {
-        // Check V2 CV storage
-        const rawCvs = localStorage.getItem('jobaz-cvs')
-        if (rawCvs) {
-          const cvs = JSON.parse(rawCvs)
-          if (Array.isArray(cvs) && cvs.length > 0) {
-            hasBaseCV = true
-          }
-        }
-
-        // Check legacy CV storage
-        if (!hasBaseCV) {
-          const hasCVFlag = localStorage.getItem('jobaz_hasCV') === 'true'
-          const baseCv = localStorage.getItem('jobaz_baseCv')
-          if (hasCVFlag && baseCv) {
-            const parsed = JSON.parse(baseCv)
-            hasBaseCV = !!(parsed.fullName || parsed.summary)
-          }
-        }
-      } catch (e) {
-        // Ignore errors
-      }
+      // Check if user has base CV using shared helper
+      const { hasCv: hasBaseCV } = getBaseCvAnyScope()
 
       // Check CV tailored status (for job-details page)
       let isCVTailored = false
@@ -1093,38 +1072,15 @@ export default function JazAssistant({}: JazAssistantProps) {
     startLoading(requestId)
 
     try {
-      // Fetch user's CV from localStorage
+      // Fetch user's CV from localStorage using shared helper
       let cvData = null
       try {
-        const rawCvs = localStorage.getItem('jobaz-cvs')
-        if (rawCvs) {
-          const cvs = JSON.parse(rawCvs)
-          if (Array.isArray(cvs) && cvs.length > 0) {
-            // Get the latest CV
-            const latestCv = cvs.reduce((latest, current) => {
-              const latestTime = latest?.savedAt ? new Date(latest.savedAt).getTime() : 0
-              const currentTime = current?.savedAt ? new Date(current.savedAt).getTime() : 0
-              return currentTime > latestTime ? current : latest
-            }, cvs[cvs.length - 1])
-            cvData = {
-              summary: latestCv.summary || '',
-              experience: latestCv.experience || [],
-              skills: latestCv.skills || [],
-            }
-          }
-        }
-
-        // Fallback to old CV storage
-        if (!cvData) {
-          const hasCV = localStorage.getItem('jobaz_hasCV') === 'true'
-          const rawCv = localStorage.getItem('jobaz_baseCv')
-          if (hasCV && rawCv) {
-            const baseCv = JSON.parse(rawCv)
-            cvData = {
-              summary: baseCv.summary || '',
-              experience: baseCv.experience || [],
-              skills: baseCv.skills || [],
-            }
+        const { hasCv, cv } = getBaseCvAnyScope()
+        if (hasCv && cv) {
+          cvData = {
+            summary: cv.summary || '',
+            experience: cv.experience || [],
+            skills: cv.skills || [],
           }
         }
       } catch (error) {
@@ -2008,30 +1964,9 @@ export default function JazAssistant({}: JazAssistantProps) {
     if (typeof window === 'undefined' || !pathname.includes('/dashboard')) return null
 
     try {
-      // Check if user has base CV
-      let hasBaseCV = false
-      let cvId: string | null = null
-      const rawCvs = localStorage.getItem('jobaz-cvs')
-      if (rawCvs) {
-        const cvs = JSON.parse(rawCvs)
-        if (Array.isArray(cvs) && cvs.length > 0) {
-          hasBaseCV = true
-          const latestCv = cvs.reduce((latest, current) => {
-            const latestTime = latest?.savedAt ? new Date(latest.savedAt).getTime() : 0
-            const currentTime = current?.savedAt ? new Date(current.savedAt).getTime() : 0
-            return currentTime > latestTime ? current : latest
-          }, cvs[cvs.length - 1])
-          cvId = latestCv.id || null
-        }
-      }
-      if (!hasBaseCV) {
-        const hasCVFlag = localStorage.getItem('jobaz_hasCV') === 'true'
-        const baseCv = localStorage.getItem('jobaz_baseCv')
-        if (hasCVFlag && baseCv) {
-          const parsed = JSON.parse(baseCv)
-          hasBaseCV = !!(parsed.fullName || parsed.summary)
-        }
-      }
+      // Check if user has base CV using shared helper
+      const { hasCv: hasBaseCV, cv } = getBaseCvAnyScope()
+      const cvId = cv?.id || null
 
       // Check for saved jobs
       const JOB_STORAGE_PREFIX = 'jobaz_job_'

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, MapPin, Briefcase, Clock } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
@@ -34,14 +34,50 @@ export default function JobFinderPage() {
   const [savedJobs, setSavedJobs] = useState<Job[]>([])
   const [isInitialized, setIsInitialized] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const hasAutoSearchedRef = useRef(false)
 
-  // Read jobTitle from URL query parameter on mount
+  // Read query or jobTitle from URL query parameter on mount
   useEffect(() => {
+    // Priority: query param (new) > jobTitle param (legacy)
+    const queryFromUrl = searchParams.get('query')
     const jobTitleFromUrl = searchParams.get('jobTitle')
-    if (jobTitleFromUrl) {
+    const locationFromUrl = searchParams.get('location')
+    
+    if (queryFromUrl) {
+      setTitle(decodeURIComponent(queryFromUrl))
+    } else if (jobTitleFromUrl) {
       setTitle(decodeURIComponent(jobTitleFromUrl))
     }
+    
+    // Set location if provided in URL
+    if (locationFromUrl && UK_CITIES.includes(locationFromUrl as any)) {
+      setLocation(locationFromUrl)
+    }
   }, [searchParams])
+
+  // Auto-trigger search when query param exists (only once to avoid API spam)
+  useEffect(() => {
+    const queryFromUrl = searchParams.get('query')
+    
+    // Only auto-search if:
+    // 1. We have a query param
+    // 2. We haven't auto-searched yet
+    // 3. We're not currently loading
+    // 4. Title is set (from previous effect)
+    // 5. We haven't already searched
+    if (queryFromUrl && !hasAutoSearchedRef.current && !loading && title && !searched) {
+      hasAutoSearchedRef.current = true
+      // Small delay to ensure all state is properly set before triggering search
+      const timer = setTimeout(() => {
+        // Use the current title value to search
+        if (title.trim()) {
+          handleSearch()
+        }
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, title, loading, searched]) // handleSearch is stable and uses current state values
 
   // Load jobFinderLocation from localStorage on mount
   useEffect(() => {
@@ -63,9 +99,10 @@ export default function JobFinderPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Skip cache restoration if we have a jobTitle from URL
+    // Skip cache restoration if we have a query or jobTitle from URL
+    const queryFromUrl = searchParams.get('query')
     const jobTitleFromUrl = searchParams.get('jobTitle')
-    if (jobTitleFromUrl) return;
+    if (queryFromUrl || jobTitleFromUrl) return;
 
     try {
       const raw = window.localStorage.getItem(JOB_FINDER_CACHE_KEY);
@@ -158,9 +195,10 @@ export default function JobFinderPage() {
 
   // Pre-fill job title from saved base CV on mount (only if no URL param)
   useEffect(() => {
-    // Skip if we have a jobTitle from URL query parameter
+    // Skip if we have a query or jobTitle from URL query parameter
+    const queryFromUrl = searchParams.get('query')
     const jobTitleFromUrl = searchParams.get('jobTitle')
-    if (jobTitleFromUrl) return;
+    if (queryFromUrl || jobTitleFromUrl) return;
 
     if (typeof window !== 'undefined') {
       const userId = getCurrentUserIdSync()

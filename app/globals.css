@@ -1722,22 +1722,43 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Interview Ready dots: slow sequential fill loop */
+/* Interview Ready dots: slow sequential fill loop (no scale to preserve layout) */
 @keyframes dot-fill {
   0%, 33.33% {
     opacity: 0.4;
-    transform: scale(0.9);
     background-color: rgba(139, 92, 246, 0.4);
   }
   50% {
     opacity: 0.8;
-    transform: scale(1);
     background-color: rgba(139, 92, 246, 0.7);
   }
   66.66%, 100% {
     opacity: 1;
-    transform: scale(1.05);
     background-color: rgba(139, 92, 246, 0.9);
+  }
+}
+
+/* Build Your Path compass: slow pulse with gentle rotation (no scale to preserve layout) */
+@keyframes compass-pulse-rotate {
+  0%, 100% {
+    opacity: 0.7;
+    transform: rotate(0deg);
+    filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.4));
+  }
+  25% {
+    opacity: 0.85;
+    transform: rotate(5deg);
+    filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.5));
+  }
+  50% {
+    opacity: 0.9;
+    transform: rotate(0deg);
+    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.6));
+  }
+  75% {
+    opacity: 0.85;
+    transform: rotate(-5deg);
+    filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.5));
   }
 }
 

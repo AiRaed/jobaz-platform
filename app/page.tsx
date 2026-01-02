@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { 
   Briefcase, 
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Compass
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -196,7 +197,7 @@ export default function LandingPage() {
             </span>
           </h1>
           <p className="text-xl md:text-2xl text-gray-300/80 mb-8 leading-relaxed max-w-3xl mx-auto">
-            Build your CV with AI, find matching jobs, tailor each application, and prepare for interviews — guided by JAZ, your AI assistant. Simple, accessible, and multilingual.
+            Build your CV with AI, find matching jobs, tailor each application, and prepare for interviews — guided by JAZ. Not ready to apply yet? Use Build Your Path to explore career routes and become job-ready. Simple, accessible, and multilingual.
           </p>
           
           {/* AI Dashboard Strip */}
@@ -205,7 +206,7 @@ export default function LandingPage() {
               <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
                 {/* CV Quality Module */}
                 <div className="flex flex-col items-center gap-2">
-                  <div className="relative w-16 h-16">
+                  <div className="relative w-16 h-16 flex items-center justify-center">
                     <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
                       <circle
                         cx="32"
@@ -238,42 +239,64 @@ export default function LandingPage() {
 
                 {/* Job Match Module */}
                 <div className="flex flex-col items-center gap-2">
-                  <div className="relative w-20 h-12 flex items-end justify-center gap-0.5">
-                    {[0.4, 0.65, 0.55, 0.75, 0.85, 0.7, 0.9, 0.95].map((baseHeight, i) => (
-                      <div
-                        key={i}
-                        className="w-1.5 bg-gradient-to-t from-violet-600/80 to-violet-400/60 rounded-t"
-                        style={{
-                          height: `${baseHeight * 100}%`,
-                          minHeight: '4px',
-                          transformOrigin: 'bottom',
-                          animation: `pulse-sparkline 3s ease-in-out infinite`,
-                          animationDelay: `${i * 0.15}s`,
-                          filter: 'drop-shadow(0 0 2px rgba(139, 92, 246, 0.4))',
-                        }}
-                      />
-                    ))}
+                  <div className="relative w-16 h-16 flex items-center justify-center">
+                    <div className="flex items-end justify-center gap-0.5 h-12">
+                      {[0.4, 0.65, 0.55, 0.75, 0.85, 0.7, 0.9, 0.95].map((baseHeight, i) => (
+                        <div
+                          key={i}
+                          className="w-1.5 bg-gradient-to-t from-violet-600/80 to-violet-400/60 rounded-t"
+                          style={{
+                            height: `${baseHeight * 100}%`,
+                            minHeight: '4px',
+                            transformOrigin: 'bottom',
+                            animation: `pulse-sparkline 3s ease-in-out infinite`,
+                            animationDelay: `${i * 0.15}s`,
+                            filter: 'drop-shadow(0 0 2px rgba(139, 92, 246, 0.4))',
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
                   <span className="text-xs text-slate-400 font-medium">Job Match</span>
                 </div>
 
                 {/* Interview Ready Module */}
                 <div className="flex flex-col items-center gap-2">
-                  <div className="flex items-center gap-1.5">
-                    {[1, 2, 3].map((dot, i) => (
-                      <div
-                        key={i}
-                        className="w-2 h-2 rounded-full bg-violet-600/60"
-                        style={{
-                          animation: `dot-fill 6s ease-in-out infinite`,
-                          animationDelay: `${i * 1.5}s`,
-                          boxShadow: i === 2 ? '0 0 6px rgba(139, 92, 246, 0.6)' : 'none',
-                        }}
-                      />
-                    ))}
+                  <div className="relative w-16 h-16 flex items-center justify-center">
+                    <div className="flex items-center gap-1.5">
+                      {[1, 2, 3].map((dot, i) => (
+                        <div
+                          key={i}
+                          className="w-2 h-2 rounded-full bg-violet-600/60"
+                          style={{
+                            animation: `dot-fill 6s ease-in-out infinite`,
+                            animationDelay: `${i * 1.5}s`,
+                            boxShadow: i === 2 ? '0 0 6px rgba(139, 92, 246, 0.6)' : 'none',
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
                   <span className="text-xs text-slate-400 font-medium">Interview Ready</span>
                 </div>
+
+                {/* Build Your Path Module */}
+                <Link 
+                  href="/build-your-path"
+                  className="flex flex-col items-center gap-2 cursor-pointer group"
+                >
+                  <div className="relative w-16 h-16 flex items-center justify-center">
+                    <Compass 
+                      className="w-16 h-16 text-violet-400/70 group-hover:text-violet-300 transition-colors"
+                      strokeWidth={2.5}
+                      style={{
+                        animation: 'compass-pulse-rotate 4s ease-in-out infinite',
+                        filter: 'drop-shadow(0 0 4px rgba(139, 92, 246, 0.4))',
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs text-slate-400 font-medium group-hover:text-violet-300/80 transition-colors">Build Your Path</span>
+                </Link>
               </div>
             </div>
           </div>

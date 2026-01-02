@@ -7,12 +7,13 @@ type Props = {
   subtitle?: string
   showBackToDashboard?: boolean // default true
   showBackToJobFinder?: boolean // default false
+  showBackToAllPaths?: boolean // default false
   jobId?: string | null
   mode?: string | null
   from?: string // query param to add when navigating back to job details
 }
 
-export default function PageHeader({ title, subtitle, showBackToDashboard = true, showBackToJobFinder = false, jobId, mode, from }: Props) {
+export default function PageHeader({ title, subtitle, showBackToDashboard = true, showBackToJobFinder = false, showBackToAllPaths = false, jobId, mode, from }: Props) {
   const router = useRouter()
 
   const handleBackToJobDetails = () => {
@@ -25,7 +26,7 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
   return (
     <header className="mb-4 pb-4 border-b border-slate-800/60" data-no-translate>
       <div className="flex flex-col gap-1">
-        {(showBackToDashboard !== false || showBackToJobFinder || jobId) && (
+        {(showBackToDashboard !== false || showBackToJobFinder || showBackToAllPaths || jobId) && (
           <div className="flex items-center gap-4 text-xs md:text-sm text-slate-400 mb-3">
             {showBackToDashboard !== false && (
               <button
@@ -43,6 +44,15 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
                 className="hover:text-slate-100 transition"
               >
                 ← Back to Job Finder
+              </button>
+            )}
+            {showBackToAllPaths && (
+              <button
+                type="button"
+                onClick={() => router.push('/build-your-path')}
+                className="hover:text-slate-100 transition"
+              >
+                ← Back to All Paths
               </button>
             )}
             {jobId && (

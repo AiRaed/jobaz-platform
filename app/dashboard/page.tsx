@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, LogOut } from 'lucide-react'
+import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, LogOut, Compass } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import AppShell from '@/components/layout/AppShell'
@@ -1368,6 +1368,35 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        {/* Build Your Path Section */}
+        <section className="mb-6">
+          <Link
+            href="/build-your-path"
+            className={cn(
+              "group relative overflow-hidden rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-950/20 to-fuchsia-950/20",
+              "p-6 flex items-start gap-4 shadow-[0_0_40px_rgba(139,92,246,0.2)]",
+              "hover:border-violet-400/50 hover:shadow-[0_0_40px_rgba(168,85,247,0.4)] transition-all duration-300 cursor-pointer"
+            )}
+          >
+            <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
+            <div className="flex-shrink-0 p-3 rounded-xl bg-violet-500/20 border border-violet-500/30">
+              <Compass className="w-6 h-6 text-violet-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-semibold text-slate-50 mb-1 group-hover:text-violet-300 transition-colors">
+                Build Your Path
+              </h3>
+              <p className="text-sm text-slate-400 mb-3">
+                Not ready to apply yet? Build your skills first.
+              </p>
+              <div className="flex items-center gap-2 text-violet-400 group-hover:text-violet-300 transition-colors">
+                <span className="text-sm font-medium">Explore Career Paths</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+          </Link>
+        </section>
+
         {/* My CV & My Cover Letters Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
           {/* My CV Section */}
@@ -1667,6 +1696,9 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-base text-slate-300 mb-3">
                     JobAZ can be used step by step or as individual tools. Choose what works best for you!
+                  </p>
+                  <p className="text-base text-slate-300 mb-3">
+                    Not sure where to start? Use Build Your Path to explore career options, understand required skills, and get job-ready before applying.
                   </p>
                 </div>
 

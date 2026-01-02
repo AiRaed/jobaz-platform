@@ -548,6 +548,7 @@ export default function JazAssistant({}: JazAssistantProps) {
       else if (pathname.startsWith('/cv-builder-v2')) page = 'cv-builder'
       else if (pathname.startsWith('/cover')) page = 'cover'
       else if (pathname.startsWith('/interview-coach')) page = 'interview'
+      else if (pathname.startsWith('/build-your-path')) page = 'build-your-path'
 
       // Get jobId (from pathname or jobData)
       const jobId = jobIdFromPath || jobData?.id
@@ -2403,6 +2404,78 @@ export default function JazAssistant({}: JazAssistantProps) {
     )
   }
 
+  // Get Build Your Path guide content based on route
+  const getBuildYourPathGuideContent = useCallback((currentPathname: string): { title: string; content: string } => {
+    // Check if we're on a detail page (has a pathId)
+    const isDetailPage = /\/build-your-path\/[^/]+/.test(currentPathname)
+    
+    if (isDetailPage) {
+      // Guide for individual path detail pages
+      return {
+        title: 'Build Your Path - Career Guide',
+        content: `Welcome to Build Your Path! This page helps you explore a specific career path.
+
+📋 What you'll find here:
+• Detailed information about this career
+• Requirements and qualifications needed
+• Recommended courses and training
+• Reality check with challenges and common mistakes
+
+🎓 Recommended Courses & Training:
+• Each course card shows official training options
+• Click "Find near you" to search for courses on GOV.UK
+• Some courses have direct links to official providers (colleges, professional bodies)
+• Location input helps you find courses in your area
+
+🚀 Prepare with JobAZ:
+Use the sidebar actions to:
+• Create a CV tailored to this career path
+• Practice interviews for this role
+• Write a cover letter
+• Find related jobs
+
+💡 Tips:
+• Read the "Reality Check" section to understand challenges
+• Check course funding options - many are free or funded
+• Start with short courses before committing to longer qualifications`
+      }
+    } else {
+      // Guide for main Build Your Path list page
+      return {
+        title: 'Build Your Path - Explore Careers',
+        content: `Welcome to Build Your Path! This section helps you discover career paths that don't require a university degree.
+
+🎯 How to use this page:
+1. Browse the career paths below
+2. Click on any path that interests you
+3. Learn about requirements, courses, and what the job really involves
+4. Use the tools to prepare for that career
+
+📚 What each path includes:
+• Who it's for and what the job really is
+• Whether you need a degree (most don't!)
+• What you actually need (courses, certificates, licenses)
+• Reality check with honest challenges
+• Recommended courses with official links
+• JobAZ tools to help you prepare
+
+🔍 Finding Courses:
+• All courses link to official UK sources (GOV.UK, colleges, professional bodies)
+• Use "Find near you" to search for courses in your area
+• Many courses are free or funded via Adult Skills Fund
+
+💼 Next Steps:
+Once you choose a path, you can:
+• Create a CV for that career
+• Find related jobs
+• Practice interviews
+• Write cover letters
+
+Start exploring to find the right path for you!`
+      }
+    }
+  }, [])
+
   // Render Next Best Action Card (helper for guide mode)
   const renderNextBestActionCard = () => {
     if (mode !== 'guide') return null
@@ -2410,6 +2483,11 @@ export default function JazAssistant({}: JazAssistantProps) {
     // DASHBOARD: Show dashboard-specific guide cards
     if (pathname.includes('/dashboard')) {
       return renderDashboardGuideCards()
+    }
+
+    // BUILD YOUR PATH: Return null to show guide content instead
+    if (pathname.startsWith('/build-your-path')) {
+      return null
     }
 
     // ROUTE GUARD: If on interview-coach, only show Interview Coach specific guidance
@@ -3314,10 +3392,26 @@ export default function JazAssistant({}: JazAssistantProps) {
               const filteredMessages = currentMessages.filter(msg => msg.role !== 'assistant-cards')
               
               if (filteredMessages.length === 0) {
+                // Build Your Path guide content
+                const buildYourPathGuide = pathname.startsWith('/build-your-path') && mode === 'guide'
+                  ? getBuildYourPathGuideContent(pathname)
+                  : null
+
                 return (
                   <div className="text-center text-slate-400 text-sm py-8">
                     {mode === 'translate' 
                       ? 'Paste text above to translate it into the selected language.'
+                      : mode === 'guide' && buildYourPathGuide
+                      ? (
+                          <div className="text-left space-y-4 max-w-2xl mx-auto">
+                            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+                              <h3 className="text-base font-semibold text-violet-300 mb-2">{buildYourPathGuide.title}</h3>
+                              <div className="text-sm text-slate-300 space-y-3 whitespace-pre-line leading-relaxed">
+                                {buildYourPathGuide.content}
+                              </div>
+                            </div>
+                          </div>
+                        )
                       : mode === 'guide'
                       ? (guideResults || nextBestAction)
                         ? (guideResults ? 'See your analysis above.' : 'See your next step above.')

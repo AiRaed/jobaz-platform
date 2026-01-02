@@ -16,6 +16,7 @@ export type JazPageContext =
   | 'cv-builder'
   | 'cover'
   | 'interview'
+  | 'build-your-path'
   | 'unknown'
 
 export interface JazGuidanceState {
@@ -55,6 +56,12 @@ export function getNextBestAction(state: JazGuidanceState): NextBestAction | nul
   // ROUTE GUARD: If on interview-coach page, return null
   // Interview Coach has its own guidance system and should never show global guidance
   if (state.page === 'interview') {
+    return null
+  }
+
+  // ROUTE GUARD: If on build-your-path page, return null
+  // Build Your Path has its own guidance system
+  if (state.page === 'build-your-path') {
     return null
   }
 

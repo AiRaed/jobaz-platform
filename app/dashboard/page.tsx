@@ -1301,7 +1301,7 @@ export default function DashboardPage() {
           <h2 className="text-sm font-semibold tracking-wide text-slate-300/80 uppercase mb-3">
             Quick Actions
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <Link
               href="/cv-builder-v2"
               className={cn(
@@ -1365,36 +1365,23 @@ export default function DashboardPage() {
                 <div className="text-xs text-slate-400 leading-snug">Practice your interview answers</div>
               </div>
             </Link>
-          </div>
-        </section>
 
-        {/* Build Your Path Section */}
-        <section className="mb-6">
-          <Link
-            href="/build-your-path"
-            className={cn(
-              "group relative overflow-hidden rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-950/20 to-fuchsia-950/20",
-              "p-6 flex items-start gap-4 shadow-[0_0_40px_rgba(139,92,246,0.2)]",
-              "hover:border-violet-400/50 hover:shadow-[0_0_40px_rgba(168,85,247,0.4)] transition-all duration-300 cursor-pointer"
-            )}
-          >
-            <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
-            <div className="flex-shrink-0 p-3 rounded-xl bg-violet-500/20 border border-violet-500/30">
-              <Compass className="w-6 h-6 text-violet-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold text-slate-50 mb-1 group-hover:text-violet-300 transition-colors">
-                Build Your Path
-              </h3>
-              <p className="text-sm text-slate-400 mb-3">
-                Not ready to apply yet? Build your skills first.
-              </p>
-              <div className="flex items-center gap-2 text-violet-400 group-hover:text-violet-300 transition-colors">
-                <span className="text-sm font-medium">Explore Career Paths</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            <Link
+              href="/build-your-path"
+              className={cn(
+                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50",
+                "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
+                "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
+              )}
+            >
+              <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
+              <Compass className="w-4 h-4 text-violet-400 flex-shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <div className="text-sm font-semibold text-slate-50">Build Your Path</div>
+                <div className="text-xs text-slate-400 leading-snug">Explore career paths and build skills</div>
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
         </section>
 
         {/* My CV & My Cover Letters Section */}

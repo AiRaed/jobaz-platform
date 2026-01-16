@@ -529,8 +529,11 @@ export default function CvBuilderV2Page() {
       setGrammarResult(data)
       // Auto-select all safe fixes
       if (data.ok && data.issues) {
-        const safeIssuePaths = new Set(
-          data.issues.filter((issue: GrammarIssue) => issue.isSafeFix).map((issue: GrammarIssue) => issue.fieldPath)
+        const safeIssuePaths = new Set<string>(
+          data.issues
+            .filter((issue: GrammarIssue) => issue.isSafeFix)
+            .map((issue: GrammarIssue) => issue.fieldPath)
+            .filter((path): path is string => typeof path === 'string')
         )
         setSelectedIssues(safeIssuePaths)
       }

@@ -512,12 +512,12 @@ export default function CvBuilderV2Page() {
     }
   }
 
-  const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set())
+  const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set<string>())
 
   const handleGrammarCheck = async () => {
     setShowGrammar(true)
     setGrammarResult(null)
-    setSelectedIssues(new Set())
+    setSelectedIssues(new Set<string>())
     setGrammarLoading(true)
     try {
       const response = await fetch('/api/cv/grammar-check', {
@@ -525,15 +525,14 @@ export default function CvBuilderV2Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cvData }),
       })
-      const data = await response.json()
+      const data = await response.json() as GrammarResult
       setGrammarResult(data)
       // Auto-select all safe fixes
       if (data.ok && data.issues) {
         const safeIssuePaths = new Set<string>(
           data.issues
-            .filter((issue: GrammarIssue) => issue.isSafeFix)
-            .map((issue: GrammarIssue) => issue.fieldPath)
-            .filter((path): path is string => typeof path === 'string')
+            .filter((issue: GrammarIssue) => issue.isSafeFix && typeof issue.fieldPath === 'string')
+            .map((issue: GrammarIssue) => issue.fieldPath as string)
         )
         setSelectedIssues(safeIssuePaths)
       }
@@ -1522,7 +1521,7 @@ export default function CvBuilderV2Page() {
                         issues={issues}
                         selectedIssues={selectedIssues}
                         onToggleIssue={(fieldPath) => {
-                          const newSelected = new Set(selectedIssues)
+                          const newSelected = new Set<string>(selectedIssues)
                           if (newSelected.has(fieldPath)) {
                             newSelected.delete(fieldPath)
                           } else {

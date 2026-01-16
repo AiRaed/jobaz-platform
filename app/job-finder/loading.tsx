@@ -8,35 +8,26 @@ export default function Loading() {
       {/* Main container */}
       <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10">
         {/* Skeleton Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="h-8 w-48 bg-slate-800/50 rounded-lg mb-2 animate-pulse" />
           <div className="h-4 w-64 bg-slate-800/30 rounded-lg animate-pulse" />
         </div>
 
-        {/* Skeleton Cards Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+        {/* Search bar skeleton */}
+        <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-6 mb-6">
+          <div className="h-12 w-full bg-slate-800/40 rounded-lg animate-pulse" />
+        </div>
+
+        {/* Job cards skeleton */}
+        <div className="space-y-4">
+          {[1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
               className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-6"
             >
-              {/* Card Header */}
-              <div className="mb-4">
-                <div className="h-6 w-32 bg-slate-800/50 rounded-lg mb-2 animate-pulse" />
-                <div className="h-4 w-full bg-slate-800/30 rounded-lg animate-pulse" />
-              </div>
-
-              {/* Card Content */}
-              <div className="space-y-3">
-                <div className="h-4 w-full bg-slate-800/40 rounded animate-pulse" />
-                <div className="h-4 w-5/6 bg-slate-800/40 rounded animate-pulse" />
-                <div className="h-4 w-4/6 bg-slate-800/40 rounded animate-pulse" />
-              </div>
-
-              {/* Shimmer effect */}
-              <div className="relative overflow-hidden mt-4">
-                <div className="absolute inset-0 shimmer-effect bg-gradient-to-r from-transparent via-violet-500/10 to-transparent" />
-              </div>
+              <div className="h-6 w-48 bg-slate-800/50 rounded-lg mb-2 animate-pulse" />
+              <div className="h-4 w-32 bg-slate-800/30 rounded-lg mb-4 animate-pulse" />
+              <div className="h-20 bg-slate-800/40 rounded-lg animate-pulse" />
             </div>
           ))}
         </div>
@@ -44,3 +35,4 @@ export default function Loading() {
     </div>
   )
 }
+

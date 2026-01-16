@@ -18,8 +18,17 @@ export default function Loading() {
           {/* Left: Editor skeleton */}
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-6">
-              <div className="h-6 w-40 bg-slate-800/50 rounded-lg mb-4 animate-pulse" />
-              <div className="h-64 bg-slate-800/40 rounded-lg animate-pulse" />
+              {/* Tabs skeleton */}
+              <div className="flex gap-2 mb-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-10 w-24 bg-slate-800/50 rounded-lg animate-pulse" />
+                ))}
+              </div>
+              {/* Content skeleton */}
+              <div className="space-y-4">
+                <div className="h-32 bg-slate-800/40 rounded-lg animate-pulse" />
+                <div className="h-20 bg-slate-800/30 rounded-lg animate-pulse" />
+              </div>
             </div>
           </div>
 
@@ -34,3 +43,4 @@ export default function Loading() {
     </div>
   )
 }
+

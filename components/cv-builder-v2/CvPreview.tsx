@@ -56,8 +56,13 @@ function formatSummary(summary: string): string[] {
 // ATS Classic Template - Single column, clean, minimal - International Professional Standard
 function AtsClassicTemplate({ data }: { data: CvData }) {
   const summaryParagraphs = formatSummary(data.summary)
-  const experience = data?.experience ?? []
-  const education = data?.education ?? []
+  // Filter empty experiences/educations only at render time (non-destructive)
+  const experience = (data?.experience ?? []).filter(
+    (exp) => exp.jobTitle?.trim() || exp.company?.trim()
+  )
+  const education = (data?.education ?? []).filter(
+    (edu) => edu.degree?.trim() || edu.school?.trim()
+  )
   const skills = data?.skills ?? []
   
   // Format contact info professionally
@@ -121,9 +126,9 @@ function AtsClassicTemplate({ data }: { data: CvData }) {
                 {exp.location && (
                   <div className="text-[11px] text-[#666666] italic mb-1.5">{exp.location}</div>
                 )}
-                {exp.bullets.length > 0 && (
+                {exp.bullets.filter((b) => b.trim()).length > 0 && (
                   <ul className="list-none ml-0 space-y-0.5">
-                    {exp.bullets.map((bullet, i) => (
+                    {exp.bullets.filter((b) => b.trim()).map((bullet, i) => (
                       <li key={i} className="leading-[1.5] flex items-start">
                         <span className="mr-1.5 text-[#2c2c2c] font-bold">•</span>
                         <span className="flex-1">{bullet}</span>
@@ -226,6 +231,52 @@ function AtsClassicTemplate({ data }: { data: CvData }) {
           </div>
         </section>
       )}
+
+      {/* Publications */}
+      {data.publications && data.publications.length > 0 && (
+        <section className="mb-4">
+          <h2 className="text-[12.5px] font-bold uppercase tracking-[0.05em] text-[#000000] mb-3">
+            Publications
+          </h2>
+          <div className="mt-2 space-y-2.5">
+            {data.publications.map((pub, idx) => {
+              const parts: string[] = []
+              
+              // Title
+              parts.push(pub.title)
+              
+              // Authors (Year). Venue/Journal
+              const citationParts: string[] = []
+              if (pub.authors) citationParts.push(pub.authors)
+              if (pub.year) {
+                citationParts.push(`(${pub.year})`)
+              }
+              if (citationParts.length > 0) {
+                parts.push(citationParts.join(' '))
+              }
+              if (pub.venueOrJournal) {
+                parts.push(pub.venueOrJournal)
+              }
+              if (pub.doiOrUrl) {
+                parts.push(pub.doiOrUrl)
+              }
+              
+              return (
+                <div key={idx} className="break-inside-avoid">
+                  <div className="text-[11.5px] leading-[1.5] text-[#1a1a1a]">
+                    {parts.join(' — ')}
+                  </div>
+                  {pub.notes && (
+                    <div className="text-[10.5px] leading-[1.4] text-[#4a4a4a] mt-1 italic">
+                      {pub.notes}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
@@ -233,8 +284,13 @@ function AtsClassicTemplate({ data }: { data: CvData }) {
 // Two Column Pro Template - Professional sidebar layout - International Standard
 function TwoColumnProTemplate({ data }: { data: CvData }) {
   const summaryParagraphs = formatSummary(data.summary)
-  const experience = data?.experience ?? []
-  const education = data?.education ?? []
+  // Filter empty experiences/educations only at render time (non-destructive)
+  const experience = (data?.experience ?? []).filter(
+    (exp) => exp.jobTitle?.trim() || exp.company?.trim()
+  )
+  const education = (data?.education ?? []).filter(
+    (edu) => edu.degree?.trim() || edu.school?.trim()
+  )
   const skills = data?.skills ?? []
   
   return (
@@ -308,6 +364,34 @@ function TwoColumnProTemplate({ data }: { data: CvData }) {
               </div>
             </section>
           )}
+
+          {/* Publications */}
+          {data.publications && data.publications.length > 0 && (
+            <section className="mb-4">
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#2c2c2c] mb-2">
+                Publications
+              </h2>
+              <div className="border-t border-[#d1d5db] mb-2" />
+              <div className="text-[10px] text-[#4a4a4a] space-y-2 leading-[1.4]">
+                {data.publications.map((pub, idx) => {
+                  const parts: string[] = []
+                  parts.push(pub.title)
+                  const citationParts: string[] = []
+                  if (pub.authors) citationParts.push(pub.authors)
+                  if (pub.year) citationParts.push(`(${pub.year})`)
+                  if (citationParts.length > 0) parts.push(citationParts.join(' '))
+                  if (pub.venueOrJournal) parts.push(pub.venueOrJournal)
+                  if (pub.doiOrUrl) parts.push(pub.doiOrUrl)
+                  return (
+                    <div key={idx} className="break-inside-avoid">
+                      <div>{parts.join(' — ')}</div>
+                      {pub.notes && <div className="text-[9.5px] italic mt-0.5">{pub.notes}</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
         </aside>
 
         {/* Right Main Content - 68% width */}
@@ -349,9 +433,9 @@ function TwoColumnProTemplate({ data }: { data: CvData }) {
                     {exp.location && (
                       <div className="text-[11px] text-[#666666] italic mb-1.5">{exp.location}</div>
                     )}
-                    {exp.bullets.length > 0 && (
+                    {exp.bullets.filter((b) => b.trim()).length > 0 && (
                       <ul className="list-none ml-0 space-y-0.5">
-                        {exp.bullets.map((bullet, i) => (
+                        {exp.bullets.filter((b) => b.trim()).map((bullet, i) => (
                           <li key={i} className="leading-[1.5] flex items-start text-[11.5px]">
                             <span className="mr-1.5 text-[#2c2c2c] font-bold">•</span>
                             <span className="flex-1">{bullet}</span>

@@ -13,122 +13,56 @@ import { extractCVKeywords, calculateMatchPercentage, generateSearchQueryFromCV,
 import { supabase } from '@/lib/supabase'
 import { clearCurrentUserStorage, initUserStorageCache, getCurrentUserIdSync, getUserScopedKeySync } from '@/lib/user-storage'
 import { UK_CITIES, getLocationValue } from '@/lib/uk-cities'
+import { computeCvScore, type CvScoreResult } from '@/lib/cv-score'
+import type { CvData } from '@/app/cv-builder-v2/page'
 
-// CV Score calculation helpers
-interface CVScoreResult {
-  score: number
-  fixes: string[]
-}
+// CV Score calculation - use shared utility
 
-function calculateCVScore(cv: any): CVScoreResult {
-  let score = 0
-  const fixes: string[] = []
-
-  // +15 if full name exists
-  if (cv?.fullName && cv.fullName.trim()) {
-    score += 15
-  } else {
-    fixes.push('Add your full name')
-  }
-
-  // +10 if email exists
-  if (cv?.email && cv.email.trim()) {
-    score += 10
-  } else {
-    fixes.push('Add your email address')
-  }
-
-  // +10 if phone exists
-  if (cv?.phone && cv.phone.trim()) {
-    score += 10
-  } else {
-    fixes.push('Add your phone number')
-  }
-
-  // +10 if summary length between 60–120 words
-  if (cv?.summary && cv.summary.trim()) {
-    const wordCount = cv.summary.trim().split(/\s+/).filter((w: string) => w.length > 0).length
-    if (wordCount >= 60 && wordCount <= 120) {
-      score += 10
-    } else {
-      fixes.push(`Adjust summary length to 60-120 words (currently ${wordCount})`)
+// Helper to convert dashboard CV format to CvData format
+function convertDashboardCvToCvData(cv: any): CvData {
+  // Convert experience format: dashboard uses { jobTitle, company, description } 
+  // but CvData expects { id, jobTitle, company, bullets: string[] }
+  const experience = (cv?.experience || []).map((exp: any) => {
+    // If it already has bullets array (V2 format), use it
+    if (Array.isArray(exp.bullets)) {
+      return exp
     }
-  } else {
-    fixes.push('Add a professional summary (60-120 words)')
-  }
-
-  // +15 if experience entries >= 2
-  const experience = cv?.experience || []
-  if (experience.length >= 2) {
-    score += 15
-  } else {
-    fixes.push(`Add at least 2 work experiences (currently ${experience.length})`)
-  }
-
-  // +10 if each experience has at least 2 bullet points on average
-  if (experience.length > 0) {
-    let totalBullets = 0
-    experience.forEach((exp: any) => {
-      let bulletCount = 0
-      // Handle bullets array (V2 format)
-      if (Array.isArray(exp.bullets) && exp.bullets.length > 0) {
-        bulletCount = exp.bullets.length
-      } 
-      // Handle description string (old format or converted format)
-      else if (exp.description && typeof exp.description === 'string') {
-        // Count bullet points (lines in description, treating newlines as bullets)
-        bulletCount = exp.description
-          .split(/\n/)
-          .filter((line: string) => line.trim().length > 0)
-          .length
-      }
-      totalBullets += bulletCount
-    })
-    const avgBullets = totalBullets / experience.length
-    if (avgBullets >= 2) {
-      score += 10
-    } else {
-      fixes.push(`Add at least 2 bullet points per experience (avg: ${avgBullets.toFixed(1)})`)
+    // Otherwise, convert description string to bullets array
+    const bullets = exp.description
+      ? exp.description.split(/\n/).filter((line: string) => line.trim().length > 0)
+      : []
+    return {
+      id: exp.id || `exp-${Math.random()}`,
+      jobTitle: exp.jobTitle || exp.title || '',
+      company: exp.company || '',
+      location: exp.location,
+      startDate: exp.startDate,
+      endDate: exp.endDate,
+      isCurrent: exp.isCurrent,
+      bullets,
     }
-  }
-
-  // +10 if skills count >= 10
-  const skills = cv?.skills || []
-  if (skills.length >= 10) {
-    score += 10
-  } else {
-    fixes.push(`Add at least 10 skills (currently ${skills.length})`)
-  }
-
-  // +10 if education exists
-  const education = cv?.education || []
-  if (education.length > 0) {
-    score += 10
-  } else {
-    fixes.push('Add your education details')
-  }
-
-  // +10 if no placeholder text like "[Company]" remains
-  const hasPlaceholders = [
-    cv?.fullName,
-    cv?.summary,
-    ...(experience.map((e: any) => `${e.jobTitle || ''} ${e.company || ''} ${e.description || ''}`)),
-    ...(education.map((e: any) => `${e.degree || ''} ${e.school || ''}`)),
-  ].some((text: string | undefined) => {
-    if (!text) return false
-    return /\[.*?\]/.test(text)
   })
 
-  if (!hasPlaceholders) {
-    score += 10
-  } else {
-    fixes.push('Remove placeholder text like [Company], [Job Title], etc.')
+  return {
+    personalInfo: {
+      fullName: cv?.fullName || '',
+      email: cv?.email || '',
+      phone: cv?.phone || '',
+      location: cv?.city || cv?.location || '',
+      linkedin: cv?.linkedin,
+      website: cv?.website,
+    },
+    summary: cv?.summary || '',
+    experience,
+    education: cv?.education || [],
+    skills: cv?.skills || [],
   }
+}
 
-  // Clamp 0–100
-  score = Math.max(0, Math.min(100, score))
-
-  return { score, fixes: fixes.slice(0, 4) } // Max 4 fixes
+// Wrapper function for backward compatibility
+function calculateCVScore(cv: any): CvScoreResult {
+  const cvData = convertDashboardCvToCvData(cv)
+  return computeCvScore(cvData)
 }
 
 const JOB_STORAGE_PREFIX = 'jobaz_job_'
@@ -171,9 +105,11 @@ export default function DashboardPage() {
   const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([])
   const [loading, setLoading] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadingCv, setLoadingCv] = useState(true)
   const [baseCv, setBaseCv] = useState<any | null>(null)
   const [cvLastUpdated, setCvLastUpdated] = useState<string | null>(null)
   const [cvId, setCvId] = useState<string | null>(null)
+  const [readiness, setReadiness] = useState<{ score: number; level: string; topFixes: string[]; lastUpdated: string } | null>(null)
   const [isCvModalOpen, setIsCvModalOpen] = useState(false)
   const [baseCover, setBaseCover] = useState<any | null>(null)
   const [coverLastUpdated, setCoverLastUpdated] = useState<string | null>(null)
@@ -203,6 +139,85 @@ export default function DashboardPage() {
   const recommendedJobsRef = useRef<HTMLDivElement>(null)
   const appliedJobsRef = useRef<HTMLDivElement>(null)
 
+  // Fetch CV from API
+  const fetchCvFromApi = useCallback(async () => {
+    setLoadingCv(true)
+    try {
+      const response = await fetch('/api/cv/get-latest')
+      
+      if (response.status === 401) {
+        // Not authenticated, redirect to landing/login
+        router.push('/')
+        return
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch CV: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      
+      if (!data.ok) {
+        console.error('API returned error:', data.error)
+        // Fall back to localStorage
+        reloadCvData()
+        setLoadingCv(false)
+        return
+      }
+      
+      if (data.hasCv && data.cv) {
+        // Map API CV format to dashboard format
+        const mappedExperience = (data.cv.experience || []).map((exp: any) => {
+          let period = ''
+          if (exp.startDate || exp.endDate) {
+            if (exp.isCurrent) {
+              period = `${exp.startDate || ''} - Present`
+            } else {
+              period = `${exp.startDate || ''} - ${exp.endDate || ''}`
+            }
+          }
+          
+          const description = exp.bullets && Array.isArray(exp.bullets) 
+            ? exp.bullets.join('\n')
+            : ''
+          
+          return {
+            jobTitle: exp.jobTitle || '',
+            company: exp.company || '',
+            period: period,
+            description: description,
+          }
+        })
+        
+        const dashboardCv = {
+          fullName: data.cv.personalInfo?.fullName || '',
+          email: data.cv.personalInfo?.email || '',
+          phone: data.cv.personalInfo?.phone || '',
+          city: data.cv.personalInfo?.location || '',
+          summary: data.cv.summary || '',
+          skills: data.cv.skills || [],
+          experience: mappedExperience,
+          education: data.cv.education || [],
+        }
+        
+        setBaseCv(dashboardCv)
+        setCvLastUpdated(data.readiness?.lastUpdated || null)
+        setReadiness(data.readiness)
+      } else {
+        // No CV found, clear state
+        setBaseCv(null)
+        setCvLastUpdated(null)
+        setReadiness(null)
+      }
+    } catch (error) {
+      console.error('Error fetching CV from API:', error)
+      // Fall back to localStorage
+      reloadCvData()
+    } finally {
+      setLoadingCv(false)
+    }
+  }, [router])
+
   // Fetch user info from Supabase auth and initialize user storage cache
   useEffect(() => {
     // Initialize user storage cache for user-scoped localStorage
@@ -221,9 +236,19 @@ export default function DashboardPage() {
           
           setUserName(displayName)
           setUserEmail(email)
+          
+          // Fetch CV from API after user is confirmed
+          fetchCvFromApi()
+        } else {
+          // No user, still try to load from localStorage as fallback
+          reloadCvData()
+          setLoadingCv(false)
         }
       } catch (error) {
         console.error('Error fetching user:', error)
+        // Fall back to localStorage
+        reloadCvData()
+        setLoadingCv(false)
       }
     }
 
@@ -246,7 +271,7 @@ export default function DashboardPage() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [fetchCvFromApi])
 
   // Load saved jobs from Job Finder's storage on mount and sync changes
   useEffect(() => {
@@ -561,10 +586,14 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // Initial load of CV data
+  // Initial load of CV data (fallback to localStorage if API fails)
+  // Note: API fetch happens in user fetch useEffect above
   useEffect(() => {
-    reloadCvData()
-  }, [reloadCvData])
+    // Only reload from localStorage if API hasn't loaded yet (as fallback)
+    if (!loadingCv) {
+      // This will run as a fallback if API fetch fails
+    }
+  }, [loadingCv])
 
   // Listen for CV save events and storage changes to auto-refresh
   useEffect(() => {
@@ -580,8 +609,8 @@ export default function DashboardPage() {
 
     // Handle custom CV save event (fired when CV is saved in builder)
     const handleCvSaved = () => {
-      // Reload CV data immediately when CV is saved
-      reloadCvData()
+      // Reload CV data from API when CV is saved
+      fetchCvFromApi()
     }
 
     // Handle storage events (for cross-tab updates)
@@ -596,8 +625,8 @@ export default function DashboardPage() {
       
       // Check if CV-related keys changed
       if (e.key === cvsKey || e.key === baseCvKey) {
-        // Reload CV data when CV storage changes
-        reloadCvData()
+        // Reload CV data from API when CV storage changes
+        fetchCvFromApi()
       }
     }
 
@@ -609,7 +638,7 @@ export default function DashboardPage() {
     
     // Also check on window focus (in case CV was saved in another tab)
     const handleFocus = () => {
-      reloadCvData()
+      fetchCvFromApi()
     }
     window.addEventListener('focus', handleFocus)
 
@@ -618,7 +647,7 @@ export default function DashboardPage() {
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [reloadCvData])
+  }, [fetchCvFromApi])
 
   // Load recommendedLocation from localStorage on mount
   useEffect(() => {
@@ -1214,9 +1243,54 @@ export default function DashboardPage() {
   // Helper for truncated summary
   const shortSummary = baseCv?.summary ? (baseCv.summary.length > 160 ? baseCv.summary.slice(0, 160) + "…" : baseCv.summary) : ""
 
-  // Loading state
+  // Loading state - show dark skeleton instead of blank screen
   if (isLoading) {
-    return <div />
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 relative overflow-hidden">
+        {/* Background glows */}
+        <div className="pointer-events-none absolute -top-40 -left-24 h-72 w-72 rounded-full bg-violet-600/30 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-fuchsia-500/25 blur-3xl" />
+
+        {/* Main container */}
+        <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10">
+          {/* Skeleton Header */}
+          <div className="mb-8">
+            <div className="h-10 w-64 bg-slate-800/50 rounded-lg mb-3 animate-pulse" />
+            <div className="h-5 w-96 bg-slate-800/30 rounded-lg animate-pulse" />
+          </div>
+
+          {/* Skeleton Stats Cards */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-6"
+              >
+                <div className="h-5 w-24 bg-slate-800/50 rounded-lg mb-3 animate-pulse" />
+                <div className="h-8 w-16 bg-slate-800/40 rounded-lg animate-pulse" />
+              </div>
+            ))}
+          </div>
+
+          {/* Skeleton Content Sections */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {[1, 2].map((i) => (
+              <div
+                key={i}
+                className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-6"
+              >
+                <div className="h-6 w-40 bg-slate-800/50 rounded-lg mb-4 animate-pulse" />
+                <div className="space-y-3">
+                  {[1, 2, 3].map((j) => (
+                    <div key={j} className="h-20 bg-slate-800/40 rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -1485,8 +1559,33 @@ export default function DashboardPage() {
               Your CV Readiness
             </h2>
             <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 px-5 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition flex-1 flex flex-col">
-              {baseCv ? (() => {
-                const scoreResult = calculateCVScore(baseCv)
+              {loadingCv ? (
+                // Loading skeleton
+                <>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="flex-shrink-0">
+                      <div className="h-12 w-16 bg-slate-800 rounded animate-pulse" />
+                      <div className="h-3 w-12 bg-slate-800 rounded mt-1 animate-pulse" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="h-3 bg-slate-800 rounded-full overflow-hidden animate-pulse mb-2" />
+                      <div className="h-3 w-3/4 bg-slate-800 rounded animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <div className="h-3 w-20 bg-slate-800 rounded mb-2 animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="h-3 w-full bg-slate-800 rounded animate-pulse" />
+                      <div className="h-3 w-5/6 bg-slate-800 rounded animate-pulse" />
+                      <div className="h-3 w-4/6 bg-slate-800 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </>
+              ) : baseCv ? (() => {
+                // Use readiness from API if available, otherwise calculate
+                const scoreResult = readiness 
+                  ? { score: readiness.score, level: readiness.level, fixes: readiness.topFixes }
+                  : calculateCVScore(baseCv)
                 const searchQuery = generateSearchQueryFromCV({
                   summary: baseCv.summary,
                   skills: baseCv.skills,
@@ -1495,41 +1594,55 @@ export default function DashboardPage() {
                 
                 return (
                   <>
-                    {/* Score Display */}
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="flex-shrink-0">
-                        <div className={cn(
-                          "text-4xl font-bold",
-                          scoreResult.score >= 70 ? "text-emerald-400" : scoreResult.score >= 50 ? "text-amber-400" : "text-red-400"
-                        )}>
-                          {scoreResult.score}
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1">out of 100</div>
-                      </div>
-                      
-                      {/* Progress Bar */}
+                    {/* Header with Refresh button */}
+                    <div className="flex items-center justify-between mb-4">
                       <div className="flex-1">
-                        <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-                          <div
-                            className={cn(
-                              "h-full transition-all duration-500 rounded-full",
-                              scoreResult.score >= 70 
-                                ? "bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                                : scoreResult.score >= 50
-                                ? "bg-gradient-to-r from-amber-500 to-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.6)]"
-                                : "bg-gradient-to-r from-red-500 to-red-400 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
-                            )}
-                            style={{ width: `${scoreResult.score}%` }}
-                          />
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1.5">
-                          {scoreResult.score >= 80 
-                            ? "Your CV is ready for job applications."
-                            : scoreResult.score >= 60
-                            ? "Your CV is solid. A few improvements can boost results."
-                            : "Your CV needs improvement before applying."}
+                        {/* Score Display */}
+                        <div className="flex items-center gap-4">
+                          <div className="flex-shrink-0">
+                            <div className={cn(
+                              "text-4xl font-bold",
+                              scoreResult.score >= 70 ? "text-emerald-400" : scoreResult.score >= 50 ? "text-amber-400" : "text-red-400"
+                            )}>
+                              {scoreResult.score}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1">out of 100</div>
+                          </div>
+                          
+                          {/* Progress Bar */}
+                          <div className="flex-1">
+                            <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className={cn(
+                                  "h-full transition-all duration-500 rounded-full",
+                                  scoreResult.score >= 70 
+                                    ? "bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
+                                    : scoreResult.score >= 50
+                                    ? "bg-gradient-to-r from-amber-500 to-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.6)]"
+                                    : "bg-gradient-to-r from-red-500 to-red-400 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
+                                )}
+                                style={{ width: `${scoreResult.score}%` }}
+                              />
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1.5">
+                              {scoreResult.score >= 80 
+                                ? "Your CV is ready for job applications."
+                                : scoreResult.score >= 60
+                                ? "Your CV is solid. A few improvements can boost results."
+                                : "Your CV needs improvement before applying."}
+                            </div>
+                          </div>
                         </div>
                       </div>
+                      {/* Refresh Readiness button */}
+                      <button
+                        onClick={fetchCvFromApi}
+                        disabled={loadingCv}
+                        className="ml-2 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Refresh Readiness"
+                      >
+                        <RefreshCw className={cn("w-4 h-4", loadingCv && "animate-spin")} />
+                      </button>
                     </div>
 
                     {/* Top Fixes */}
@@ -1544,6 +1657,13 @@ export default function DashboardPage() {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+                    
+                    {/* Last Updated */}
+                    {readiness?.lastUpdated && (
+                      <div className="text-xs text-slate-500 mb-2">
+                        Last updated: {new Date(readiness.lastUpdated).toLocaleDateString()}
                       </div>
                     )}
 

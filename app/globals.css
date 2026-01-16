@@ -24,6 +24,9 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   transition: background-color 300ms ease, color 300ms ease;
+  /* Ensure dark background is always present, even during loading */
+  background: linear-gradient(to bottom right, #050816, #050617, #02010f) !important;
+  min-height: 100vh;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -34,6 +37,21 @@ h1, h2, h3, h4, h5, h6 {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  
+  /* Shimmer animation for loading skeletons */
+  .shimmer-effect {
+    animation: shimmer 2s infinite;
+    transform: translateX(-100%);
+  }
+  
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
   }
 }
 

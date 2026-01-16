@@ -168,9 +168,13 @@ export default function AuthCallbackPage() {
   }, [router, searchParams])
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className="bg-[#141414] rounded-2xl border border-gray-800 shadow-lg p-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 relative overflow-hidden flex items-center justify-center px-4 py-12">
+      {/* Background glows */}
+      <div className="pointer-events-none absolute -top-40 -left-24 h-72 w-72 rounded-full bg-violet-600/30 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-fuchsia-500/25 blur-3xl" />
+      
+      <div className="w-full max-w-md relative z-10">
+        <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-8">
           <h1 className="text-2xl font-heading font-bold text-white mb-4 text-center">
             Processing Authentication...
           </h1>

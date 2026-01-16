@@ -32,14 +32,13 @@ export default function EducationTab({ education, onUpdate }: EducationTabProps)
         <div key={index} className="p-4 bg-slate-900/30 rounded-lg border border-slate-700/50">
           <div className="flex justify-between items-start mb-3">
             <h3 className="text-sm font-semibold text-slate-300">Education #{index + 1}</h3>
-            {education.length > 1 && (
-              <button
-                onClick={() => removeEducation(index)}
-                className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              onClick={() => removeEducation(index)}
+              className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition"
+              title="Remove this education"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="space-y-3">

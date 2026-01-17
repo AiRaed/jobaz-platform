@@ -82,99 +82,18 @@ export function getUserScopedKeySync(baseKey: string, userId: string | null): st
 
 /**
  * Get all localStorage keys for a specific user
+ * NOTE: localStorage persistence has been removed - this now returns empty array
  */
 export function getUserStorageKeys(userId: string): string[] {
-  if (typeof window === 'undefined') return []
-  
-  const keys: string[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key && key.includes(`_${userId}`)) {
-      keys.push(key)
-    }
-  }
-  return keys
+  return []
 }
 
 /**
  * Clear all localStorage keys for a specific user
+ * NOTE: localStorage persistence has been removed - this is now a no-op
  */
 export async function clearUserStorage(userId: string | null): Promise<void> {
-  if (typeof window === 'undefined' || !userId) return
-  
-  try {
-    // Clear all user-scoped keys (format: jobaz_*_${userId})
-    const userKeys = getUserStorageKeys(userId)
-    userKeys.forEach(key => {
-      localStorage.removeItem(key)
-    })
-    
-    // Clear all job-specific keys for this user (jobaz_job_*_${userId})
-    const jobKeys: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('jobaz_job_') && key.endsWith(`_${userId}`)) {
-        jobKeys.push(key)
-      }
-    }
-    jobKeys.forEach(key => localStorage.removeItem(key))
-    
-    // Clear interview training flags for this user
-    const interviewKeys: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.includes('_interview_trained') && key.includes(`_${userId}`)) {
-        interviewKeys.push(key)
-      }
-    }
-    interviewKeys.forEach(key => localStorage.removeItem(key))
-    
-    // Also clear any legacy keys that might not be user-scoped yet
-    // This is a safety measure during migration - only clear if user is logged out
-    // (We check this by verifying userId is provided, meaning we're clearing for a specific user)
-    const legacyKeys = [
-      'jobaz-applied-jobs',
-      'jobaz-cvs',
-      'jobaz_baseCv',
-      'jobaz_hasCV',
-      'jobaz_cvLastUpdated',
-      'jobaz_baseCoverLetter',
-      'jobaz_hasCoverLetter',
-      'jobaz_coverLastUpdated',
-      'jobaz-saved-jobs',
-      'jobaz_job_info',
-      'jobaz_lastJobId',
-      'jobaz-cover-draft',
-      'jobaz_prefill_summary',
-    ]
-    
-    // Clear legacy keys only if they exist (during migration period)
-    legacyKeys.forEach(key => {
-      if (localStorage.getItem(key)) {
-        localStorage.removeItem(key)
-      }
-    })
-    
-    // Clear all legacy job keys (jobaz_job_* without user ID suffix)
-    // Only if they don't have a user ID suffix (to avoid clearing other users' data)
-    const legacyJobKeys: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('jobaz_job_')) {
-        // Check if it's a legacy key (doesn't match user-scoped pattern)
-        // Legacy format: jobaz_job_${jobId} (3 parts)
-        // User-scoped format: jobaz_job_${jobId}_${userId} (4+ parts)
-        const parts = key.split('_')
-        if (parts.length <= 3) { // jobaz_job_${jobId} format (legacy)
-          legacyJobKeys.push(key)
-        }
-      }
-    }
-    legacyJobKeys.forEach(key => localStorage.removeItem(key))
-    
-  } catch (error) {
-    console.error('Error clearing user storage:', error)
-  }
+  // No-op: localStorage persistence has been removed
 }
 
 /**
@@ -187,27 +106,9 @@ export async function clearCurrentUserStorage(): Promise<void> {
 
 /**
  * Get all storage keys that match a pattern (for a specific user)
+ * NOTE: localStorage persistence has been removed - this now returns empty array
  */
 export function getUserStorageKeysByPattern(pattern: string, userId: string | null): string[] {
-  if (typeof window === 'undefined') return []
-  
-  const keys: string[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key) {
-      // Check if key matches pattern and belongs to user (if userId provided)
-      if (userId) {
-        if (key.includes(pattern) && key.includes(`_${userId}`)) {
-          keys.push(key)
-        }
-      } else {
-        // If no userId, match pattern only (for backward compatibility)
-        if (key.includes(pattern)) {
-          keys.push(key)
-        }
-      }
-    }
-  }
-  return keys
+  return []
 }
 

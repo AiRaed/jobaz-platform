@@ -1,5 +1,5 @@
 // Job information storage utility
-// Uses localStorage for now, will be replaced with Supabase when accounts are built
+// NOTE: localStorage persistence has been removed - all functions now use in-memory state only
 
 export interface JobInfo {
   jobTitle: string
@@ -8,33 +8,19 @@ export interface JobInfo {
   skills?: string
 }
 
-const STORAGE_KEY = 'jobaz_job_info'
+// In-memory storage (session only, no persistence)
+let jobInfoMemory: JobInfo | null = null
 
 export function saveJobInfo(jobInfo: JobInfo): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(jobInfo))
-  }
+  jobInfoMemory = jobInfo
 }
 
 export function getJobInfo(): JobInfo | null {
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try {
-        return JSON.parse(stored) as JobInfo
-      } catch (error) {
-        console.error('Error parsing job info from localStorage:', error)
-        return null
-      }
-    }
-  }
-  return null
+  return jobInfoMemory
 }
 
 export function clearJobInfo(): void {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(STORAGE_KEY)
-  }
+  jobInfoMemory = null
 }
 
 // Helper to format job info for API calls

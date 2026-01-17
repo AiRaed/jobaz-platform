@@ -23,7 +23,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 export async function GET(req: NextRequest) {
   try {
     // Create Supabase client with route handler (uses cookies for auth)
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
@@ -80,24 +80,28 @@ export async function GET(req: NextRequest) {
 
     const cvRow = cvRows[0]
 
-    // Map database row to CvData format
+    // The CV data is stored in the 'data' column as a JSONB object
+    // Read from cvRow.data instead of trying to access flattened fields
+    const rawCvData = cvRow.data || {}
+    
+    // Map database row to CvData format - read from data column
     const cvData: CvData = {
       personalInfo: {
-        fullName: cvRow.personal_info?.fullName || cvRow.personal_info?.name || '',
-        email: cvRow.personal_info?.email || '',
-        phone: cvRow.personal_info?.phone || '',
-        location: cvRow.personal_info?.location || cvRow.personal_info?.city || '',
-        linkedin: cvRow.personal_info?.linkedin || '',
-        website: cvRow.personal_info?.website || cvRow.personal_info?.portfolio || '',
+        fullName: rawCvData.personalInfo?.fullName || rawCvData.personal_info?.fullName || '',
+        email: rawCvData.personalInfo?.email || rawCvData.personal_info?.email || '',
+        phone: rawCvData.personalInfo?.phone || rawCvData.personal_info?.phone || '',
+        location: rawCvData.personalInfo?.location || rawCvData.personal_info?.location || '',
+        linkedin: rawCvData.personalInfo?.linkedin || rawCvData.personal_info?.linkedin || '',
+        website: rawCvData.personalInfo?.website || rawCvData.personal_info?.website || '',
       },
-      summary: cvRow.summary || '',
-      experience: Array.isArray(cvRow.experience) ? cvRow.experience : [],
-      education: Array.isArray(cvRow.education) ? cvRow.education : [],
-      skills: Array.isArray(cvRow.skills) ? cvRow.skills : [],
-      projects: Array.isArray(cvRow.projects) ? cvRow.projects : undefined,
-      languages: Array.isArray(cvRow.languages) ? cvRow.languages : undefined,
-      certifications: Array.isArray(cvRow.certifications) ? cvRow.certifications : undefined,
-      publications: Array.isArray(cvRow.publications) ? cvRow.publications : undefined,
+      summary: typeof rawCvData.summary === 'string' ? rawCvData.summary : '',
+      experience: Array.isArray(rawCvData.experience) ? rawCvData.experience : [],
+      education: Array.isArray(rawCvData.education) ? rawCvData.education : [],
+      skills: Array.isArray(rawCvData.skills) ? rawCvData.skills : [],
+      projects: Array.isArray(rawCvData.projects) ? rawCvData.projects : undefined,
+      languages: Array.isArray(rawCvData.languages) ? rawCvData.languages : undefined,
+      certifications: Array.isArray(rawCvData.certifications) ? rawCvData.certifications : undefined,
+      publications: Array.isArray(rawCvData.publications) ? rawCvData.publications : undefined,
     }
 
     // Calculate readiness score

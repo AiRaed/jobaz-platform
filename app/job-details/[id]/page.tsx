@@ -5,7 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { MapPin, Briefcase, Clock, CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, Sparkles, Save, Copy, Edit, X, Bot, Target, ArrowRight } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
-import { addAppliedJob, type AppliedJob } from '@/lib/applied-jobs-storage'
+// Applied jobs now saved via API - localStorage removed
 import { cleanJobDetailsCoverLetter, cleanCoverLetterClosing } from '@/lib/normalize'
 import TranslatableText from '@/components/TranslatableText'
 import PageHeader from '@/components/PageHeader'
@@ -13,7 +13,7 @@ import { useJazStore } from '@/lib/jaz-store'
 import ApplyAssistantPanel from '@/components/apply/ApplyAssistantPanel'
 import { getCurrentUserIdSync, getUserScopedKeySync, initUserStorageCache } from '@/lib/user-storage'
 import { useNextStepLoadingStore, generateRequestId } from '@/lib/next-step-loading-store'
-import { getBaseCvAnyScope } from '@/lib/cv-storage'
+// CV storage helper removed - now using Supabase API
 
 type DescriptionBlock =
   | { type: 'paragraph'; text: string }
@@ -220,6 +220,73 @@ export default function JobDetailsPage() {
     initUserStorageCache()
   }, [])
 
+  // Fetch CV from Supabase on mount
+  useEffect(() => {
+    const fetchCv = async () => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[JobDetails] CV fetch')
+      }
+      
+      setLoadingCv(true)
+      setCvError(null)
+      
+      try {
+        const response = await fetch('/api/cv/get-latest')
+        
+        // Handle 401 - Not authenticated
+        if (response.status === 401) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[JobDetails] CV fetch - unauthenticated (401)')
+          }
+          setCvError('authentication-required')
+          setBaseCv(null)
+          setHasCv(false)
+          setLoadingCv(false)
+          return
+        }
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch CV: ${response.status} ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[JobDetails] CV fetch response:', { ok: data.ok, hasCv: data.hasCv })
+        }
+        
+        if (data.ok && data.hasCv) {
+          setBaseCv(data.cv)
+          setHasCv(true)
+          setCvError(null)
+          
+          // Pre-fill CV summary from cloud CV if available and no existing summary
+          // (localStorage restore will happen later and may override this)
+          if (data.cv?.summary && data.cv.summary.trim() && !cvSummary.trim()) {
+            setCvSummary(data.cv.summary.trim())
+          }
+        } else {
+          // No CV found
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[JobDetails] hasCv: false - no CV found')
+          }
+          setBaseCv(null)
+          setHasCv(false)
+          setCvError(null)
+        }
+      } catch (error) {
+        console.error('[JobDetails] Error fetching CV:', error)
+        setCvError(error instanceof Error ? error.message : 'Failed to fetch CV')
+        setBaseCv(null)
+        setHasCv(false)
+      } finally {
+        setLoadingCv(false)
+      }
+    }
+    
+    fetchCv()
+  }, [])
+
   // Helper function to get user-scoped storage keys
   const getUserKey = useCallback((baseKey: string) => {
     const userId = getCurrentUserIdSync()
@@ -229,6 +296,12 @@ export default function JobDetailsPage() {
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // CV state from Supabase
+  const [baseCv, setBaseCv] = useState<any | null>(null)
+  const [loadingCv, setLoadingCv] = useState(true)
+  const [cvError, setCvError] = useState<string | null>(null)
+  const [hasCv, setHasCv] = useState(false)
   
   // Local state for statuses
   const [cvStatus, setCvStatus] = useState<'not-tailored' | 'ready'>('not-tailored')
@@ -275,10 +348,12 @@ export default function JobDetailsPage() {
     })
   }, [job, openJaz])
 
-  const handleApply = useCallback(() => {
+  const handleApply = useCallback(async () => {
     if (!job) return
 
-    // Update application status to submitted
+    console.log('[AppliedJobs] Starting apply process for job:', job.id)
+
+    // Update application status to submitted (optimistic update)
     setApplicationStatus('submitted')
     // Update training status to available
     setTrainingStatus('available')
@@ -286,29 +361,13 @@ export default function JobDetailsPage() {
     // Save to localStorage with updated state (user-scoped)
     const jobStorageKey = jobId ? getUserScopedJobKey(jobId) : null
     if (typeof window !== 'undefined' && jobStorageKey) {
-      // Get user name for cleaning cover letter (user-scoped)
+      // Get user name for cleaning cover letter from cloud CV
       let userName = 'Your Name'
       try {
-        const hasCVKey = getUserScopedKey('hasCV')
-        const baseCvKey = getUserScopedKey('baseCv')
-        const hasCV = localStorage.getItem(hasCVKey) === 'true'
-        const rawCv = localStorage.getItem(baseCvKey)
-        if (hasCV && rawCv) {
-          const baseCv = JSON.parse(rawCv)
-          if (baseCv.fullName && baseCv.fullName.trim()) {
-            userName = baseCv.fullName.trim()
-          }
-        }
-        // Also check saved cover letter (user-scoped)
-        const hasCoverLetterKey = getUserScopedKey('hasCoverLetter')
-        const baseCoverKey = getUserScopedKey('baseCoverLetter')
-        const hasCoverLetter = localStorage.getItem(hasCoverLetterKey) === 'true'
-        const rawCover = localStorage.getItem(baseCoverKey)
-        if (hasCoverLetter && rawCover) {
-          const baseCover = JSON.parse(rawCover)
-          if (baseCover.applicantName && baseCover.applicantName.trim()) {
-            userName = baseCover.applicantName.trim()
-          }
+        if (baseCv?.personalInfo?.fullName && baseCv.personalInfo.fullName.trim()) {
+          userName = baseCv.personalInfo.fullName.trim()
+        } else if (baseCv?.fullName && baseCv.fullName.trim()) {
+          userName = baseCv.fullName.trim()
         }
       } catch (error) {
         console.error('Error getting user name:', error)
@@ -334,34 +393,77 @@ export default function JobDetailsPage() {
       window.dispatchEvent(new Event('jobaz-job-state-changed'))
     }
     
-    // Add job to applied jobs list
-    const appliedJob: AppliedJob = {
-      id: job.id,
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      sourceSite: (job as any)?._reedJob ? 'Reed' : undefined, // Detect source if available
-      jobUrl: job.link || (job as any)?.applyUrl || (job as any)?.url,
-      createdAt: new Date().toISOString(),
-      status: 'submitted',
-      hasCv: cvStatus === 'ready',
-      hasCover: coverStatus === 'ready',
+    // Save applied job to Supabase via API
+    try {
+      console.log('[AppliedJobs] Calling /api/jobs/applied/upsert')
+      
+      const jobKey = job.id
+      const source = (job as any)?._reedJob ? 'Reed' : undefined
+      const jobUrl = job.link || (job as any)?.applyUrl || (job as any)?.url
+      
+      const response = await fetch('/api/jobs/applied/upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jobKey,
+          source,
+          jobTitle: job.title,
+          company: job.company,
+          location: job.location,
+          url: jobUrl,
+          data: {
+            hasCv: cvStatus === 'ready',
+            hasCover: coverStatus === 'ready',
+            status: 'submitted',
+          },
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.ok) {
+        console.error('[AppliedJobs] Failed to save applied job:', result.error)
+        // Show error message
+        setShowSuccessMessage(true)
+        // Change message state to error (we'll need to track this separately or use a message state)
+        setTimeout(() => {
+          setShowSuccessMessage(false)
+        }, 5000)
+        // Note: We could add an error state here for better UX
+        return
+      }
+
+      console.log('[AppliedJobs] Successfully saved applied job to Supabase:', result.appliedJob?.id)
+      
+      // Dispatch event to notify Dashboard and other components
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('jobaz-applied-jobs-changed'))
+      }
+      
+      // Show success message
+      setShowSuccessMessage(true)
+      setTimeout(() => {
+        setShowSuccessMessage(false)
+      }, 5000)
+
+      // Trigger refetch of JAZ Insight after applying
+      setShouldRefetchInsight(prev => prev + 1)
+
+      // Open job application URL in new tab
+      if (jobUrl) {
+        window.open(jobUrl, '_blank', 'noopener,noreferrer')
+      }
+    } catch (error) {
+      console.error('[AppliedJobs] Error saving applied job:', error)
+      // Show error message
+      setShowSuccessMessage(true)
+      setTimeout(() => {
+        setShowSuccessMessage(false)
+      }, 5000)
     }
-    addAppliedJob(appliedJob)
-    
-    // Show success message
-    setShowSuccessMessage(true)
-    setTimeout(() => {
-      setShowSuccessMessage(false)
-    }, 5000)
-
-    // Trigger refetch of JAZ Insight after applying
-    setShouldRefetchInsight(prev => prev + 1)
-
-    // Open job application URL in new tab
-    const jobUrl = job?.link || (job as any)?.applyUrl || (job as any)?.url || 'https://www.indeed.com'
-    window.open(jobUrl, '_blank', 'noopener,noreferrer')
-  }, [job, jobId, cvSummary, coverLetterText, cvStatus, coverStatus, addAppliedJob])
+  }, [job, jobId, cvSummary, coverLetterText, cvStatus, coverStatus, baseCv])
 
   const handleTrainForInterview = useCallback(() => {
     if (!job) return
@@ -638,29 +740,13 @@ export default function JobDetailsPage() {
   const saveJobStateToStorage = useCallback((overrides?: Partial<StoredJobState>) => {
     if (typeof window === 'undefined' || !jobStorageKey) return
 
-    // Get user name for cleaning cover letter (user-scoped)
+    // Get user name for cleaning cover letter from cloud CV
     let userName = 'Your Name'
     try {
-      const hasCVKey = getUserScopedKey('hasCV')
-      const baseCvKey = getUserScopedKey('baseCv')
-      const hasCV = localStorage.getItem(hasCVKey) === 'true'
-      const rawCv = localStorage.getItem(baseCvKey)
-      if (hasCV && rawCv) {
-        const baseCv = JSON.parse(rawCv)
-        if (baseCv.fullName && baseCv.fullName.trim()) {
-          userName = baseCv.fullName.trim()
-        }
-      }
-      // Also check saved cover letter (user-scoped)
-      const hasCoverLetterKey = getUserScopedKey('hasCoverLetter')
-      const baseCoverKey = getUserScopedKey('baseCoverLetter')
-      const hasCoverLetter = localStorage.getItem(hasCoverLetterKey) === 'true'
-      const rawCover = localStorage.getItem(baseCoverKey)
-      if (hasCoverLetter && rawCover) {
-        const baseCover = JSON.parse(rawCover)
-        if (baseCover.applicantName && baseCover.applicantName.trim()) {
-          userName = baseCover.applicantName.trim()
-        }
+      if (baseCv?.personalInfo?.fullName && baseCv.personalInfo.fullName.trim()) {
+        userName = baseCv.personalInfo.fullName.trim()
+      } else if (baseCv?.fullName && baseCv.fullName.trim()) {
+        userName = baseCv.fullName.trim()
       }
     } catch (error) {
       console.error('Error getting user name:', error)
@@ -687,7 +773,7 @@ export default function JobDetailsPage() {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('jobaz-job-state-changed'))
     }
-  }, [jobStorageKey, cvSummary, coverLetterText, cvStatus, coverStatus, applicationStatus, trainingStatus])
+  }, [jobStorageKey, cvSummary, coverLetterText, cvStatus, coverStatus, applicationStatus, trainingStatus, baseCv])
 
   useEffect(() => {
     if (!jobId) return
@@ -1009,74 +1095,16 @@ export default function JobDetailsPage() {
   // Note: Removed default initialization useEffects - fields should always start empty
   // Prefill only happens when user explicitly clicks "AI Tailor Summary" or "AI Generate Cover Letter"
 
-  // Load saved CV summary on mount (using CV Builder V2 storage, same as Dashboard)
+  // Load saved CV summary from cloud CV (already loaded in fetchCv useEffect)
   useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    try {
-      // Get cvId from URL search params first, then from localStorage
-      const cvIdFromUrl = searchParams?.get('cvId') || null
-      
-      // Try to get cvId from localStorage (jobaz_job_info or other sources)
-      let cvId = cvIdFromUrl
-      if (!cvId) {
-        try {
-          const jobInfo = localStorage.getItem(`jobaz_job_info`)
-          if (jobInfo) {
-            const parsed = JSON.parse(jobInfo)
-            if (parsed.cvId) {
-              cvId = parsed.cvId
-            }
-          }
-        } catch (e) {
-          // Ignore errors from job info
-        }
-      }
-
-      // Use shared helper to get CV from any scope
-      let cvSummary: string | null = null
-      
-      // If cvId is specified, try to find that specific CV first
-      if (cvId) {
-        const userId = getCurrentUserIdSync()
-        const cvsKey = userId ? getUserScopedKeySync('cvs', userId) : 'jobaz-cvs'
-        const rawCvs = localStorage.getItem(cvsKey)
-        if (rawCvs) {
-          try {
-            const cvs = JSON.parse(rawCvs)
-            if (Array.isArray(cvs) && cvs.length > 0) {
-              const targetCv = cvs.find((cv: any) => cv.id === cvId)
-              if (targetCv && targetCv.summary && targetCv.summary.trim()) {
-                cvSummary = targetCv.summary.trim()
-              }
-            }
-          } catch (error) {
-            console.error('Error parsing CVs for cvId:', error)
-          }
-        }
-      }
-      
-      // If no cvId or CV not found by cvId, use shared helper
-      if (!cvSummary) {
-        const { hasCv, cv } = getBaseCvAnyScope()
-        if (hasCv && cv && cv.summary && cv.summary.trim()) {
-          cvSummary = cv.summary.trim()
-        }
-      }
-
-      if (cvSummary) {
-        setSavedCVSummary(cvSummary)
-        setHasSavedCV(true)
-      } else {
-        setSavedCVSummary(null)
-        setHasSavedCV(false)
-      }
-    } catch (error) {
-      console.error('Error loading saved CV:', error)
+    if (baseCv?.summary && baseCv.summary.trim()) {
+      setSavedCVSummary(baseCv.summary.trim())
+      setHasSavedCV(true)
+    } else {
       setSavedCVSummary(null)
       setHasSavedCV(false)
     }
-  }, [searchParams])
+  }, [baseCv])
 
   const handleOptimizeCV = () => {
     // Scroll to CV panel only - status updates are handled by handleAITailorSummary
@@ -1093,12 +1121,19 @@ export default function JobDetailsPage() {
   }
 
   const handleAITailorSummary = async () => {
-    if (!cvSummary.trim()) {
-      alert('Please enter a CV summary first.')
+    // Use cloud CV summary if available, otherwise use current cvSummary
+    const baseSummary = baseCv?.summary?.trim() || cvSummary.trim()
+    
+    if (!baseSummary && !cvSummary.trim()) {
+      alert('Please enter a CV summary first or ensure you have a saved CV.')
       return
     }
 
     if (!job) return
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[JobDetails] starting match/tailor')
+    }
 
     const requestId = generateRequestId('ai-tailor-summary')
     const { startLoading, stopLoading } = useNextStepLoadingStore.getState()
@@ -1130,7 +1165,7 @@ export default function JobDetailsPage() {
         body: JSON.stringify({
           mode: 'summary',
           jobDescription: jobDescription,
-          currentSummary: cvSummary,
+          currentSummary: cvSummary.trim() || baseSummary,
         }),
       })
 
@@ -1185,33 +1220,41 @@ export default function JobDetailsPage() {
     }
   }
 
-  const handleCopyToCV = () => {
-    if (typeof window === 'undefined') return
-
-    // Check if user has a saved CV (user-scoped)
-    const hasCVKey = getUserKey('hasCV')
-    const baseCvKey = getUserKey('baseCv')
-    const hasCV = localStorage.getItem(hasCVKey) === 'true'
-    const rawCv = localStorage.getItem(baseCvKey)
-
-    if (!hasCV || !rawCv) {
+  const handleCopyToCV = async () => {
+    if (!hasCv || !baseCv) {
       alert('No saved CV found. Please create one first.')
       return
     }
 
     try {
-      const baseCv = JSON.parse(rawCv)
-      // Update the summary field with the tailored summary
-      baseCv.summary = cvSummary.trim() || baseCv.summary
-      localStorage.setItem(baseCvKey, JSON.stringify(baseCv))
-      
-      setCvTailorMessage('Tailored summary copied to your CV.')
-      
-      // Note: CV status is already updated when AI Tailor Summary is clicked
-      // No need to update again here
+      // Update CV summary via API
+      const response = await fetch('/api/cv/upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...baseCv,
+          summary: cvSummary.trim() || baseCv.summary,
+        }),
+      })
+
+      if (response.ok) {
+        setCvTailorMessage('Tailored summary saved to your CV.')
+        // Refresh CV from API to get updated version
+        const refreshResponse = await fetch('/api/cv/get-latest')
+        if (refreshResponse.ok) {
+          const data = await refreshResponse.json()
+          if (data.ok && data.hasCv) {
+            setBaseCv(data.cv)
+          }
+        }
+      } else {
+        throw new Error('Failed to save CV')
+      }
     } catch (error) {
       console.error('Error copying to CV:', error)
-      setCvTailorMessage('Failed to copy to CV. Please try again.')
+      setCvTailorMessage('Failed to save to CV. Please try again.')
     }
   }
 
@@ -1245,93 +1288,14 @@ export default function JobDetailsPage() {
   }
 
   const handleViewSavedCV = () => {
-    // Reload CV summary from V2 storage before opening modal to ensure we have the latest
-    if (typeof window !== 'undefined') {
-      try {
-        // Get cvId from URL search params first, then from localStorage
-        const cvIdFromUrl = searchParams?.get('cvId') || null
-        
-        // Try to get cvId from localStorage (user-scoped)
-        let cvId = cvIdFromUrl
-        if (!cvId) {
-          try {
-            const jobInfoKey = getUserKey('job_info')
-            const jobInfo = localStorage.getItem(jobInfoKey)
-            if (jobInfo) {
-              const parsed = JSON.parse(jobInfo)
-              if (parsed.cvId) {
-                cvId = parsed.cvId
-              }
-            }
-          } catch (e) {
-            // Ignore errors
-          }
-        }
-
-        // Read CVs from V2 storage (user-scoped) (same logic as useEffect)
-        let cvSummary: string | null = null
-        
-        const cvsKey = getUserKey('cvs')
-        const rawCvs = localStorage.getItem(cvsKey)
-        if (rawCvs) {
-          try {
-            const cvs = JSON.parse(rawCvs)
-            if (Array.isArray(cvs) && cvs.length > 0) {
-              let targetCv = null
-              
-              // If cvId is specified, find that CV
-              if (cvId) {
-                targetCv = cvs.find((cv: any) => cv.id === cvId)
-              }
-              
-              // If no cvId or CV not found, get the latest CV
-              if (!targetCv) {
-                targetCv = cvs.reduce((latest, current) => {
-                  const latestTime = latest?.savedAt ? new Date(latest.savedAt).getTime() : 0
-                  const currentTime = current?.savedAt ? new Date(current.savedAt).getTime() : 0
-                  return currentTime > latestTime ? current : latest
-                }, cvs[cvs.length - 1])
-              }
-              
-              // Get summary from the found CV
-              if (targetCv && targetCv.summary && targetCv.summary.trim()) {
-                cvSummary = targetCv.summary.trim()
-              }
-            }
-          } catch (error) {
-            console.error('Error parsing V2 CVs:', error)
-          }
-        }
-        
-        // Fallback to old storage only if V2 storage is empty (user-scoped)
-        if (!cvSummary) {
-          const hasCVKey = getUserKey('hasCV')
-          const baseCvKey = getUserKey('baseCv')
-          const hasCV = localStorage.getItem(hasCVKey) === 'true'
-          const rawCv = localStorage.getItem(baseCvKey)
-          
-          if (hasCV && rawCv) {
-            const baseCv: SavedCV = JSON.parse(rawCv)
-            if (baseCv.summary && baseCv.summary.trim()) {
-              cvSummary = baseCv.summary.trim()
-            }
-          }
-        }
-
-        if (cvSummary) {
-          setSavedCVSummary(cvSummary)
-          setHasSavedCV(true)
-          setShowSavedCVModal(true)
-        } else {
-          // If no summary found, don't open modal
-          setSavedCVSummary(null)
-          setHasSavedCV(false)
-        }
-      } catch (error) {
-        console.error('Error loading CV summary:', error)
-        setSavedCVSummary(null)
-        setHasSavedCV(false)
-      }
+    // Use CV from cloud (already loaded)
+    if (baseCv?.summary && baseCv.summary.trim()) {
+      setSavedCVSummary(baseCv.summary.trim())
+      setHasSavedCV(true)
+      setShowSavedCVModal(true)
+    } else {
+      setSavedCVSummary(null)
+      setHasSavedCV(false)
     }
   }
 
@@ -1381,29 +1345,13 @@ export default function JobDetailsPage() {
       if ((data.ok && coverLetterContent.trim()) || coverLetterContent.trim()) {
         // Clean the cover letter text to remove any heading and duplicate greetings
         const cleanedText = cleanJobDetailsCoverLetter(coverLetterContent)
-        // Get user name from saved CV or cover letter, fallback to "Your Name" (user-scoped)
+        // Get user name from cloud CV, fallback to "Your Name"
         let userName = 'Your Name'
         try {
-          const hasCVKey = getUserKey('hasCV')
-          const baseCvKey = getUserKey('baseCv')
-          const hasCV = localStorage.getItem(hasCVKey) === 'true'
-          const rawCv = localStorage.getItem(baseCvKey)
-          if (hasCV && rawCv) {
-            const baseCv = JSON.parse(rawCv)
-            if (baseCv.fullName && baseCv.fullName.trim()) {
-              userName = baseCv.fullName.trim()
-            }
-          }
-          // Also check saved cover letter (user-scoped)
-          const hasCoverLetterKey = getUserKey('hasCoverLetter')
-          const baseCoverKey = getUserKey('baseCoverLetter')
-          const hasCoverLetter = localStorage.getItem(hasCoverLetterKey) === 'true'
-          const rawCover = localStorage.getItem(baseCoverKey)
-          if (hasCoverLetter && rawCover) {
-            const baseCover = JSON.parse(rawCover)
-            if (baseCover.applicantName && baseCover.applicantName.trim()) {
-              userName = baseCover.applicantName.trim()
-            }
+          if (baseCv?.personalInfo?.fullName && baseCv.personalInfo.fullName.trim()) {
+            userName = baseCv.personalInfo.fullName.trim()
+          } else if (baseCv?.fullName && baseCv.fullName.trim()) {
+            userName = baseCv.fullName.trim()
           }
         } catch (error) {
           console.error('Error getting user name:', error)
@@ -1756,7 +1704,7 @@ export default function JobDetailsPage() {
               onOptimizeCV={handleOptimizeCV}
               onGenerateCoverLetter={handleGenerateCoverLetter}
               onTrainInterview={handleTrainForInterview}
-              cvSummary={cvSummary}
+              cvSummary={cvSummary || baseCv?.summary || ''}
               coverLetterText={coverLetterText}
               shouldRefetch={shouldRefetchInsight > 0}
             />
@@ -1811,8 +1759,8 @@ export default function JobDetailsPage() {
                   <button
                     id="jobaz-tailor-summary-btn"
                     onClick={handleAITailorSummary}
-                    disabled={isTailoringCv}
-                    title="Matches your CV to this role's keywords"
+                    disabled={isTailoringCv || loadingCv || !hasCv || cvError === 'authentication-required'}
+                    title={!hasCv ? "Create a CV first" : cvError === 'authentication-required' ? "Sign in required" : "Matches your CV to this role's keywords"}
                     className="flex-1 rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/60 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {isTailoringCv ? (
@@ -1828,7 +1776,7 @@ export default function JobDetailsPage() {
                     )}
                   </button>
                   
-                  {hasSavedCV && (
+                  {hasCv && hasSavedCV && !loadingCv && (
                     <button
                       onClick={handleViewSavedCV}
                       className="rounded-full bg-slate-900/80 px-4 py-2.5 text-sm font-medium text-slate-100 border border-slate-600/70 hover:border-violet-400/60 hover:text-violet-100 transition flex items-center justify-center gap-2 whitespace-nowrap"

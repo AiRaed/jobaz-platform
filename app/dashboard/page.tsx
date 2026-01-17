@@ -6,7 +6,7 @@ import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight,
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import AppShell from '@/components/layout/AppShell'
-import { getAppliedJobs, removeAppliedJob, type AppliedJob } from '@/lib/applied-jobs-storage'
+import { type AppliedJob } from '@/lib/applied-jobs-storage'
 import Logo from '@/components/Logo'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { extractCVKeywords, calculateMatchPercentage, generateSearchQueryFromCV, extractSummaryKeywords, filterJobsByRelevance, isTrainingJob } from '@/lib/job-matching'
@@ -121,6 +121,7 @@ export default function DashboardPage() {
     isOpen: false,
     jobId: null,
   })
+  const [cvError, setCvError] = useState<{ type: '403' | '500' | 'network'; message: string } | null>(null)
   const [recommendedJobs, setRecommendedJobs] = useState<Job[]>([])
   const [loadingRecommendedJobs, setLoadingRecommendedJobs] = useState(false)
   const [savedJobsFromJobFinder, setSavedJobsFromJobFinder] = useState<Job[]>([])
@@ -139,90 +140,260 @@ export default function DashboardPage() {
   const recommendedJobsRef = useRef<HTMLDivElement>(null)
   const appliedJobsRef = useRef<HTMLDivElement>(null)
 
-  // Fetch CV from API
+  // Fetch CV from API - single source of truth (Supabase only)
   const fetchCvFromApi = useCallback(async () => {
     setLoadingCv(true)
+    setCvError(null) // Clear previous errors
+    
     try {
       const response = await fetch('/api/cv/get-latest')
       
+      // Handle 401 - Not authenticated
       if (response.status === 401) {
-        // Not authenticated, redirect to landing/login
+        setLoadingCv(false)
+        setLoading(false)
+        setIsLoading(false)
         router.push('/')
         return
       }
       
+      // Handle 403 - RLS permission error
+      if (response.status === 403) {
+        setCvError({
+          type: '403',
+          message: 'Permission error. Please sign out and sign in again to refresh your session.'
+        })
+        setBaseCv(null)
+        setCvLastUpdated(null)
+        setReadiness(null)
+        setLoadingCv(false)
+        setLoading(false)
+        setIsLoading(false)
+        return
+      }
+      
+      // Handle 500 - Server error
+      if (response.status === 500) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || 'Server error occurred'
+        console.error('[Dashboard] Server error:', errorMessage)
+        setCvError({
+          type: '500',
+          message: `Server error: ${errorMessage}`
+        })
+        setBaseCv(null)
+        setCvLastUpdated(null)
+        setReadiness(null)
+        setLoadingCv(false)
+        setLoading(false)
+        setIsLoading(false)
+        return
+      }
+      
+      // Handle other non-ok responses
       if (!response.ok) {
-        throw new Error(`Failed to fetch CV: ${response.statusText}`)
+        throw new Error(`Failed to fetch CV: ${response.status} ${response.statusText}`)
       }
       
       const data = await response.json()
       
+      // Handle API-level errors (ok: false)
       if (!data.ok) {
-        console.error('API returned error:', data.error)
-        // Fall back to localStorage
-        reloadCvData()
-        setLoadingCv(false)
-        return
-      }
-      
-      if (data.hasCv && data.cv) {
-        // Map API CV format to dashboard format
-        const mappedExperience = (data.cv.experience || []).map((exp: any) => {
-          let period = ''
-          if (exp.startDate || exp.endDate) {
-            if (exp.isCurrent) {
-              period = `${exp.startDate || ''} - Present`
-            } else {
-              period = `${exp.startDate || ''} - ${exp.endDate || ''}`
-            }
-          }
-          
-          const description = exp.bullets && Array.isArray(exp.bullets) 
-            ? exp.bullets.join('\n')
-            : ''
-          
-          return {
-            jobTitle: exp.jobTitle || '',
-            company: exp.company || '',
-            period: period,
-            description: description,
-          }
+        console.error('[Dashboard] API returned error:', data.error)
+        setCvError({
+          type: '500',
+          message: data.error || 'Failed to fetch CV'
         })
-        
-        const dashboardCv = {
-          fullName: data.cv.personalInfo?.fullName || '',
-          email: data.cv.personalInfo?.email || '',
-          phone: data.cv.personalInfo?.phone || '',
-          city: data.cv.personalInfo?.location || '',
-          summary: data.cv.summary || '',
-          skills: data.cv.skills || [],
-          experience: mappedExperience,
-          education: data.cv.education || [],
-        }
-        
-        setBaseCv(dashboardCv)
-        setCvLastUpdated(data.readiness?.lastUpdated || null)
-        setReadiness(data.readiness)
-      } else {
-        // No CV found, clear state
         setBaseCv(null)
         setCvLastUpdated(null)
         setReadiness(null)
+        setLoadingCv(false)
+        setLoading(false)
+        setIsLoading(false)
+        return
       }
-    } catch (error) {
-      console.error('Error fetching CV from API:', error)
-      // Fall back to localStorage
-      reloadCvData()
+      
+      // Success - no error
+      setCvError(null)
+      
+      // Handle hasCv: false (no CV found - this is OK)
+      if (!data.hasCv || !data.cv) {
+        setBaseCv(null)
+        setCvLastUpdated(null)
+        setReadiness(null)
+        setLoadingCv(false)
+        setLoading(false)
+        setIsLoading(false)
+        return
+      }
+      
+      // Map API CV format to dashboard format
+      const mappedExperience = (data.cv.experience || []).map((exp: any) => {
+        let period = ''
+        if (exp.startDate || exp.endDate) {
+          if (exp.isCurrent) {
+            period = `${exp.startDate || ''} - Present`
+          } else {
+            period = `${exp.startDate || ''} - ${exp.endDate || ''}`
+          }
+        }
+        
+        const description = exp.bullets && Array.isArray(exp.bullets) 
+          ? exp.bullets.join('\n')
+          : ''
+        
+        return {
+          jobTitle: exp.jobTitle || '',
+          company: exp.company || '',
+          period: period,
+          description: description,
+        }
+      })
+      
+      const dashboardCv = {
+        fullName: data.cv.personalInfo?.fullName || '',
+        email: data.cv.personalInfo?.email || '',
+        phone: data.cv.personalInfo?.phone || '',
+        city: data.cv.personalInfo?.location || '',
+        summary: data.cv.summary || '',
+        skills: data.cv.skills || [],
+        experience: mappedExperience,
+        education: data.cv.education || [],
+      }
+      
+      setBaseCv(dashboardCv)
+      setCvLastUpdated(data.readiness?.lastUpdated || null)
+      setReadiness(data.readiness)
+    } catch (error: any) {
+      // Network or unexpected errors
+      console.error('[Dashboard] Error fetching CV from API:', error)
+      setCvError({
+        type: 'network',
+        message: error.message || 'Network error. Please check your connection and try again.'
+      })
+      setBaseCv(null)
+      setCvLastUpdated(null)
+      setReadiness(null)
     } finally {
+      // ALWAYS end loading states
       setLoadingCv(false)
+      setLoading(false)
+      setIsLoading(false)
     }
   }, [router])
 
-  // Fetch user info from Supabase auth and initialize user storage cache
-  useEffect(() => {
-    // Initialize user storage cache for user-scoped localStorage
-    initUserStorageCache()
+  // Fetch cover letter from API - single source of truth (Supabase only)
+  const fetchCoverFromApi = useCallback(async () => {
+    try {
+      const response = await fetch('/api/cover/get-latest')
+      
+      // Handle 401 - Not authenticated (this is OK, user may not be logged in)
+      if (response.status === 401) {
+        setBaseCover(null)
+        setCoverLastUpdated(null)
+        return
+      }
+      
+      // Handle other non-ok responses
+      if (!response.ok) {
+        throw new Error(`Failed to fetch cover letter: ${response.status} ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      
+      // Handle API-level errors (ok: false)
+      if (!data.ok) {
+        console.error('[Dashboard] Cover letter API returned error:', data.error)
+        setBaseCover(null)
+        setCoverLastUpdated(null)
+        return
+      }
+      
+      // Handle hasCover: false (no cover letter found - this is OK)
+      if (!data.hasCover || !data.cover) {
+        setBaseCover(null)
+        setCoverLastUpdated(null)
+        return
+      }
+      
+      // Map API cover letter format to dashboard format
+      const coverData = data.cover || {}
+      
+      const dashboardCover = {
+        applicantName: coverData.applicantName || '',
+        recipientName: coverData.recipientName || '',
+        company: coverData.company || '',
+        cityState: coverData.cityState || '',
+        role: coverData.role || '',
+        bodyText: coverData.bodyText || '',
+        keywords: coverData.keywords || '',
+        layout: coverData.layout || 'minimal',
+        atsMode: coverData.atsMode || false,
+      }
+      
+      setBaseCover(dashboardCover)
+      setCoverLastUpdated(data.meta?.updated_at || null)
+    } catch (error: any) {
+      // Network or unexpected errors
+      console.error('[Dashboard] Error fetching cover letter from API:', error)
+      setBaseCover(null)
+      setCoverLastUpdated(null)
+    }
+  }, [])
+
+  // Fetch applied jobs from API - single source of truth (Supabase only)
+  const fetchAppliedJobsFromApi = useCallback(async () => {
+    console.log('[AppliedJobs] Dashboard: Fetching applied jobs from API')
     
+    try {
+      const response = await fetch('/api/jobs/applied/list')
+      
+      // Handle 401 - Not authenticated (this is OK, user may not be logged in)
+      if (response.status === 401) {
+        console.log('[AppliedJobs] Dashboard: Not authenticated (401)')
+        setAppliedJobs([])
+        return
+      }
+      
+      // Handle other non-ok responses
+      if (!response.ok) {
+        throw new Error(`Failed to fetch applied jobs: ${response.status} ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      
+      // Handle API-level errors (ok: false)
+      if (!data.ok) {
+        console.error('[AppliedJobs] Dashboard: API returned error:', data.error)
+        setAppliedJobs([])
+        return
+      }
+      
+      // Map API response to AppliedJob format expected by dashboard
+      const mappedJobs: AppliedJob[] = (data.jobs || []).map((job: any) => ({
+        id: job.job_key || job.id || '',
+        title: job.job_title || job.title || '',
+        company: job.company || '',
+        location: job.location || undefined,
+        sourceSite: job.source || undefined,
+        jobUrl: job.url || undefined,
+        createdAt: job.applied_at || job.created_at || new Date().toISOString(),
+        status: job.data?.status || 'submitted',
+        hasCv: job.data?.hasCv || false,
+        hasCover: job.data?.hasCover || false,
+      }))
+      
+      console.log('[AppliedJobs] Dashboard: Successfully loaded', mappedJobs.length, 'applied jobs')
+      setAppliedJobs(mappedJobs)
+    } catch (error: any) {
+      // Network or unexpected errors
+      console.error('[AppliedJobs] Dashboard: Error fetching applied jobs from API:', error)
+      setAppliedJobs([])
+    }
+  }, [])
+
+  // Fetch user info from Supabase auth
+  useEffect(() => {
     const fetchUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -237,18 +408,23 @@ export default function DashboardPage() {
           setUserName(displayName)
           setUserEmail(email)
           
-          // Fetch CV from API after user is confirmed
+          // Fetch CV, cover letter, and applied jobs from API after user is confirmed
           fetchCvFromApi()
+          fetchCoverFromApi()
+          fetchAppliedJobsFromApi()
         } else {
-          // No user, still try to load from localStorage as fallback
-          reloadCvData()
+          // No user - redirect to login
           setLoadingCv(false)
+          setLoading(false)
+          setIsLoading(false)
+          router.push('/')
         }
       } catch (error) {
-        console.error('Error fetching user:', error)
-        // Fall back to localStorage
-        reloadCvData()
+        console.error('[Dashboard] Error fetching user:', error)
         setLoadingCv(false)
+        setLoading(false)
+        setIsLoading(false)
+        // Don't redirect on error - let fetchCvFromApi handle auth errors
       }
     }
 
@@ -271,331 +447,44 @@ export default function DashboardPage() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [fetchCvFromApi])
+  }, [fetchCvFromApi, fetchCoverFromApi, fetchAppliedJobsFromApi])
 
   // Load saved jobs from Job Finder's storage on mount and sync changes
+  // NOTE: localStorage persistence has been removed - saved jobs are now in-memory only
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const loadSavedJobs = () => {
-      const userId = getCurrentUserIdSync()
-      const savedJobsKey = userId ? getUserScopedKeySync('saved-jobs', userId) : 'jobaz-saved-jobs'
-      const saved = localStorage.getItem(savedJobsKey)
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as Job[]
-          setSavedJobsFromJobFinder(parsed)
-        } catch (error) {
-          console.error('Failed to parse saved jobs from localStorage:', error)
-        }
-      } else {
-        setSavedJobsFromJobFinder([])
-      }
+      // No-op: localStorage persistence has been removed
+      setSavedJobsFromJobFinder([])
       setIsSavedJobsInitialized(true)
     }
 
     // Load on mount
     loadSavedJobs()
 
-    // Listen for storage changes (when jobs are removed from Job Finder)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (!e.key) return
-      
-      const userId = getCurrentUserIdSync()
-      const savedJobsKey = userId ? getUserScopedKeySync('saved-jobs', userId) : 'jobaz-saved-jobs'
-      
-      if (e.key === savedJobsKey) {
-        // Saved jobs changed, reload
-        loadSavedJobs()
-      }
-    }
-
     // Listen for custom events (for same-tab updates)
     const handleCustomStorageChange = () => {
       loadSavedJobs()
     }
 
-    window.addEventListener('storage', handleStorageChange)
     window.addEventListener('jobaz-saved-jobs-changed', handleCustomStorageChange)
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('jobaz-saved-jobs-changed', handleCustomStorageChange)
     }
   }, [])
 
-  // Function to reload CV data from localStorage
-  const reloadCvData = useCallback(() => {
-    if (typeof window === 'undefined') return
-
-    const userId = getCurrentUserIdSync()
-    
-    // Helper to get user-scoped storage key
-    const getUserKey = (baseKey: string) => {
-      if (userId) {
-        return getUserScopedKeySync(baseKey, userId)
-      }
-      return baseKey // Fallback to legacy key
-    }
-    
-    // Helper to get user-scoped job storage key
-    const getJobKey = (jobId: string) => {
-      if (userId) {
-        return getUserScopedKeySync(`job_${jobId}`, userId)
-      }
-      return JOB_STORAGE_PREFIX + jobId // Fallback to legacy key
-    }
-
-    // Read all localStorage keys for saved jobs (user-scoped)
-    const jobs: SavedJob[] = []
-    const jobKeyPattern = userId ? `jobaz_job_${userId}` : JOB_STORAGE_PREFIX
-    
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith(jobKeyPattern) && !key.includes('_interview_trained') && !key.includes('_action_plan')) {
-        // Extract job ID from key
-        let jobId = ''
-        if (userId) {
-          // Format: jobaz_job_${jobId}_${userId}
-          const match = key.match(/jobaz_job_(.+?)_(.+)$/)
-          if (match) {
-            jobId = match[1]
-          }
-        } else {
-          // Legacy format: jobaz_job_${jobId}
-          jobId = key.replace(JOB_STORAGE_PREFIX, '')
-        }
-        
-        if (jobId) {
-          const storedValue = localStorage.getItem(key)
-          
-          if (storedValue) {
-            try {
-              const data: StoredJobState = JSON.parse(storedValue)
-              jobs.push({
-                id: jobId,
-                cvSummary: data.cvSummary || '',
-                coverLetterText: data.coverLetterText || '',
-                statuses: data.statuses || {
-                  cv: 'not-tailored',
-                  cover: 'not-created',
-                  application: 'not-submitted',
-                  training: 'not-available',
-                },
-              })
-            } catch (error) {
-              console.error(`Error parsing stored job ${jobId}:`, error)
-            }
-          }
-        }
-      }
-    }
-
-    // Read CVs from V2 storage (user-scoped)
-    let baseCvData: any = null
-    let lastUpdated: string | null = null
-    let currentCvId: string | null = null
-    
-    const cvsKey = getUserKey('cvs')
-    const rawCvs = localStorage.getItem(cvsKey)
-    if (rawCvs) {
-      try {
-        const cvs = JSON.parse(rawCvs)
-        if (Array.isArray(cvs) && cvs.length > 0) {
-          // Get the latest CV (by savedAt timestamp, or last in array)
-          const latestCv = cvs.reduce((latest, current) => {
-            const latestTime = latest?.savedAt ? new Date(latest.savedAt).getTime() : 0
-            const currentTime = current?.savedAt ? new Date(current.savedAt).getTime() : 0
-            return currentTime > latestTime ? current : latest
-          }, cvs[cvs.length - 1])
-          
-          // Map V2 CV structure to old structure for compatibility
-          // Convert V2 experience format to old format
-          const mappedExperience = (latestCv.experience || []).map((exp: any) => {
-            // Build period string from dates
-            let period = ''
-            if (exp.startDate || exp.endDate) {
-              if (exp.isCurrent) {
-                period = `${exp.startDate || ''} - Present`
-              } else {
-                period = `${exp.startDate || ''} - ${exp.endDate || ''}`
-              }
-            }
-            
-            // Convert bullets array to description string
-            const description = exp.bullets && Array.isArray(exp.bullets) 
-              ? exp.bullets.join('\n')
-              : ''
-            
-            return {
-              jobTitle: exp.jobTitle || '',
-              company: exp.company || '',
-              period: period,
-              description: description,
-            }
-          })
-          
-          baseCvData = {
-            fullName: latestCv.personalInfo?.fullName || '',
-            email: latestCv.personalInfo?.email || '',
-            phone: latestCv.personalInfo?.phone || '',
-            city: latestCv.personalInfo?.location || '',
-            summary: latestCv.summary || '',
-            skills: latestCv.skills || [],
-            experience: mappedExperience,
-            education: latestCv.education || [],
-          }
-          
-          lastUpdated = latestCv.savedAt || null
-          currentCvId = latestCv.id || null
-        }
-      } catch (error) {
-        console.error('Error parsing V2 CVs:', error)
-      }
-    }
-    
-    // Fallback to old storage if V2 storage is empty (user-scoped)
-    if (!baseCvData) {
-      const baseCvKey = getUserKey('baseCv')
-      const rawCv = localStorage.getItem(baseCvKey)
-      if (rawCv) {
-        try {
-          baseCvData = JSON.parse(rawCv)
-          const cvLastUpdatedKey = getUserKey('cvLastUpdated')
-          lastUpdated = localStorage.getItem(cvLastUpdatedKey)
-        } catch (error) {
-          console.error('Error parsing base CV:', error)
-        }
-      }
-    }
-
-    // Read base cover letter from localStorage (user-scoped)
-    let baseCoverData: any = null
-    const baseCoverKey = getUserKey('baseCoverLetter')
-    const rawCover = localStorage.getItem(baseCoverKey)
-    if (rawCover) {
-      try {
-        baseCoverData = JSON.parse(rawCover)
-      } catch (error) {
-        console.error('Error parsing base cover letter:', error)
-      }
-    }
-
-    // Read cover letter last updated date (user-scoped)
-    const coverLastUpdatedKey = getUserKey('coverLastUpdated')
-    const coverLastUpdatedDate = localStorage.getItem(coverLastUpdatedKey)
-
-    setBaseCv(baseCvData)
-    setCvLastUpdated(lastUpdated)
-    setCvId(currentCvId)
-    setBaseCover(baseCoverData)
-    setCoverLastUpdated(coverLastUpdatedDate)
-
-    setSavedJobs(jobs)
-    setLoading(false)
-    setIsLoading(false)
-
-    // Load applied jobs from the applied jobs storage
-    const appliedJobsList = getAppliedJobs()
-    setAppliedJobs(appliedJobsList)
-    
-    // Return early for metadata fetching - don't block the main flow
-    return { jobs, appliedJobsList }
-
-    // Fetch job metadata (title and company) for each job
-    const fetchJobMetadata = async () => {
-      const jobsWithMetadata = await Promise.all(
-        jobs.map(async (job) => {
-          try {
-            const response = await fetch(`/api/jobs/${job.id}`)
-            if (response.ok) {
-              const data = await response.json()
-              if (data.job) {
-                return {
-                  ...job,
-                  title: data.job.title || '',
-                  company: data.job.company || '',
-                }
-              }
-            }
-          } catch (error) {
-            console.error(`Error fetching job metadata for ${job.id}:`, error)
-          }
-          return job
-        })
-      )
-      setSavedJobs(jobsWithMetadata)
-    }
-
-    if (jobs.length > 0) {
-      fetchJobMetadata()
-    }
-
-    // Fetch metadata for applied jobs if needed (to ensure we have location, etc.)
-    const fetchAppliedJobMetadata = async () => {
-      const appliedJobsWithMetadata = await Promise.all(
-        appliedJobsList.map(async (appliedJob) => {
-          // If we already have all the data, return as is
-          if (appliedJob.title && appliedJob.company && appliedJob.location) {
-            return appliedJob
-          }
-          
-          // Otherwise, try to fetch from API
-          try {
-            const response = await fetch(`/api/jobs/${appliedJob.id}`)
-            if (response.ok) {
-              const data = await response.json()
-              if (data.job) {
-                return {
-                  ...appliedJob,
-                  title: appliedJob.title || data.job.title || '',
-                  company: appliedJob.company || data.job.company || '',
-                  location: appliedJob.location || data.job.location || '',
-                }
-              }
-            }
-          } catch (error) {
-            console.error(`Error fetching applied job metadata for ${appliedJob.id}:`, error)
-          }
-          return appliedJob
-        })
-      )
-      setAppliedJobs(appliedJobsWithMetadata)
-    }
-
-    if (appliedJobsList.length > 0) {
-      fetchAppliedJobMetadata()
-    }
-
-    // Load saved jobs for recommendations (user-scoped)
-    const savedJobsKey = getUserKey('saved-jobs')
-    if (savedJobsKey) {
-      const savedJobsRaw = localStorage.getItem(savedJobsKey)
-      if (savedJobsRaw) {
-        try {
-          // TypeScript narrowing: savedJobsRaw is guaranteed to be string here
-          const parsed: Job[] = JSON.parse(savedJobsRaw as string)
-          // Validate that parsed data is an array of Job objects
-          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.id) {
-            setSavedJobsFromJobFinder(parsed)
-          }
-        } catch (error) {
-          console.error('Failed to parse saved jobs for recommendations:', error)
-        }
-      }
-    }
-  }, [])
-
-  // Initial load of CV data (fallback to localStorage if API fails)
-  // Note: API fetch happens in user fetch useEffect above
+  // Initial load - ensure loading states always end
   useEffect(() => {
-    // Only reload from localStorage if API hasn't loaded yet (as fallback)
+    // If CV loading completes (success or error), ensure all loading states are cleared
     if (!loadingCv) {
-      // This will run as a fallback if API fetch fails
+      setLoading(false)
+      setIsLoading(false)
     }
   }, [loadingCv])
 
-  // Listen for CV save events and storage changes to auto-refresh
+  // Listen for CV and cover letter save events and storage changes to auto-refresh
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -613,56 +502,61 @@ export default function DashboardPage() {
       fetchCvFromApi()
     }
 
-    // Handle storage events (for cross-tab updates)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (!e.key) return
-      
-      const userId = getCurrentUserIdSync()
-      if (!userId) return
-      
-      const cvsKey = getUserScopedKeySync('cvs', userId)
-      const baseCvKey = getUserScopedKeySync('baseCv', userId)
-      
-      // Check if CV-related keys changed
-      if (e.key === cvsKey || e.key === baseCvKey) {
-        // Reload CV data from API when CV storage changes
-        fetchCvFromApi()
-      }
+    // Handle custom cover letter save event (fired when cover letter is saved in builder)
+    const handleCoverSaved = () => {
+      // Reload cover letter data from API when cover letter is saved
+      fetchCoverFromApi()
     }
 
-    // Listen for custom CV save event
+    // Handle applied jobs changes (fired when user applies for a job)
+    const handleAppliedJobsChanged = () => {
+      console.log('[AppliedJobs] Dashboard: Event received, refreshing applied jobs')
+      // Reload applied jobs from API when applied jobs change
+      fetchAppliedJobsFromApi()
+    }
+
+    // Handle storage events (for cross-tab updates)
+    // NOTE: localStorage persistence has been removed - storage events are no longer used
+    const handleStorageChange = (e: StorageEvent) => {
+      // No-op: localStorage persistence has been removed
+    }
+
+    // Listen for custom CV, cover letter, and applied jobs save events
     window.addEventListener('jobaz-cv-saved', handleCvSaved)
+    window.addEventListener('jobaz-cover-saved', handleCoverSaved)
+    window.addEventListener('jobaz-applied-jobs-changed', handleAppliedJobsChanged)
     
     // Listen for storage events (cross-tab)
-    window.addEventListener('storage', handleStorageChange)
+    // NOTE: localStorage persistence has been removed - storage events are no longer used
+    // window.addEventListener('storage', handleStorageChange)
     
-    // Also check on window focus (in case CV was saved in another tab)
+    // Also check on window focus (in case CV, cover, or applied jobs were updated in another tab)
     const handleFocus = () => {
       fetchCvFromApi()
+      fetchCoverFromApi()
+      fetchAppliedJobsFromApi()
     }
     window.addEventListener('focus', handleFocus)
 
     return () => {
       window.removeEventListener('jobaz-cv-saved', handleCvSaved)
-      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('jobaz-cover-saved', handleCoverSaved)
+      window.removeEventListener('jobaz-applied-jobs-changed', handleAppliedJobsChanged)
+      // window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [fetchCvFromApi])
+  }, [fetchCvFromApi, fetchCoverFromApi, fetchAppliedJobsFromApi])
 
   // Load recommendedLocation from localStorage on mount
+  // NOTE: localStorage persistence has been removed - recommendedLocation is now in-memory only
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    
-    const savedLocation = localStorage.getItem('recommendedLocation')
-    if (savedLocation && UK_CITIES.includes(savedLocation as any)) {
-      setRecommendedLocation(savedLocation)
-    }
+    // No-op: localStorage persistence has been removed
   }, [])
 
   // Save recommendedLocation to localStorage when it changes
+  // NOTE: localStorage persistence has been removed - recommendedLocation is now in-memory only
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    localStorage.setItem('recommendedLocation', recommendedLocation)
+    // No-op: localStorage persistence has been removed
   }, [recommendedLocation])
 
   // Create CV signature to track CV changes for auto-refresh
@@ -875,7 +769,8 @@ export default function DashboardPage() {
                   category: (job as any).category,
                 }
                 
-                sessionStorage.setItem(cacheKey, JSON.stringify(cachedJob))
+                // NOTE: sessionStorage persistence has been removed
+                // sessionStorage.setItem(cacheKey, JSON.stringify(cachedJob))
               } catch (error) {
                 console.error('Error caching Adzuna job:', error)
               }
@@ -918,35 +813,20 @@ export default function DashboardPage() {
   }, [cvSignature, fetchRecommendedJobs])
 
   // Handler for saving a job to Job Finder
+  // NOTE: localStorage persistence has been removed - saved jobs are now in-memory only
   const handleSaveRecommendedJob = (job: Job) => {
     if (typeof window === 'undefined') return
 
-    const userId = getCurrentUserIdSync()
-    const savedJobsKey = userId ? getUserScopedKeySync('saved-jobs', userId) : 'jobaz-saved-jobs'
-    
-    // Load existing saved jobs
-    const existing = localStorage.getItem(savedJobsKey)
-    let savedJobs: Job[] = []
-    if (existing) {
-      try {
-        savedJobs = JSON.parse(existing) as Job[]
-      } catch (error) {
-        console.error('Failed to parse existing saved jobs:', error)
-        savedJobs = []
+    // No-op: localStorage persistence has been removed - use in-memory state only
+    // Jobs can still be saved to in-memory state via setSavedJobsFromJobFinder
+    setSavedJobsFromJobFinder(prev => {
+      // Check if job is already saved
+      if (prev.some((j) => j.id === job.id)) {
+        return prev // Already saved
       }
-    }
-
-    // Check if job is already saved
-    if (savedJobs.some((j) => j.id === job.id)) {
-      return // Already saved
-    }
-
-    // Add job to saved jobs
-    const updated = [...savedJobs, job]
-    localStorage.setItem(savedJobsKey, JSON.stringify(updated))
-    
-    // Update local state
-    setSavedJobsFromJobFinder(updated)
+      // Add job to saved jobs (in-memory only)
+      return [...prev, job]
+    })
     
     // Dispatch custom event to notify other components
     window.dispatchEvent(new Event('jobaz-saved-jobs-changed'))
@@ -1056,10 +936,10 @@ export default function DashboardPage() {
 
   const handleConfirmRemove = () => {
     if (confirmModalState.jobId) {
-      // Remove from storage
-      removeAppliedJob(confirmModalState.jobId)
-      
-      // Update UI state immediately
+      // Remove from UI state immediately (optimistic update)
+      // NOTE: Deletion from Supabase would require a DELETE API endpoint
+      // For now, we just remove from UI state
+      console.log('[AppliedJobs] Dashboard: Removing job from UI:', confirmModalState.jobId)
       setAppliedJobs(prevJobs => prevJobs.filter(job => job.id !== confirmModalState.jobId))
     }
     
@@ -1130,11 +1010,8 @@ export default function DashboardPage() {
     const hasInterviewTraining = savedJobs.some(job => job.statuses.training === 'available') || appliedJobs.length > 0
 
     // Check if user has started interview training (to avoid suggesting "Find Jobs" during training)
-    const hasStartedInterviewTraining = savedJobs.some(job => {
-      if (typeof window === 'undefined') return false
-      const interviewTrainedFlag = localStorage.getItem(`jobaz_job_${job.id}_interview_trained`)
-      return interviewTrainedFlag === 'true'
-    })
+    // NOTE: localStorage persistence has been removed - interview training flags are now in-memory only
+    const hasStartedInterviewTraining = false // localStorage persistence removed
 
     // Determine next step based on priority
     // Critical UX Rule: Never suggest "Find Jobs" during Interview Coach
@@ -1578,6 +1455,41 @@ export default function DashboardPage() {
                       <div className="h-3 w-full bg-slate-800 rounded animate-pulse" />
                       <div className="h-3 w-5/6 bg-slate-800 rounded animate-pulse" />
                       <div className="h-3 w-4/6 bg-slate-800 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </>
+              ) : cvError ? (
+                // Error state
+                <>
+                  <div className="flex items-start gap-3 mb-4">
+                    <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-red-400 mb-1">
+                        {cvError.type === '403' ? 'Permission Error' : cvError.type === '500' ? 'Server Error' : 'Network Error'}
+                      </div>
+                      <div className="text-xs text-slate-400 mb-3">
+                        {cvError.message}
+                      </div>
+                      {cvError.type === '403' && (
+                        <button
+                          onClick={async () => {
+                            await supabase.auth.signOut()
+                            router.push('/')
+                          }}
+                          className="text-xs text-violet-400 hover:text-violet-300 underline"
+                        >
+                          Sign out and sign in again
+                        </button>
+                      )}
+                      {(cvError.type === '500' || cvError.type === 'network') && (
+                        <button
+                          onClick={fetchCvFromApi}
+                          disabled={loadingCv}
+                          className="text-xs text-violet-400 hover:text-violet-300 underline disabled:opacity-50"
+                        >
+                          Try again
+                        </button>
+                      )}
                     </div>
                   </div>
                 </>

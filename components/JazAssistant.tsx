@@ -1074,19 +1074,25 @@ export default function JazAssistant({}: JazAssistantProps) {
     startLoading(requestId)
 
     try {
-      // Fetch user's CV from localStorage using shared helper
+      // Fetch user's latest CV from Supabase
+      console.log('[JAZ] Fetching latest CV...')
       let cvData = null
+      
       try {
-        const { hasCv, cv } = getBaseCvAnyScope()
-        if (hasCv && cv) {
+        const res = await fetch('/api/cv/get-latest', { cache: 'no-store' })
+        const result = await res.json()
+        
+        console.log('[JAZ] hasCv:', result.hasCv)
+        
+        if (result.ok && result.hasCv && result.cv) {
           cvData = {
-            summary: cv.summary || '',
-            experience: cv.experience || [],
-            skills: cv.skills || [],
+            summary: result.cv.summary || '',
+            experience: result.cv.experience || [],
+            skills: result.cv.skills || [],
           }
         }
       } catch (error) {
-        console.error('Error loading CV:', error)
+        console.error('[JAZ] Error fetching CV:', error)
       }
 
       if (!cvData || !cvData.summary) {

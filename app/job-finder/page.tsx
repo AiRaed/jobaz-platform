@@ -6,7 +6,7 @@ import { Search, MapPin, Briefcase, Clock } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
 import PageHeader from '@/components/PageHeader'
 import TranslatableText from '@/components/TranslatableText'
-import { getUserScopedKeySync, getCurrentUserIdSync, initUserStorageCache } from '@/lib/user-storage'
+// NOTE: Removed user-storage imports - saved jobs now use Supabase API
 import { UK_CITIES, getLocationValue } from '@/lib/uk-cities'
 
 const JOB_FINDER_CACHE_KEY = "jobaz-job-finder-cache";
@@ -32,6 +32,8 @@ export default function JobFinderPage() {
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [savedJobs, setSavedJobs] = useState<Job[]>([])
+  const [savedSet, setSavedSet] = useState<Set<string>>(new Set()) // Set of job_key for quick lookups
+  const [savedItems, setSavedItems] = useState<Array<{ job_key: string; job: Job; created_at: string }>>([]) // Full saved items from Supabase
   const [isInitialized, setIsInitialized] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const hasAutoSearchedRef = useRef(false)
@@ -79,21 +81,8 @@ export default function JobFinderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, title, loading, searched]) // handleSearch is stable and uses current state values
 
-  // Load jobFinderLocation from localStorage on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    
-    const savedLocation = localStorage.getItem('jobFinderLocation')
-    if (savedLocation && UK_CITIES.includes(savedLocation as any)) {
-      setLocation(savedLocation)
-    }
-  }, [])
-
-  // Save jobFinderLocation to localStorage when it changes
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    localStorage.setItem('jobFinderLocation', location)
-  }, [location])
+  // NOTE: jobFinderLocation localStorage persistence removed
+  // Location is now only stored in component state
 
   // Restore cached search state on mount (but only if no URL param was provided)
   useEffect(() => {
@@ -135,65 +124,68 @@ export default function JobFinderPage() {
         setJobs(cache.jobs);
         setSearched(true);
       }
-      if (cache.savedJobs) {
-        setSavedJobs(cache.savedJobs);
-      }
+      // NOTE: savedJobs are now loaded from Supabase, not from cache
+      // Removed cache.savedJobs restoration
     } catch (err) {
       console.error("Failed to restore job finder cache", err);
     }
   }, [searchParams]);
 
-  // Initialize user storage cache
+  // Load saved jobs from Supabase on mount
   useEffect(() => {
-    initUserStorageCache()
-  }, [])
+    if (typeof window === 'undefined' || isInitialized) return
 
-  // Load saved jobs from localStorage on mount (user-scoped)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !isInitialized) {
-      const userId = getCurrentUserIdSync()
-      const savedJobsKey = userId ? getUserScopedKeySync('saved-jobs', userId) : 'jobaz-saved-jobs'
-      const saved = localStorage.getItem(savedJobsKey)
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved)
-          setSavedJobs(parsed)
-        } catch (error) {
-          console.error('Failed to parse saved jobs from localStorage:', error)
+    const loadSavedJobs = async () => {
+      try {
+        console.log('[SavedJobs] Loading saved jobs from Supabase')
+        const response = await fetch('/api/saved-jobs/list')
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            // User not authenticated - that's okay, just start with empty saved jobs
+            console.log('[SavedJobs] User not authenticated, starting with empty saved jobs')
+            setIsInitialized(true)
+            return
+          }
+          throw new Error(`Failed to load saved jobs: ${response.statusText}`)
         }
+
+        const data = await response.json()
+        
+        if (data.ok && Array.isArray(data.items)) {
+          console.log('[SavedJobs] Loaded', data.items.length, 'saved jobs from Supabase')
+          
+          // Convert saved items to Job array for backward compatibility
+          const jobs: Job[] = data.items.map((item: { job_key: string; job: Job; created_at: string }) => item.job)
+          
+          // Create Set of job_key for quick lookups
+          const jobKeySet = new Set(data.items.map((item: { job_key: string }) => item.job_key))
+          
+          setSavedJobs(jobs)
+          setSavedSet(jobKeySet)
+          setSavedItems(data.items)
+        } else {
+          console.error('[SavedJobs] Invalid response format:', data)
+          setSavedJobs([])
+          setSavedSet(new Set())
+          setSavedItems([])
+        }
+      } catch (error) {
+        console.error('[SavedJobs] Error loading saved jobs:', error)
+        // On error, start with empty saved jobs
+        setSavedJobs([])
+        setSavedSet(new Set())
+        setSavedItems([])
+      } finally {
+        setIsInitialized(true)
       }
-      setIsInitialized(true)
     }
+
+    loadSavedJobs()
   }, [isInitialized])
 
-  // Save savedJobs to localStorage whenever it changes (but only after initial load) (user-scoped)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isInitialized) {
-      const userId = getCurrentUserIdSync()
-      const savedJobsKey = userId ? getUserScopedKeySync('saved-jobs', userId) : 'jobaz-saved-jobs'
-      localStorage.setItem(savedJobsKey, JSON.stringify(savedJobs))
-      
-      // Dispatch custom event to notify Dashboard and other components
-      window.dispatchEvent(new Event('jobaz-saved-jobs-changed'))
-      
-      // Also update the job finder cache with savedJobs (user-scoped cache key)
-      try {
-        const cacheKey = userId ? `${JOB_FINDER_CACHE_KEY}_${userId}` : JOB_FINDER_CACHE_KEY
-        const raw = window.localStorage.getItem(cacheKey);
-        const base = raw ? JSON.parse(raw) : {};
-        const updated = {
-          ...base,
-          savedJobs: savedJobs,
-          timestamp: Date.now(), // refresh TTL
-        };
-        window.localStorage.setItem(cacheKey, JSON.stringify(updated));
-      } catch (err) {
-        console.error("Failed to update job finder cache with savedJobs", err);
-      }
-    }
-  }, [savedJobs, isInitialized])
-
   // Pre-fill job title from saved base CV on mount (only if no URL param)
+  // NOTE: This still uses localStorage for baseCv (not related to saved jobs)
   useEffect(() => {
     // Skip if we have a query or jobTitle from URL query parameter
     const queryFromUrl = searchParams.get('query')
@@ -201,8 +193,8 @@ export default function JobFinderPage() {
     if (queryFromUrl || jobTitleFromUrl) return;
 
     if (typeof window !== 'undefined') {
-      const userId = getCurrentUserIdSync()
-      const baseCvKey = userId ? getUserScopedKeySync('baseCv', userId) : 'jobaz_baseCv'
+      // NOTE: Using legacy non-scoped key for baseCv (not related to saved jobs migration)
+      const baseCvKey = 'jobaz_baseCv'
       const raw = localStorage.getItem(baseCvKey)
       if (raw) {
         try {
@@ -308,7 +300,7 @@ export default function JobFinderPage() {
             jobType: type,
             jobs: results,
             timestamp: Date.now(),
-            savedJobs: savedJobs,
+            // NOTE: savedJobs are now persisted in Supabase, not in cache
           };
           window.localStorage.setItem(JOB_FINDER_CACHE_KEY, JSON.stringify(cache));
         } catch (err) {
@@ -376,21 +368,110 @@ export default function JobFinderPage() {
     router.push(`/job-details/${jobId}?mode=tailorCv`)
   }
 
-  const handleSaveJob = (job: Job) => {
-    setSavedJobs((prev) => {
-      if (prev.some((j) => j.id === job.id)) {
-        return prev // Already saved, don't add duplicate
+  const handleSaveJob = async (job: Job) => {
+    // Use job.id as job_key
+    const jobKey = job.id
+    
+    // Optimistic update
+    const wasSaved = savedSet.has(jobKey)
+    
+    if (!wasSaved) {
+      // Optimistically add to UI
+      setSavedJobs((prev) => [...prev, job])
+      setSavedSet((prev) => new Set([...prev, jobKey]))
+    } else {
+      // Optimistically remove from UI
+      setSavedJobs((prev) => prev.filter((j) => j.id !== jobKey))
+      setSavedSet((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(jobKey)
+        return newSet
+      })
+      setSavedItems((prev) => prev.filter((item) => item.job_key !== jobKey))
+    }
+
+    try {
+      console.log('[SavedJobs] Toggling saved job:', jobKey)
+      const response = await fetch('/api/saved-jobs/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          job_key: jobKey,
+          job: job,
+        }),
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.error('[SavedJobs] User not authenticated')
+          // Revert optimistic update
+          if (!wasSaved) {
+            setSavedJobs((prev) => prev.filter((j) => j.id !== jobKey))
+            setSavedSet((prev) => {
+              const newSet = new Set(prev)
+              newSet.delete(jobKey)
+              return newSet
+            })
+          } else {
+            setSavedJobs((prev) => [...prev, job])
+            setSavedSet((prev) => new Set([...prev, jobKey]))
+          }
+          return
+        }
+        throw new Error(`Failed to toggle saved job: ${response.statusText}`)
       }
-      return [...prev, job]
-    })
+
+      const data = await response.json()
+      
+      if (data.ok) {
+        console.log('[SavedJobs] Toggle successful, saved:', data.saved)
+        
+        if (data.saved) {
+          // Job was saved - add to savedItems
+          setSavedItems((prev) => [
+            ...prev,
+            {
+              job_key: jobKey,
+              job: job,
+              created_at: new Date().toISOString(),
+            },
+          ])
+        } else {
+          // Job was removed - remove from savedItems
+          setSavedItems((prev) => prev.filter((item) => item.job_key !== jobKey))
+        }
+      } else {
+        throw new Error(data.error || 'Failed to toggle saved job')
+      }
+    } catch (error) {
+      console.error('[SavedJobs] Error toggling saved job:', error)
+      // Revert optimistic update on error
+      if (!wasSaved) {
+        setSavedJobs((prev) => prev.filter((j) => j.id !== jobKey))
+        setSavedSet((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(jobKey)
+          return newSet
+        })
+      } else {
+        setSavedJobs((prev) => [...prev, job])
+        setSavedSet((prev) => new Set([...prev, jobKey]))
+      }
+    }
   }
 
-  const handleRemoveSavedJob = (jobId: string) => {
-    setSavedJobs((prev) => prev.filter((j) => j.id !== jobId))
+  const handleRemoveSavedJob = async (jobId: string) => {
+    // Use the same toggle logic
+    const job = savedJobs.find((j) => j.id === jobId)
+    if (job) {
+      await handleSaveJob(job)
+    }
   }
 
   const isJobSaved = (jobId: string) => {
-    return savedJobs.some((j) => j.id === jobId)
+    return savedSet.has(jobId)
   }
 
   return (

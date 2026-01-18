@@ -159,7 +159,9 @@ export default function JobFinderPage() {
           const jobs: Job[] = data.items.map((item: { job_key: string; job: Job; created_at: string }) => item.job)
           
           // Create Set of job_key for quick lookups
-          const jobKeySet = new Set(data.items.map((item: { job_key: string }) => item.job_key))
+          const jobKeySet = new Set<string>(
+            (data?.items ?? []).map((x: any) => String(x.job_key ?? x))
+          )
           
           setSavedJobs(jobs)
           setSavedSet(jobKeySet)

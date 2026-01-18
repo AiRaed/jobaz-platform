@@ -67,6 +67,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Handle /sitemap.xml - always allow, never redirect (must return XML)
+  if (pathname === '/sitemap.xml') {
+    return response
+  }
+
   // Public routes that don't require authentication
   const publicRoutes = ['/', '/auth', '/privacy', '/terms']
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))

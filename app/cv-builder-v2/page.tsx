@@ -15,13 +15,14 @@ import EducationTab from '@/components/cv-builder-v2/EducationTab'
 import SkillsTab from '@/components/cv-builder-v2/SkillsTab'
 import MoreTab from '@/components/cv-builder-v2/MoreTab'
 import JobDescriptionPanel from '@/components/cv-builder-v2/JobDescriptionPanel'
+import CvCustomizationPanel, { type CvCustomizationOptions } from '@/components/cv-builder-v2/CvCustomizationPanel'
 import PageHeader from '@/components/PageHeader'
 import { useJazContext } from '@/contexts/JazContextContext'
 import type { CvBuilderContext } from '@/components/JazAssistant'
 import { getUserScopedKeySync, getCurrentUserIdSync, initUserStorageCache } from '@/lib/user-storage'
 import { computeCvScore } from '@/lib/cv-score'
 
-export type CvTemplateId = 'atsClassic' | 'twoColumnPro'
+export type CvTemplateId = 'atsClassic' | 'twoColumnPro' | 'customizeStyle'
 
 export type CvSectionExperience = {
   id: string
@@ -188,9 +189,18 @@ export default function CvBuilderV2Page() {
   const [activeTab, setActiveTab] = useState<Tab>('personal')
   const [selectedTemplate, setSelectedTemplate] = useState<CvTemplateId>('atsClassic')
   const [loading, setLoading] = useState({ export: false, ai: false })
+  const [customizationOptions, setCustomizationOptions] = useState<CvCustomizationOptions>({
+    fontFamily: 'inter',
+    fontSize: 'medium',
+    lineSpacing: 'normal',
+    headingFontWeight: 'bold',
+    headingUnderline: false,
+    sectionSpacing: 'normal',
+  })
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const { setContext } = useJazContext()
   const [jobDescription, setJobDescription] = useState<string>('')
+  const [stylePanelOpen, setStylePanelOpen] = useState(true)
 
   // Right-column toolbar modals (compact)
   const [showCvCheck, setShowCvCheck] = useState(false)
@@ -1171,18 +1181,17 @@ export default function CvBuilderV2Page() {
           <div className="space-y-3">
             {/* Compact sticky toolbar (desktop sticky, mobile normal) */}
             <div className="lg:sticky lg:top-4 lg:z-40">
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur px-3 py-2">
-                <div className="w-full space-y-2">
-                  {/* Shared toolbar button style - rounded-lg, unified sizing */}
-                  {/* Row 1: Templates + Downloads */}
-                  <div className="flex w-full items-center justify-between gap-3">
-                    {/* Left group: Template label + buttons */}
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-slate-400 font-medium">Template</span>
+              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur px-3 py-1.5">
+                <div className="w-full space-y-1.5">
+                  {/* Responsive button container with flex-wrap */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {/* Left group: Template buttons */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-sm text-slate-400 font-medium shrink-0 py-0.5">Template</span>
                       <button
                         onClick={() => setSelectedTemplate('atsClassic')}
                         className={cn(
-                          'inline-flex items-center justify-center h-8 px-3 py-1.5 text-sm font-medium rounded-lg border transition shrink-0 gap-2',
+                          'inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-medium rounded-lg border transition shrink-0',
                           selectedTemplate === 'atsClassic'
                             ? 'border-violet-500 text-violet-200 bg-violet-500/15 shadow-[0_0_10px_rgba(139,92,246,0.45)]'
                             : 'border-slate-700/60 text-slate-300 bg-slate-900/40 hover:border-slate-600/80 hover:text-slate-100 hover:bg-slate-800/50'
@@ -1193,7 +1202,7 @@ export default function CvBuilderV2Page() {
                       <button
                         onClick={() => setSelectedTemplate('twoColumnPro')}
                         className={cn(
-                          'inline-flex items-center justify-center h-8 px-3 py-1.5 text-sm font-medium rounded-lg border transition shrink-0 gap-2',
+                          'inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-medium rounded-lg border transition shrink-0',
                           selectedTemplate === 'twoColumnPro'
                             ? 'border-violet-500 text-violet-200 bg-violet-500/15 shadow-[0_0_10px_rgba(139,92,246,0.45)]'
                             : 'border-slate-700/60 text-slate-300 bg-slate-900/40 hover:border-slate-600/80 hover:text-slate-100 hover:bg-slate-800/50'
@@ -1201,13 +1210,45 @@ export default function CvBuilderV2Page() {
                       >
                         Two Column Pro
                       </button>
+                      <button
+                        onClick={() => setSelectedTemplate('customizeStyle')}
+                        className={cn(
+                          'inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-medium rounded-lg border transition shrink-0',
+                          selectedTemplate === 'customizeStyle'
+                            ? 'border-violet-500 text-violet-200 bg-violet-500/15 shadow-[0_0_10px_rgba(139,92,246,0.45)]'
+                            : 'border-slate-700/60 text-slate-300 bg-slate-900/40 hover:border-slate-600/80 hover:text-slate-100 hover:bg-slate-800/50'
+                        )}
+                      >
+                        Customize Style
+                      </button>
                     </div>
+                    
+                    {/* Center group: Grammar & Spelling + CV Check (AI) */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        onClick={handleGrammarCheck}
+                        disabled={reviewLoading || grammarLoading}
+                        className="inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-semibold rounded-lg bg-gradient-to-br from-amber-900/30 to-slate-800/50 border border-amber-500/60 text-amber-200 hover:border-amber-400/70 hover:text-amber-100 shadow-lg shadow-amber-900/20 hover:shadow-amber-900/30 backdrop-blur-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-amber-500/60 disabled:hover:text-amber-200 disabled:hover:shadow-amber-900/20 shrink-0 gap-2"
+                      >
+                        <FileEdit className="w-4 h-4" />
+                        Grammar &amp; Spelling
+                      </button>
+                      <button
+                        onClick={handleCvCheck}
+                        disabled={reviewLoading || grammarLoading}
+                        className="inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-semibold rounded-lg bg-gradient-to-br from-sky-900/30 to-slate-800/50 border border-sky-500/70 text-sky-200 hover:border-sky-400/80 hover:text-sky-100 shadow-lg shadow-sky-900/30 hover:shadow-sky-900/40 backdrop-blur-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-sky-500/70 disabled:hover:text-sky-200 disabled:hover:shadow-sky-900/30 shrink-0 gap-2"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        CV Check AI
+                      </button>
+                    </div>
+                    
                     {/* Right group: PDF + DOCX */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap ml-auto">
                       <button
                         onClick={() => handleExport('pdf')}
                         disabled={loading.export}
-                        className="inline-flex items-center justify-center h-8 px-3 py-1.5 text-sm font-semibold text-white rounded-lg bg-violet-600/90 border border-violet-400/60 shadow-[0_0_18px_rgba(139,92,246,0.55)] hover:bg-violet-500 hover:border-violet-300 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 gap-2"
+                        className="inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-semibold text-white rounded-lg bg-violet-600/90 border border-violet-400/60 shadow-[0_0_18px_rgba(139,92,246,0.55)] hover:bg-violet-500 hover:border-violet-300 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 gap-2"
                       >
                         {loading.export ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                         PDF
@@ -1215,30 +1256,17 @@ export default function CvBuilderV2Page() {
                       <button
                         onClick={() => handleExport('docx')}
                         disabled={loading.export}
-                        className="inline-flex items-center justify-center h-8 px-3 py-1.5 text-sm font-semibold text-white rounded-lg bg-violet-600/90 border border-violet-400/60 shadow-[0_0_18px_rgba(139,92,246,0.55)] hover:bg-violet-500 hover:border-violet-300 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 gap-2"
+                        className="inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-semibold text-white rounded-lg bg-violet-600/90 border border-violet-400/60 shadow-[0_0_18px_rgba(139,92,246,0.55)] hover:bg-violet-500 hover:border-violet-300 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 gap-2"
                       >
                         {loading.export ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                         DOCX
                       </button>
                     </div>
-                  </div>
-
-                  {/* Row 2: AI + Score + Grammar */}
-                  <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3">
-                    {/* Left: CV Check (AI) */}
-                    <button
-                      onClick={handleCvCheck}
-                      disabled={reviewLoading || grammarLoading}
-                      className="inline-flex items-center justify-center h-8 px-3 py-1.5 text-sm font-semibold rounded-lg bg-gradient-to-br from-sky-900/30 to-slate-800/50 border border-sky-500/70 text-sky-200 hover:border-sky-400/80 hover:text-sky-100 shadow-lg shadow-sky-900/30 hover:shadow-sky-900/40 backdrop-blur-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-sky-500/70 disabled:hover:text-sky-200 disabled:hover:shadow-sky-900/30 shrink-0 gap-2"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      CV Check (AI)
-                    </button>
                     
-                    {/* Center: CV Score */}
+                    {/* CV Score - full width on small screens */}
                     {cvScore && (
                       <div 
-                        className="text-center justify-self-center whitespace-nowrap"
+                        className="w-full sm:w-auto text-center sm:text-left whitespace-nowrap"
                         title="CV Score shows how complete and ATS-ready your CV is."
                       >
                         <span className="text-sm text-slate-400">
@@ -1270,26 +1298,100 @@ export default function CvBuilderV2Page() {
                         </span>
                       </div>
                     )}
-                    
-                    {/* Right: Grammar & Spelling */}
-                    <button
-                      onClick={handleGrammarCheck}
-                      disabled={reviewLoading || grammarLoading}
-                      className="inline-flex items-center justify-center h-8 px-3 py-1.5 text-sm font-semibold rounded-lg bg-gradient-to-br from-amber-900/30 to-slate-800/50 border border-amber-500/60 text-amber-200 hover:border-amber-400/70 hover:text-amber-100 shadow-lg shadow-amber-900/20 hover:shadow-amber-900/30 backdrop-blur-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-amber-500/60 disabled:hover:text-amber-200 disabled:hover:shadow-amber-900/20 shrink-0 gap-2"
-                    >
-                      <FileEdit className="w-4 h-4" />
-                      Grammar &amp; Spelling
-                    </button>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Customization Panel - shown only when customizeStyle is active */}
+            {selectedTemplate === 'customizeStyle' && (
+              <CvCustomizationPanel
+                options={customizationOptions}
+                onChange={setCustomizationOptions}
+                isOpen={stylePanelOpen}
+                onToggle={() => setStylePanelOpen(!stylePanelOpen)}
+              />
+            )}
+
             {/* A4 Preview - keep preview component unchanged */}
             <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-3 md:p-4 flex items-center justify-center min-h-[600px]">
               <div className="mx-auto aspect-[1/1.414] w-full max-w-[460px] bg-white text-slate-900 shadow-lg overflow-hidden rounded-md">
-                <div id="cv-preview" ref={previewRef} className="p-8 h-full overflow-y-auto">
-                  <CvPreview data={cvData} template={selectedTemplate} />
+                <div
+                  id="cv-preview"
+                  ref={previewRef}
+                  className={cn('p-8 h-full overflow-y-auto', selectedTemplate === 'customizeStyle' && 'cv-customize-style')}
+                  style={
+                    selectedTemplate === 'customizeStyle'
+                      ? {
+                          '--cv-font-family':
+                            customizationOptions.fontFamily === 'inter'
+                              ? 'Inter, system-ui, sans-serif'
+                              : customizationOptions.fontFamily === 'serif'
+                              ? 'Georgia, serif'
+                              : 'Monaco, monospace',
+                          '--cv-font-size':
+                            customizationOptions.fontSize === 'small'
+                              ? '10.5px'
+                              : customizationOptions.fontSize === 'medium'
+                              ? '11.5px'
+                              : '12.5px',
+                          '--cv-line-height':
+                            customizationOptions.lineSpacing === 'compact'
+                              ? '1.4'
+                              : customizationOptions.lineSpacing === 'normal'
+                              ? '1.5'
+                              : '1.7',
+                          '--cv-heading-font-weight': customizationOptions.headingFontWeight === 'bold' ? '700' : '400',
+                          '--cv-heading-underline': customizationOptions.headingUnderline ? 'underline' : 'none',
+                          '--cv-section-spacing':
+                            customizationOptions.sectionSpacing === 'tight'
+                              ? '0.75rem'
+                              : customizationOptions.sectionSpacing === 'normal'
+                              ? '1rem'
+                              : '1.5rem',
+                        } as React.CSSProperties
+                      : undefined
+                  }
+                >
+                  {selectedTemplate === 'customizeStyle' && (
+                    <style>{`
+                      #cv-preview.cv-customize-style {
+                        font-family: var(--cv-font-family) !important;
+                      }
+                      #cv-preview.cv-customize-style .cv-preview,
+                      #cv-preview.cv-customize-style .ats-classic,
+                      #cv-preview.cv-customize-style .two-column-pro {
+                        font-family: var(--cv-font-family) !important;
+                        font-size: var(--cv-font-size) !important;
+                        line-height: var(--cv-line-height) !important;
+                      }
+                      /* Apply font family to name heading explicitly */
+                      #cv-preview.cv-customize-style h1 {
+                        font-family: var(--cv-font-family) !important;
+                        text-decoration: none !important;
+                        border-bottom: none !important;
+                        font-weight: var(--cv-heading-font-weight) !important;
+                      }
+                      /* Only apply underline to section headings (h2), not the name (h1) */
+                      #cv-preview.cv-customize-style h2 {
+                        font-weight: var(--cv-heading-font-weight) !important;
+                        text-decoration: var(--cv-heading-underline) !important;
+                      }
+                      #cv-preview.cv-customize-style h3 {
+                        font-weight: var(--cv-heading-font-weight) !important;
+                        text-decoration: var(--cv-heading-underline) !important;
+                      }
+                      #cv-preview.cv-customize-style section {
+                        margin-bottom: var(--cv-section-spacing) !important;
+                      }
+                      #cv-preview.cv-customize-style p,
+                      #cv-preview.cv-customize-style li,
+                      #cv-preview.cv-customize-style div:not(.cv-preview):not(.ats-classic):not(.two-column-pro) {
+                        line-height: var(--cv-line-height) !important;
+                      }
+                    `}</style>
+                  )}
+                  <CvPreview data={cvData} template={selectedTemplate === 'customizeStyle' ? 'atsClassic' : selectedTemplate} />
                 </div>
               </div>
             </div>

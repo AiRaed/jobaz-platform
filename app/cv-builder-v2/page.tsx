@@ -900,14 +900,12 @@ export default function CvBuilderV2Page() {
     }
   }
 
-  const handleSaveCvToDashboard = () => {
+  const handleSaveCvToDashboard = async () => {
     try {
       if (typeof window === 'undefined') return
 
-      // Create CV object with all current data including template
-      const cvToSave = {
-        id: `cv-${Date.now()}`, // Timestamp-based ID
-        savedAt: new Date().toISOString(),
+      // Prepare CV data for API
+      const cvDataToSave = {
         template: selectedTemplate,
         personalInfo: cvData.personalInfo,
         summary: cvData.summary,
@@ -920,84 +918,54 @@ export default function CvBuilderV2Page() {
         publications: cvData.publications || [],
       }
 
-      // Load existing CVs from localStorage (user-scoped)
-      const cvsKey = getUserKey('cvs')
-      const existingCvsJson = localStorage.getItem(cvsKey)
-      let existingCvs: any[] = []
-      
-      if (existingCvsJson) {
-        try {
-          existingCvs = JSON.parse(existingCvsJson)
-          if (!Array.isArray(existingCvs)) {
-            existingCvs = []
-          }
-        } catch (error) {
-          console.error('Error parsing existing CVs:', error)
-          existingCvs = []
-        }
-      }
-
-      // Check for duplicate CVs by comparing content (excluding id and savedAt)
-      const cvContent = {
-        template: cvToSave.template,
-        personalInfo: cvToSave.personalInfo,
-        summary: cvToSave.summary,
-        experience: cvToSave.experience,
-        education: cvToSave.education,
-        skills: cvToSave.skills,
-        projects: cvToSave.projects,
-        languages: cvToSave.languages,
-        certifications: cvToSave.certifications,
-        publications: cvToSave.publications,
-      }
-
-      const isDuplicate = existingCvs.some(existingCv => {
-        const existingContent = {
-          template: existingCv.template,
-          personalInfo: existingCv.personalInfo,
-          summary: existingCv.summary,
-          experience: existingCv.experience,
-          education: existingCv.education,
-          skills: existingCv.skills,
-          projects: existingCv.projects || [],
-          languages: existingCv.languages || [],
-          certifications: existingCv.certifications || [],
-          publications: existingCv.publications || [],
-        }
-        return JSON.stringify(cvContent) === JSON.stringify(existingContent)
+      // Call API to upsert CV
+      const response = await fetch('/api/cv/upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'My CV',
+          data: cvDataToSave,
+        }),
       })
 
-      if (isDuplicate) {
-        showToast('error', 'This CV is already saved to your dashboard.')
-        return
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to save CV')
       }
 
-      // Append new CV to the array
-      existingCvs.push(cvToSave)
-
-      // Save back to localStorage (user-scoped)
-      localStorage.setItem(cvsKey, JSON.stringify(existingCvs))
-
-      // Also save legacy flags (hasCV + baseCv) using the same scope logic
-      const userId = getCurrentUserIdSync()
-      const hasCvKey = userId ? getUserScopedKeySync('hasCV', userId) : 'jobaz_hasCV'
-      const baseCvKey = userId ? getUserScopedKeySync('baseCv', userId) : 'jobaz_baseCv'
-      
-      // Set hasCV flag
-      localStorage.setItem(hasCvKey, 'true')
-      
-      // Set baseCv (minimal object with essential fields from latest CV)
-      const baseCv = {
-        fullName: cvToSave.personalInfo?.fullName || '',
-        email: cvToSave.personalInfo?.email || '',
-        phone: cvToSave.personalInfo?.phone || '',
-        city: cvToSave.personalInfo?.location || '',
-        summary: cvToSave.summary || '',
-        skills: cvToSave.skills || [],
-        experience: cvToSave.experience || [],
-        education: cvToSave.education || [],
+      const result = await response.json()
+      if (!result.ok || !result.cv) {
+        throw new Error(result.error || 'Failed to save CV')
       }
-      localStorage.setItem(baseCvKey, JSON.stringify(baseCv))
+
+      // Re-fetch latest CV from API to ensure we have the updated version
+      const refreshResponse = await fetch('/api/cv/get-latest')
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json()
+        if (refreshData.ok && refreshData.hasCv && refreshData.cv) {
+          // Update local state with the latest CV from API
+          // This ensures we're always working with the saved version
+          const savedCv = refreshData.cv.data || {}
+          const updates: Partial<CvData> = {}
+          if (savedCv.personalInfo) updates.personalInfo = savedCv.personalInfo
+          if (savedCv.summary !== undefined) updates.summary = savedCv.summary
+          if (savedCv.experience) updates.experience = savedCv.experience
+          if (savedCv.education) updates.education = savedCv.education
+          if (savedCv.skills) updates.skills = savedCv.skills
+          if (savedCv.projects) updates.projects = savedCv.projects
+          if (savedCv.languages) updates.languages = savedCv.languages
+          if (savedCv.certifications) updates.certifications = savedCv.certifications
+          if (savedCv.publications) updates.publications = savedCv.publications
+          if (Object.keys(updates).length > 0) {
+            updateCvData(updates)
+          }
+          if (savedCv.template) {
+            setSelectedTemplate(savedCv.template as CvTemplateId)
+          }
+        }
+      }
 
       // Dispatch custom event to notify dashboard of CV save
       if (typeof window !== 'undefined') {
@@ -1013,7 +981,7 @@ export default function CvBuilderV2Page() {
       showToast('success', 'CV saved to your dashboard!')
     } catch (error) {
       console.error('Error saving CV to dashboard:', error)
-      showToast('error', 'Failed to save CV. Please try again.')
+      showToast('error', error instanceof Error ? error.message : 'Failed to save CV. Please try again.')
     }
   }
 

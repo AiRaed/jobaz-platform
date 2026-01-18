@@ -92,49 +92,105 @@ export async function POST(req: NextRequest) {
     console.log('[CV Upsert] Skills count:', data?.skills?.length || 0)
     console.log('[CV Upsert] Experience count:', data?.experience?.length || 0)
 
-    // Upsert CV to database using onConflict: 'user_id' to ensure one CV per user
-    const { data: cvRow, error: upsertError } = await supabase
+    // First query: check if row exists for this user
+    const { data: existingRows, error: queryError } = await supabase
       .from('cvs')
-      .upsert(
-        {
-          user_id: user.id,
-          title: title,
-          data: data,
-        },
-        {
-          onConflict: 'user_id',
-        }
-      )
-      .select()
-      .single()
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
 
-    if (upsertError) {
-      // Strong error logging
-      console.error('[CV Upsert] Supabase error message:', upsertError.message)
-      console.error('[CV Upsert] Supabase error code:', upsertError.code)
-      console.error('[CV Upsert] Supabase error details:', upsertError.details)
-      console.error('[CV Upsert] Supabase error hint:', upsertError.hint)
-      console.error('[CV Upsert] Full Supabase error:', JSON.stringify(upsertError, null, 2))
-
-      // Return detailed error response
+    if (queryError) {
+      console.error('[CV Upsert] Query error:', queryError)
       return NextResponse.json(
         {
           ok: false,
-          error: upsertError.message || 'Failed to save CV to database',
-          code: upsertError.code || null,
-          details: upsertError.details || null,
-          hint: upsertError.hint || null,
+          error: queryError.message || 'Failed to query CVs',
+          code: queryError.code || null,
+          details: queryError.details || null,
+          hint: queryError.hint || null,
         },
         { status: 500 }
       )
     }
 
-    if (!cvRow) {
-      console.error('[CV Upsert] Upsert succeeded but no data returned')
-      return NextResponse.json(
-        { ok: false, error: 'Failed to save CV: No data returned' },
-        { status: 500 }
-      )
+    let cvRow
+
+    if (existingRows && existingRows.length > 0) {
+      // Row exists: UPDATE
+      const existingId = existingRows[0].id
+      console.log('[UPSERT] updating existing CV', existingId)
+
+      const { data: updatedRow, error: updateError } = await supabase
+        .from('cvs')
+        .update({
+          title: title,
+          data: data,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+        .select()
+        .single()
+
+      if (updateError) {
+        console.error('[CV Upsert] Update error:', updateError)
+        return NextResponse.json(
+          {
+            ok: false,
+            error: updateError.message || 'Failed to update CV',
+            code: updateError.code || null,
+            details: updateError.details || null,
+            hint: updateError.hint || null,
+          },
+          { status: 500 }
+        )
+      }
+
+      if (!updatedRow) {
+        console.error('[CV Upsert] Update succeeded but no data returned')
+        return NextResponse.json(
+          { ok: false, error: 'Failed to update CV: No data returned' },
+          { status: 500 }
+        )
+      }
+
+      cvRow = updatedRow
+      console.log('[UPSERT] updated_at', updatedRow.updated_at)
+    } else {
+      // No row exists: INSERT
+      const { data: insertedRow, error: insertError } = await supabase
+        .from('cvs')
+        .insert({
+          user_id: user.id,
+          title: title,
+          data: data,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error('[CV Upsert] Insert error:', insertError)
+        return NextResponse.json(
+          {
+            ok: false,
+            error: insertError.message || 'Failed to insert CV',
+            code: insertError.code || null,
+            details: insertError.details || null,
+            hint: insertError.hint || null,
+          },
+          { status: 500 }
+        )
+      }
+
+      if (!insertedRow) {
+        console.error('[CV Upsert] Insert succeeded but no data returned')
+        return NextResponse.json(
+          { ok: false, error: 'Failed to insert CV: No data returned' },
+          { status: 500 }
+        )
+      }
+
+      cvRow = insertedRow
+      console.log('[UPSERT] inserted new CV with updated_at', insertedRow.updated_at)
     }
 
     console.log('[CV Upsert] Successfully saved CV for user:', user.id)

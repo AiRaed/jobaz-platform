@@ -1228,33 +1228,65 @@ export default function JobDetailsPage() {
 
     try {
       // Update CV summary via API
+      // First fetch the current CV data to merge with the updated summary
+      const currentCvResponse = await fetch('/api/cv/get-latest')
+      let currentCvData = null
+      
+      if (currentCvResponse.ok) {
+        const currentCvResult = await currentCvResponse.json()
+        if (currentCvResult.ok && currentCvResult.hasCv && currentCvResult.cv?.data) {
+          currentCvData = currentCvResult.cv.data
+        }
+      }
+
+      // Merge current CV data with updated summary
+      const updatedCvData = currentCvData ? {
+        ...currentCvData,
+        summary: cvSummary.trim() || currentCvData.summary || '',
+      } : {
+        // Fallback to baseCv format if API fetch fails
+        personalInfo: baseCv.personalInfo || {},
+        summary: cvSummary.trim() || baseCv.summary || '',
+        experience: baseCv.experience || [],
+        education: baseCv.education || [],
+        skills: baseCv.skills || [],
+      }
+
       const response = await fetch('/api/cv/upsert', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...baseCv,
-          summary: cvSummary.trim() || baseCv.summary,
+          title: 'My CV',
+          data: updatedCvData,
         }),
       })
 
-      if (response.ok) {
-        setCvTailorMessage('Tailored summary saved to your CV.')
-        // Refresh CV from API to get updated version
-        const refreshResponse = await fetch('/api/cv/get-latest')
-        if (refreshResponse.ok) {
-          const data = await refreshResponse.json()
-          if (data.ok && data.hasCv) {
-            setBaseCv(data.cv)
-          }
-        }
-      } else {
-        throw new Error('Failed to save CV')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to save CV')
       }
+
+      const result = await response.json()
+      if (!result.ok) {
+        throw new Error(result.error || 'Failed to save CV')
+      }
+
+      // Refresh CV from API to get updated version
+      const refreshResponse = await fetch('/api/cv/get-latest')
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json()
+        if (data.ok && data.hasCv && data.cv) {
+          // Update baseCv with the full CV structure
+          setBaseCv(data.cv.data || data.cv)
+        }
+      }
+
+      setCvTailorMessage('Tailored summary saved to your CV.')
     } catch (error) {
       console.error('Error copying to CV:', error)
-      setCvTailorMessage('Failed to save to CV. Please try again.')
+      setCvTailorMessage(error instanceof Error ? error.message : 'Failed to save to CV. Please try again.')
     }
   }
 

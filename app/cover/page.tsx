@@ -382,13 +382,13 @@ export default function CoverPage() {
     return cleaned.trim()
   }
 
-  const handleSaveCoverLetterToDashboard = () => {
+  const handleSaveCoverLetterToDashboard = async () => {
     try {
       // Clean the cover letter before saving
       const cleanedBody = hasLetterContent ? cleanCoverLetterClosing(safeLetterBody, applicantName || 'Your Name') : ''
       
-      // Build the base cover letter object from current state
-      const baseCoverLetter = {
+      // Build the cover letter data object from current state
+      const coverLetterData = {
         applicantName: applicantName || '',
         recipientName: recipientName || '',
         company: company || '',
@@ -398,19 +398,51 @@ export default function CoverPage() {
         keywords: keywords || '',
       }
 
-      // Save to localStorage (user-scoped)
-      const baseCoverKey = getUserKey('baseCoverLetter')
-      const hasCoverKey = getUserKey('hasCoverLetter')
-      const coverLastUpdatedKey = getUserKey('coverLastUpdated')
-      localStorage.setItem(baseCoverKey, JSON.stringify(baseCoverLetter))
-      localStorage.setItem(hasCoverKey, 'true')
-      localStorage.setItem(coverLastUpdatedKey, new Date().toISOString())
+      // Call API to upsert cover letter
+      const response = await fetch('/api/cover/upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'Cover Letter',
+          job_key: null,
+          data: coverLetterData,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to save cover letter')
+      }
+
+      const result = await response.json()
+      if (!result.ok) {
+        throw new Error(result.error || 'Failed to save cover letter')
+      }
+
+      // Re-fetch latest cover letter from API to ensure we have the updated version
+      const refreshResponse = await fetch('/api/cover/get-latest')
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json()
+        if (refreshData.ok && refreshData.hasCoverLetter && refreshData.coverLetter) {
+          // Update local state with the latest cover letter from API
+          const savedData = refreshData.coverLetter.data || {}
+          if (savedData.applicantName !== undefined) setApplicantName(savedData.applicantName)
+          if (savedData.recipientName !== undefined) setRecipientName(savedData.recipientName)
+          if (savedData.company !== undefined) setCompany(savedData.company)
+          if (savedData.cityState !== undefined) setCityState(savedData.cityState)
+          if (savedData.role !== undefined) setRole(savedData.role)
+          if (savedData.bodyText !== undefined) setLetterBody(savedData.bodyText)
+          if (savedData.keywords !== undefined) setKeywords(savedData.keywords)
+        }
+      }
 
       // Show success message
       showToast('success', 'Cover letter saved to your dashboard.')
     } catch (error) {
       console.error('Error saving cover letter to dashboard:', error)
-      showToast('error', 'Failed to save cover letter. Please try again.')
+      showToast('error', error instanceof Error ? error.message : 'Failed to save cover letter. Please try again.')
     }
   }
 

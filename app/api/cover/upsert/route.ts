@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
     if (existingRows && existingRows.length > 0) {
       // Row exists: UPDATE
       const existingId = existingRows[0].id
+      console.log('[UPSERT] updating existing cover letter', existingId)
       
       const { data: updatedRow, error: updateError } = await supabase
         .from('cover_letters')
@@ -119,7 +120,7 @@ export async function POST(req: NextRequest) {
           data: data,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', existingId)
+        .eq('user_id', user.id)
         .select()
         .single()
 
@@ -148,6 +149,7 @@ export async function POST(req: NextRequest) {
       result = updatedRow
       coverId = updatedRow.id
       updatedAt = updatedRow.updated_at || new Date().toISOString()
+      console.log('[UPSERT] updated_at', updatedAt)
     } else {
       // No row exists: INSERT
       const { data: insertedRow, error: insertError } = await supabase

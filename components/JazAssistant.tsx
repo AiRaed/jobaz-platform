@@ -109,7 +109,7 @@ export interface CvBuilderContext {
   experienceCount: number
   skillsCount: number
   hasJobDescription: boolean
-  template?: 'atsClassic' | 'twoColumnPro'
+  template?: 'atsClassic' | 'twoColumnPro' | 'customizeStyle'
 }
 
 export interface CoverLetterContext {

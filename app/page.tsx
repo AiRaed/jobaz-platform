@@ -4,8 +4,6 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { 
   Briefcase, 
-  ChevronDown,
-  ChevronUp,
   Compass
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -14,7 +12,6 @@ import Logo from '@/components/Logo'
 
 export default function LandingPage() {
   const router = useRouter()
-  const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
@@ -80,16 +77,6 @@ export default function LandingPage() {
     }
   }
 
-  const scrollToSection = (id: string) => {
-    const element = document.getElementById(id)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' })
-    }
-  }
-
-  const toggleFaq = (index: number) => {
-    setOpenFaq(openFaq === index ? null : index)
-  }
 
   return (
     <div className="relative overflow-x-hidden bg-gradient-to-br from-[#050617] via-[#0b0820] to-[#050814] text-white">
@@ -400,80 +387,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Final CTA Section */}
-      <section id="pricing" className="max-w-5xl mx-auto px-4 py-20">
-        <div className="max-w-2xl mx-auto rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] p-12 text-center">
-          <Link 
-            href="/auth"
-            className="cta-premium-glow inline-block bg-gradient-to-br from-[#9b5cff] to-[#8a4ae8] hover:from-[#8a4ae8] hover:to-[#7a3ad8] text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 mb-3 relative"
-          >
-            Get started for free
-          </Link>
-          <p className="text-sm text-gray-400">
-            No credit card required.
-          </p>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="max-w-5xl mx-auto px-4 py-20">
-        <h2 className="text-4xl md:text-5xl font-heading font-bold text-center mb-12 text-white">
-          Frequently asked questions
-        </h2>
-        
-        <div className="max-w-3xl mx-auto space-y-4">
-          {[
-            {
-              q: "Is JobAZ just a CV builder?",
-              a: "No, JobAZ is a complete job search platform. We help you build your CV, find matching jobs, create tailored cover letters, and train for interviews — all in one place."
-            },
-            {
-              q: "Can I use my existing CV?",
-              a: "Yes! You can upload your existing CV and we'll help you optimize it, or use it to find matching jobs and generate tailored applications."
-            },
-            {
-              q: "Will JobAZ apply to jobs for me?",
-              a: "No, JobAZ doesn't automatically apply to jobs. We help you create tailored CVs and cover letters for each position, but you control when and how you submit your applications."
-            },
-            {
-              q: "Do I need perfect English to use the platform?",
-              a: "Not at all! JobAZ supports multiple languages and can help you create professional CVs and cover letters even if English isn't your first language."
-            },
-            {
-              q: "How does the AI interview training work?",
-              a: "Our AI interview coach asks you realistic questions based on the job you're applying for. You can practice your answers, get instant feedback, and improve your confidence before the real interview."
-            }
-          ].map((faq, index) => (
-            <div 
-              key={index}
-              className={`rounded-2xl border backdrop-blur-sm overflow-hidden transition-all duration-300 ${
-                openFaq === index
-                  ? 'border-violet-400/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)]'
-                  : 'border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)]'
-              }`}
-            >
-              <button
-                onClick={() => toggleFaq(index)}
-                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors"
-              >
-                <span className={`font-semibold text-lg ${openFaq === index ? 'text-violet-200' : 'text-white'}`}>
-                  {faq.q}
-                </span>
-                {openFaq === index ? (
-                  <ChevronUp className="w-5 h-5 text-violet-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                )}
-              </button>
-              {openFaq === index && (
-                <div className="px-6 pb-4 text-violet-200/90">
-                  {faq.a}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* Footer */}
       <footer id="contact" className="border-t border-slate-700/60 bg-slate-950/50 backdrop-blur-sm" data-no-translate>
@@ -491,6 +404,9 @@ export default function LandingPage() {
               <ul className="space-y-2 text-gray-400">
                 <li>
                   <Link href="#" className="hover:text-violet-300 transition-colors">About</Link>
+                </li>
+                <li>
+                  <span className="hover:text-violet-300 transition-colors">Created by Raed Mahfoud — Independent AI product creator.</span>
                 </li>
                 <li>
                   <a href="mailto:jobaz.app@outlook.com" className="hover:text-violet-300 transition-colors">jobaz.app@outlook.com</a>

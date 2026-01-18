@@ -9,6 +9,7 @@ import AppShell from '@/components/layout/AppShell'
 import { type AppliedJob } from '@/lib/applied-jobs-storage'
 import Logo from '@/components/Logo'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { DeleteAccountModal } from '@/components/DeleteAccountModal'
 import { extractCVKeywords, calculateMatchPercentage, generateSearchQueryFromCV, extractSummaryKeywords, filterJobsByRelevance, isTrainingJob } from '@/lib/job-matching'
 import { supabase } from '@/lib/supabase'
 import { clearCurrentUserStorage, initUserStorageCache, getCurrentUserIdSync, getUserScopedKeySync } from '@/lib/user-storage'
@@ -121,6 +122,9 @@ export default function DashboardPage() {
     isOpen: false,
     jobId: null,
   })
+  const [deleteAccountModalOpen, setDeleteAccountModalOpen] = useState(false)
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [cvError, setCvError] = useState<{ type: '403' | '500' | 'network'; message: string } | null>(null)
   const [recommendedJobs, setRecommendedJobs] = useState<Job[]>([])
   const [loadingRecommendedJobs, setLoadingRecommendedJobs] = useState(false)
@@ -958,6 +962,45 @@ export default function DashboardPage() {
     })
   }
 
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true)
+    
+    try {
+      // Call the delete account API
+      const response = await fetch('/api/account/delete', {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.ok) {
+        const errorMessage = data.error || 'Failed to delete account'
+        console.error('[Delete Account] Error:', errorMessage)
+        setToast({ type: 'error', message: errorMessage })
+        setIsDeletingAccount(false)
+        return
+      }
+
+      // Success - sign out and redirect
+      await supabase.auth.signOut()
+      
+      // Clear user storage
+      await clearCurrentUserStorage()
+      
+      // Show success message briefly before redirect
+      setToast({ type: 'success', message: 'Account deleted' })
+      
+      // Redirect to landing page after a short delay
+      setTimeout(() => {
+        router.push('/')
+      }, 1000)
+    } catch (error: any) {
+      console.error('[Delete Account] Unexpected error:', error)
+      setToast({ type: 'error', message: error.message || 'Failed to delete account' })
+      setIsDeletingAccount(false)
+    }
+  }
+
   const formatDaysAgo = (isoDateString: string | null): string | null => {
     if (!isoDateString) return null
     
@@ -1171,6 +1214,7 @@ export default function DashboardPage() {
   }
 
   return (
+    <div>
   <AppShell>
       {/* Header */}
       <div className="mb-6">
@@ -2391,8 +2435,63 @@ export default function DashboardPage() {
           onConfirm={handleConfirmRemove}
           onCancel={handleCancelRemove}
         />
+
+        {/* Delete Account Modal */}
+        <DeleteAccountModal
+          isOpen={deleteAccountModalOpen}
+          onConfirm={handleDeleteAccount}
+          onCancel={() => {
+            if (!isDeletingAccount) {
+              setDeleteAccountModalOpen(false)
+            }
+          }}
+          isDeleting={isDeletingAccount}
+        />
       </>
+
+      {/* Footer */}
+      <footer className="mt-16 pt-8 border-t border-slate-700/60">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-400">
+          <div className="flex items-center gap-6">
+            <Link href="/privacy" className="hover:text-violet-300 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-violet-300 transition-colors">
+              Terms & Conditions
+            </Link>
+            <button
+              onClick={() => setDeleteAccountModalOpen(true)}
+              className="text-red-400 hover:text-red-300 transition-colors"
+            >
+              Delete Account
+            </button>
+          </div>
+          <p className="text-slate-500">© {new Date().getFullYear()} JobAZ</p>
+        </div>
+      </footer>
   </AppShell>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
+          <div
+            className={cn(
+              'rounded-lg px-4 py-3 shadow-lg flex items-center gap-2',
+              toast.type === 'success'
+                ? 'bg-green-600/90 text-white'
+                : 'bg-red-600/90 text-white'
+            )}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5" />
+            ) : (
+              <XCircle className="w-5 h-5" />
+            )}
+            <span className="text-sm font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
+  </div>
   )
 }
 

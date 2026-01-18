@@ -26,7 +26,7 @@ export default function TermsPage() {
             </h1>
           </div>
           <p className="text-sm text-slate-400">
-            Last updated: December 2025
+            Last updated: October 2025
           </p>
         </motion.div>
 
@@ -51,7 +51,22 @@ export default function TermsPage() {
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                2. Free Use & Donations
+                2. AI-Generated Content & Career Guidance
+              </h2>
+              <p className="text-slate-300 leading-relaxed">
+                JobAZ uses artificial intelligence to generate CV content, summaries, career suggestions, and guidance tools such as Build Your Path.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                All AI-generated content is provided for informational and assistance purposes only and does not constitute professional, legal, or employment advice.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                Users are fully responsible for reviewing, editing, and validating any generated content before using it in real job applications.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
+                3. Free Use & Donations
               </h2>
               <p className="text-slate-300 leading-relaxed">
                 JobAZ is currently provided free of charge.
@@ -66,7 +81,7 @@ export default function TermsPage() {
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                3. Job Listings & Third-Party Platforms
+                4. Job Listings & Third-Party Platforms
               </h2>
               <p className="text-slate-300 leading-relaxed">
                 JobAZ aggregates job listings from third-party sources, including but not limited to Adzuna and other external job boards or employer websites.
@@ -81,7 +96,7 @@ export default function TermsPage() {
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                4. No Guarantee of Employment
+                5. No Guarantee of Employment
               </h2>
               <p className="text-slate-300 leading-relaxed">
                 JobAZ provides tools and guidance to support job searching and career preparation.
@@ -93,7 +108,7 @@ export default function TermsPage() {
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                5. Intellectual Property
+                6. Intellectual Property
               </h2>
               <p className="text-slate-300 leading-relaxed">
                 All JobAZ branding, design elements, and platform features remain the intellectual property of JobAZ.
@@ -105,7 +120,7 @@ export default function TermsPage() {
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                6. Limitation of Liability
+                7. Limitation of Liability
               </h2>
               <p className="text-slate-300 leading-relaxed">
                 JobAZ is not liable for:
@@ -120,7 +135,25 @@ export default function TermsPage() {
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                7. Updates to Terms
+                8. Acceptable Use
+              </h2>
+              <p className="text-slate-300 leading-relaxed">
+                Users must not misuse the platform, generate misleading content, impersonate others, or use JobAZ for unlawful purposes.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
+                9. Account Suspension or Termination
+              </h2>
+              <p className="text-slate-300 leading-relaxed">
+                JobAZ reserves the right to suspend or terminate accounts that violate the Terms or misuse the platform.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
+                10. Updates to Terms
               </h2>
               <p className="text-slate-300 leading-relaxed">
                 These Terms & Conditions may be updated periodically to reflect platform improvements or legal requirements. Continued use of JobAZ implies acceptance of the latest version.

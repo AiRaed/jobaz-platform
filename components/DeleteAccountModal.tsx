@@ -1,40 +1,44 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
-interface ConfirmModalProps {
+interface DeleteAccountModalProps {
   isOpen: boolean
-  title: string
-  message: string
-  onConfirm: () => void
+  onConfirm: () => Promise<void>
   onCancel: () => void
-  variant?: 'default' | 'danger'
-  confirmText?: string
+  isDeleting?: boolean
 }
 
-export function ConfirmModal({
+export function DeleteAccountModal({
   isOpen,
-  title,
-  message,
   onConfirm,
   onCancel,
-  variant = 'default',
-  confirmText,
-}: ConfirmModalProps) {
+  isDeleting = false,
+}: DeleteAccountModalProps) {
+  const [confirmText, setConfirmText] = useState('')
+  const confirmTextMatch = confirmText === 'DELETE'
+
+  // Reset confirmation text when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setConfirmText('')
+    }
+  }, [isOpen])
+
   // Handle escape key to close modal
   useEffect(() => {
     if (!isOpen) return
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !isDeleting) {
         onCancel()
       }
     }
 
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onCancel])
+  }, [isOpen, isDeleting, onCancel])
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -53,7 +57,7 @@ export function ConfirmModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      onClick={onCancel}
+      onClick={!isDeleting ? onCancel : undefined}
     >
       {/* Backdrop */}
       <div
@@ -77,8 +81,8 @@ export function ConfirmModal({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="confirm-modal-title"
-        aria-describedby="confirm-modal-message"
+        aria-labelledby="delete-account-modal-title"
+        aria-describedby="delete-account-modal-message"
       >
         {/* Subtle violet glow effect */}
         <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 pointer-events-none" />
@@ -87,25 +91,51 @@ export function ConfirmModal({
         <div className="relative">
           {/* Title */}
           <h2
-            id="confirm-modal-title"
+            id="delete-account-modal-title"
             className="text-xl font-heading font-bold mb-3 text-slate-50"
           >
-            {title}
+            Delete your account?
           </h2>
 
           {/* Message */}
           <p
-            id="confirm-modal-message"
-            className="text-sm text-slate-300 mb-6 leading-relaxed whitespace-pre-line"
+            id="delete-account-modal-message"
+            className="text-sm text-slate-300 mb-4 leading-relaxed whitespace-pre-line"
           >
-            {message}
+            This action is permanent. All your CVs, cover letters, saved jobs, and account data will be permanently deleted.
+            {'\n\n'}
+            This cannot be undone.
           </p>
+
+          {/* Confirmation Input */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Type <span className="text-red-400 font-mono">DELETE</span> to confirm:
+            </label>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              disabled={isDeleting}
+              className={cn(
+                'w-full px-3 py-2 rounded-lg text-sm font-mono',
+                'bg-slate-900/80 text-slate-100',
+                'border border-slate-600/70',
+                'focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:ring-offset-2 focus:ring-offset-slate-950',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                'transition-all duration-200'
+              )}
+              placeholder="DELETE"
+              autoFocus
+            />
+          </div>
 
           {/* Buttons */}
           <div className="flex gap-3 justify-end">
             {/* Cancel Button */}
             <button
               onClick={onCancel}
+              disabled={isDeleting}
               className={cn(
                 'px-4 py-2 rounded-lg text-sm font-medium',
                 'bg-slate-800/80 text-slate-200',
@@ -113,36 +143,35 @@ export function ConfirmModal({
                 'hover:bg-slate-700/80 hover:border-slate-500/70',
                 'hover:text-slate-100',
                 'transition-all duration-200',
-                'focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:ring-offset-2 focus:ring-offset-slate-950'
+                'focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:ring-offset-2 focus:ring-offset-slate-950',
+                'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
               Cancel
             </button>
 
-            {/* Confirm Button */}
+            {/* Delete Button */}
             <button
               onClick={onConfirm}
+              disabled={!confirmTextMatch || isDeleting}
               className={cn(
                 'px-4 py-2 rounded-lg text-sm font-medium',
                 'transition-all duration-200',
                 'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950',
-                variant === 'danger'
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                confirmTextMatch && !isDeleting
                   ? cn(
-                      'bg-red-600/10 text-red-400 border border-red-500/30',
-                      'hover:bg-red-600/20 hover:border-red-500/50 hover:text-red-300',
+                      'bg-red-600/20 text-red-400 border border-red-500/50',
+                      'hover:bg-red-600/30 hover:border-red-500/70 hover:text-red-300',
                       'focus:ring-red-500/50'
                     )
                   : cn(
-                      'bg-gradient-to-r from-violet-600 to-fuchsia-600',
-                      'text-white',
-                      'hover:from-violet-500 hover:to-fuchsia-500',
-                      'shadow-[0_0_18px_rgba(139,92,246,0.6)]',
-                      'hover:shadow-[0_0_24px_rgba(139,92,246,0.8)]',
-                      'focus:ring-violet-500/50'
+                      'bg-red-600/10 text-red-500/50 border border-red-500/20',
+                      'cursor-not-allowed'
                     )
               )}
             >
-              {confirmText || (variant === 'danger' ? 'Delete my account' : 'Remove')}
+              {isDeleting ? 'Deleting...' : 'Delete my account'}
             </button>
           </div>
         </div>

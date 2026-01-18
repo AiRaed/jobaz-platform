@@ -26,7 +26,7 @@ export default function PrivacyPage() {
             </h1>
           </div>
           <p className="text-sm text-slate-400">
-            Last updated: October 2025
+            Last updated: January 2026
           </p>
         </motion.div>
 
@@ -46,16 +46,24 @@ export default function PrivacyPage() {
                 1. Data We Collect
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                We collect minimal personal information such as your email (only if voluntarily provided) and anonymous usage data to improve site performance.
+                We collect information you provide when using JobAZ, including:
               </p>
+              <ul className="list-disc list-inside mt-4 space-y-2 text-slate-300">
+                <li>Account information (email address, name) for authentication</li>
+                <li>CVs you create and save on the platform</li>
+                <li>Cover letters you create and save</li>
+                <li>Saved jobs and applied jobs you track</li>
+                <li>Career-related information you provide in Build Your Path, including your education, experience, skills, and career goals</li>
+                <li>Anonymous usage data through Google Analytics to understand how our platform is used</li>
+              </ul>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-semibold mb-4 text-slate-50">
-                2. Cookies
+                2. How We Store Your Data
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                Our website uses essential cookies to ensure proper functionality. You can disable cookies through your browser settings at any time.
+                Your data is securely stored using Supabase, our authentication and database provider. Supabase handles all user authentication and securely stores your CVs, cover letters, saved jobs, applied jobs, and Build Your Path information. All data is encrypted and protected with industry-standard security measures.
               </p>
             </section>
 
@@ -64,25 +72,61 @@ export default function PrivacyPage() {
                 3. How We Use Data
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                Data is used solely for improving the user experience and maintaining service quality. We do not sell, rent, or share your data with third parties.
+                We use your data to provide and improve JobAZ services, including storing your CVs and cover letters, tracking your saved and applied jobs, powering Build Your Path career recommendations, and maintaining your account. We use Google Analytics to understand how our platform is used and improve functionality.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                <strong className="text-slate-50">We do not sell your data.</strong> We may process your data through trusted service providers (like Supabase for authentication and database storage, and Google Analytics for usage analytics) solely to operate and improve JobAZ. These providers are bound by strict privacy and security requirements.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-semibold mb-4 text-slate-50">
-                4. Your Rights
+                4. Career Tools & Build Your Path
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                You can request deletion or correction of your data at any time by contacting us through the support page.
+                JobAZ provides AI-powered career tools including a CV builder, cover letter creation, job tracking, and the "Build Your Path" feature. These tools allow users to explore career options, save progress, and receive personalized recommendations.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                Any information entered into these tools (such as CV content, summaries, preferences, or career-related inputs) is stored securely and used only to personalize the user experience, improve functionality, and allow users to access their data across devices and sessions.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                JobAZ does not sell, rent, or share this information with third parties.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-semibold mb-4 text-slate-50">
-                5. Security
+                5. Your Rights
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                We apply modern encryption and secure protocols (SSL) to protect all user information.
+                You can access, update, or delete your data at any time through your account settings. You can delete your CVs, cover letters, saved jobs, and Build Your Path data directly in the platform. To delete your account or request data correction, contact us through the support page.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4 text-slate-50">
+                6. Account Deletion & Data Removal
+              </h2>
+              <p className="text-slate-300 leading-relaxed">
+                Users have the right to delete their account at any time.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                When an account is deleted, all associated personal data — including CVs, cover letters, saved jobs, and related records — is permanently removed from our systems, except where retention is required by law.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                Account deletion can be initiated directly from the user dashboard. This action is irreversible.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                If you experience any issues deleting your account, you may contact us via the support page.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4 text-slate-50">
+                7. Security
+              </h2>
+              <p className="text-slate-300 leading-relaxed">
+                We use modern encryption and secure protocols (SSL/TLS) to protect all user information. Your data is stored securely through Supabase with industry-standard security measures. We regularly review and update our security practices to keep your information safe.
               </p>
             </section>
           </div>

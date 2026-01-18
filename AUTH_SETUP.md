@@ -25,7 +25,9 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 # Production (update with your production URL)
 # NEXT_PUBLIC_SITE_URL=https://yourdomain.com
 
-# Optional: Service Role Key (for admin operations only)
+# Required for Account Deletion: Service Role Key (for admin operations only)
+# This is required for the "Delete Account" feature to work.
+# NEVER expose this key to the client - it should only be used in API routes.
 # SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
@@ -37,6 +39,9 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 4. Copy:
    - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
    - **anon/public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - **service_role key** → `SUPABASE_SERVICE_ROLE_KEY` (for account deletion feature)
+
+⚠️ **Important:** The service role key has admin privileges and should NEVER be exposed to client-side code. Only use it in API routes (`app/api/**`).
 
 ## Supabase Dashboard Configuration
 

@@ -429,10 +429,15 @@ export default function CoverPage() {
           // Update local state with the latest cover letter from API
           const savedData = refreshData.coverLetter.data || {}
           if (savedData.applicantName !== undefined) setApplicantName(savedData.applicantName)
-          if (savedData.recipientName !== undefined) setRecipientName(savedData.recipientName)
-          if (savedData.company !== undefined) setCompany(savedData.company)
-          if (savedData.cityState !== undefined) setCityState(savedData.cityState)
-          if (savedData.role !== undefined) setRole(savedData.role)
+          // Batch recipient info updates using setRecipientInfo
+          const recipientUpdates: { recipientName?: string; company?: string; cityState?: string; role?: string } = {}
+          if (savedData.recipientName !== undefined) recipientUpdates.recipientName = savedData.recipientName
+          if (savedData.company !== undefined) recipientUpdates.company = savedData.company
+          if (savedData.cityState !== undefined) recipientUpdates.cityState = savedData.cityState
+          if (savedData.role !== undefined) recipientUpdates.role = savedData.role
+          if (Object.keys(recipientUpdates).length > 0) {
+            setRecipientInfo(recipientUpdates)
+          }
           if (savedData.bodyText !== undefined) setLetterBody(savedData.bodyText)
           if (savedData.keywords !== undefined) setKeywords(savedData.keywords)
         }

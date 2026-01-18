@@ -55,7 +55,12 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Get the current session
+  // Get the current user (more reliable than getSession for middleware)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Get session for email confirmation checks
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -100,7 +105,7 @@ export async function middleware(request: NextRequest) {
   // Handle /auth route
   if (pathname.startsWith('/auth')) {
     // If user is logged in and tries to access /auth, redirect to dashboard
-    if (session) {
+    if (user) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     // If not logged in, allow access to /auth
@@ -110,12 +115,12 @@ export async function middleware(request: NextRequest) {
   // Handle protected routes
   if (isProtectedRoute) {
     // If user is not logged in, redirect to landing page
-    if (!session) {
+    if (!user) {
       return NextResponse.redirect(new URL('/', request.url))
     }
     
-    // Check if email is confirmed
-    if (session.user && !session.user.email_confirmed_at) {
+    // Check if email is confirmed (session should exist if user exists)
+    if (session?.user && !session.user.email_confirmed_at) {
       // For dashboard, redirect to auth page with email confirmation message
       if (pathname.startsWith('/dashboard')) {
         const url = new URL('/auth', request.url)
@@ -133,7 +138,7 @@ export async function middleware(request: NextRequest) {
   
   // Handle other routes (not explicitly public or protected)
   // If not public and user is not logged in, redirect to landing page
-  if (!isPublicRoute && !isProtectedRoute && !session) {
+  if (!isPublicRoute && !isProtectedRoute && !user) {
     // Allow access to other routes if not logged in (like /api routes, etc.)
     // Only redirect if it looks like a page route
     if (!pathname.startsWith('/api') && !pathname.startsWith('/_next')) {
@@ -151,10 +156,11 @@ export const config = {
      * Match all request paths except for the ones starting with:
      * - _next/static (static files)
      * - _next/image (image optimization files)
+     * - api (API routes)
      * - favicon.ico (favicon file)
-     * - public folder
+     * - static files (images, fonts, etc.)
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.json|.\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).)',
+    '/((?!_next/static|_next/image|api|favicon.ico|sitemap.xml|robots.txt|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff|woff2|ttf|eot)$).*)',
   ],
 }
 

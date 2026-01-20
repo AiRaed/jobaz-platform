@@ -123,8 +123,9 @@ export async function POST(req: NextRequest) {
 
     // Recalculate counts
     const charCount = content.length
-    const wordCount = content.trim().split(/\s+/).filter(w => w.length > 0).length
-    const pageCount = Math.max(1, Math.ceil(charCount / document.page_size))
+    const wordCount = content.trim().split(/\s+/).filter((w: string) => w.length > 0).length
+    const estimatedPages = Math.ceil(wordCount / 250) // ~250 words per page (fallback if page_size not available)
+    const pageCount = Math.max(1, estimatedPages)
 
     // Update document
     const { data: updatedDocument, error: updateError } = await supabase

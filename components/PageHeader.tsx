@@ -14,9 +14,10 @@ type Props = {
   from?: string // query param to add when navigating back to job details
   horizontalLayout?: boolean // if true, uses 2-column layout with disclaimer on right
   disclaimer?: string // disclaimer text to show on right side of header
+  notice?: string // notice text to show on right side of header (smaller, for beta/under development)
 }
 
-export default function PageHeader({ title, subtitle, showBackToDashboard = true, showBackToJobFinder = false, showBackToAllPaths = false, jobId, mode, from, horizontalLayout = false, disclaimer }: Props) {
+export default function PageHeader({ title, subtitle, showBackToDashboard = true, showBackToJobFinder = false, showBackToAllPaths = false, jobId, mode, from, horizontalLayout = false, disclaimer, notice }: Props) {
   const router = useRouter()
 
   const handleBackToJobDetails = () => {
@@ -92,12 +93,19 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
               )}
             </div>
             
-            {/* RIGHT: Disclaimer */}
-            {disclaimer && (
-              <div className="md:flex-shrink-0 md:max-w-md md:min-w-0 md:pl-4">
-                <p className="text-xs md:text-sm text-slate-300 leading-tight md:leading-snug m-0 px-2 md:px-0">
-                  {disclaimer}
-                </p>
+            {/* RIGHT: Disclaimer and/or Notice */}
+            {(disclaimer || notice) && (
+              <div className="md:flex-shrink-0 md:max-w-md md:min-w-0 md:pl-4 flex flex-col gap-1.5">
+                {notice && (
+                  <p className="text-[11px] md:text-xs text-slate-400 leading-tight m-0 px-2 md:px-0">
+                    {notice}
+                  </p>
+                )}
+                {disclaimer && (
+                  <p className="text-xs md:text-sm text-slate-300 leading-tight md:leading-snug m-0 px-2 md:px-0">
+                    {disclaimer}
+                  </p>
+                )}
               </div>
             )}
           </div>

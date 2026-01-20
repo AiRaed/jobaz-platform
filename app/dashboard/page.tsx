@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, LogOut, Compass, FileCheck } from 'lucide-react'
+import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, LogOut, Compass, FileCheck, Wrench } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import AppShell from '@/components/layout/AppShell'
@@ -1385,11 +1385,27 @@ export default function DashboardPage() {
                 "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
               )}
             >
+              {/* Bold diagonal maintenance stripe - corner to corner */}
+              <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-2xl z-0">
+                <div 
+                  className="absolute top-0 right-0 w-[200%] h-6 bg-gradient-to-br from-red-600/30 via-orange-600/35 to-red-500/30 origin-top-right"
+                  style={{
+                    transform: 'rotate(-38deg)',
+                    transformOrigin: 'top right',
+                    boxShadow: '0 0 8px rgba(239, 68, 68, 0.2)',
+                  }}
+                />
+              </div>
+              
               <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
-              <FileCheck className="w-4 h-4 text-violet-400 flex-shrink-0" />
-              <div className="flex flex-col min-w-0">
+              <FileCheck className="w-4 h-4 text-violet-400 flex-shrink-0 relative z-10" />
+              <div className="flex flex-col min-w-0 flex-1 relative z-10">
                 <div className="text-sm font-semibold text-slate-50">Writing Review</div>
                 <div className="text-xs text-slate-400 leading-snug">Review and improve any text</div>
+                <div className="flex flex-col items-start gap-0.5 mt-1">
+                  <Wrench className="w-3.5 h-3.5 text-red-400" />
+                  <span className="text-[11px] text-red-400 font-semibold leading-tight">Under development</span>
+                </div>
               </div>
             </Link>
           </div>

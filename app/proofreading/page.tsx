@@ -1415,6 +1415,19 @@ export default function ProofreadingPage() {
         disclaimer={activeTab === 'proofreading' ? "Note: This tool supports writing improvement and review, not final authorship. Always follow your academic or professional guidelines and seek human review when required." : undefined}
       />
       
+      {/* BETA Notice - Centered under title (only for Writing Review tab) */}
+      {activeTab === 'proofreading' && (
+        <div className="max-w-[1920px] mx-auto px-4 pt-2 pb-2 flex justify-center">
+          <div className="text-red-400 text-base md:text-lg font-semibold flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-950/20 border border-red-500/30">
+            <span className="text-xl md:text-2xl">🛠️</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="font-semibold">Writing Review is currently in BETA</span>
+              <span className="text-sm font-normal text-red-300/80">This feature is under active development. Some tools may be unstable or incomplete.</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Tab Navigation */}
       <div className="max-w-[1920px] mx-auto px-4 pt-4">
         <div className="flex gap-2 mb-4">

@@ -134,3 +134,138 @@ export async function exportToDocx(
     throw error
   }
 }
+
+// Helper function to sanitize filename
+function sanitizeFilename(filename: string): string {
+  return filename
+    .replace(/[^a-z0-9]/gi, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()
+    .substring(0, 50) // Limit length
+}
+
+// Helper function to parse content into paragraphs
+function parseContentToParagraphs(content: string, Paragraph: any): any[] {
+  const paragraphs: any[] = []
+  
+  // Trim excessive blank lines at start/end
+  const trimmedContent = content.trim()
+  
+  if (!trimmedContent) {
+    return []
+  }
+  
+  // Split by double newlines for paragraphs, single newlines for line breaks
+  const parts = trimmedContent.split(/\n\n+/)
+  
+  for (const part of parts) {
+    const lines = part.split('\n')
+    const paragraphText = lines.join(' ').trim()
+    
+    if (paragraphText) {
+      paragraphs.push(
+        new Paragraph({
+          text: paragraphText,
+          spacing: {
+            after: 120, // 6pt after (120 twips = 6pt)
+          },
+        })
+      )
+    }
+  }
+  
+  return paragraphs
+}
+
+export async function exportProofreadingToDocx(
+  pages: Array<{ id: string; content: string }>,
+  projectTitle: string
+): Promise<void> {
+  if (typeof window === 'undefined') return
+  
+  const { 
+    Document, 
+    Packer, 
+    Paragraph, 
+    PageBreak
+  } = await import('docx')
+  
+  // Filter out empty pages
+  const nonEmptyPages = pages.filter(page => page.content.trim().length > 0)
+  
+  if (nonEmptyPages.length === 0) {
+    throw new Error('No content to export')
+  }
+  
+  // Build all paragraphs with page breaks between pages
+  const allParagraphs: any[] = []
+  
+  for (let i = 0; i < nonEmptyPages.length; i++) {
+    const page = nonEmptyPages[i]
+    
+    // Parse content into paragraphs
+    const paragraphs = parseContentToParagraphs(page.content, Paragraph)
+    
+    // Add content paragraphs
+    allParagraphs.push(...paragraphs)
+    
+    // Add page break after all pages except the last
+    if (i < nonEmptyPages.length - 1) {
+      allParagraphs.push(new Paragraph({ children: [new PageBreak()] }))
+    }
+  }
+  
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            size: {
+              orientation: 'portrait',
+              width: 11906, // A4 width in twips (21cm = 11906 twips)
+              height: 16838, // A4 height in twips (29.7cm = 16838 twips)
+            },
+            margin: {
+              top: 1440, // 2.54cm = 1440 twips (1 inch = 1440 twips)
+              right: 1440,
+              bottom: 1440,
+              left: 1440,
+            },
+          },
+        },
+        children: allParagraphs,
+      },
+    ],
+    styles: {
+      default: {
+        document: {
+          run: {
+            font: 'Calibri',
+            size: 22, // 11pt (22 half-points)
+          },
+          paragraph: {
+            spacing: {
+              line: 276, // 1.15 line spacing (240 * 1.15 = 276 twips)
+              lineRule: 'auto',
+            },
+          },
+        },
+      },
+    },
+  })
+  
+  try {
+    const blob = await Packer.toBlob(doc)
+    
+    // Generate filename: jobaz-proofreading-<projectTitle>-<YYYY-MM-DD>.docx
+    const sanitizedTitle = sanitizeFilename(projectTitle || 'untitled')
+    const date = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+    const filename = `jobaz-proofreading-${sanitizedTitle}-${date}.docx`
+    
+    downloadFile(blob, filename)
+  } catch (error) {
+    console.error('Proofreading DOCX export failed:', error)
+    throw error
+  }
+}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, LogOut, Compass } from 'lucide-react'
+import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, LogOut, Compass, FileCheck } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import AppShell from '@/components/layout/AppShell'
@@ -1296,7 +1296,7 @@ export default function DashboardPage() {
           <h2 className="text-sm font-semibold tracking-wide text-slate-300/80 uppercase mb-3">
             Quick Actions
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
             <Link
               href="/cv-builder-v2"
               className={cn(
@@ -1374,6 +1374,22 @@ export default function DashboardPage() {
               <div className="flex flex-col min-w-0">
                 <div className="text-sm font-semibold text-slate-50">Build Your Path</div>
                 <div className="text-xs text-slate-400 leading-snug">Explore career paths and build skills</div>
+              </div>
+            </Link>
+
+            <Link
+              href="/proofreading"
+              className={cn(
+                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50",
+                "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
+                "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
+              )}
+            >
+              <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
+              <FileCheck className="w-4 h-4 text-violet-400 flex-shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <div className="text-sm font-semibold text-slate-50">Writing Review</div>
+                <div className="text-xs text-slate-400 leading-snug">Review and improve any text</div>
               </div>
             </Link>
           </div>

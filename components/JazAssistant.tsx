@@ -136,7 +136,26 @@ export interface InterviewCoachContext {
   canNext?: boolean
 }
 
-export type JazPageContext = CvBuilderContext | CoverLetterContext | InterviewCoachContext | null
+export interface ProofreadingWorkspaceContext {
+  page: 'proofreading-workspace'
+  activeTab: 'proofreading' | 'email'
+  // Proofreading tab state
+  hasProject?: boolean
+  hasContent?: boolean
+  hasIssues?: boolean
+  openIssuesCount?: number
+  isAcademicProject?: boolean
+  hasPages?: boolean
+  // Email Builder tab state
+  hasEmailProject?: boolean
+  emailMode?: 'paste' | 'generate' | null
+  emailBodyEmpty?: boolean
+  emailFieldsComplete?: boolean
+  emailDraftExists?: boolean
+  emailIsProofread?: boolean
+}
+
+export type JazPageContext = CvBuilderContext | CoverLetterContext | InterviewCoachContext | ProofreadingWorkspaceContext | null
 
 interface JazAssistantProps {
   // Context is now provided via JazContextProvider
@@ -952,42 +971,115 @@ export default function JazAssistant({}: JazAssistantProps) {
   }, [isOpen])
 
   // Get hint message based on current page
-  const getHintMessage = useCallback(() => {
+  const getHintMessage = useCallback((): { line1: string; line2?: string } | null => {
     if (pathname.startsWith('/cv-builder-v2')) {
-      return "I can help you to improve your CV, rewrite sections, and translate content."
+      return { line1: "I can help you to improve your CV, rewrite sections, and translate content." }
     } else if (pathname.startsWith('/cover')) {
-      return "I can help you to generate, rewrite, and translate your cover letter."
+      return { line1: "I can help you to generate, rewrite, and translate your cover letter." }
     } else if (pathname.startsWith('/job-finder')) {
-      return "I can help you to translate job listings and explain requirements."
+      return { line1: "I can help you to translate job listings and explain requirements." }
     } else if (pathname.startsWith('/job-details')) {
-      return "I can help you to understand this job, translate it, and guide your next steps."
+      return { line1: "I can help you to understand this job, translate it, and guide your next steps." }
     } else if (pathname.startsWith('/interview-coach')) {
-      return "I can help you to improve your answers, understand feedback, and translate tips."
+      return { line1: "I can help you to improve your answers, understand feedback, and translate tips." }
     } else if (pathname.startsWith('/dashboard')) {
-      return "I can help you to understand the platform and guide your job application journey."
+      return { line1: "I can help you to understand the platform and guide your job application journey." }
+    } else if (pathname.startsWith('/proofreading')) {
+      // Get activeTab from context if available
+      if (context && context.page === 'proofreading-workspace') {
+        const ctx = context as ProofreadingWorkspaceContext
+        if (ctx.activeTab === 'proofreading') {
+          return {
+            line1: "I can help you find and fix issues in your text (grammar, clarity, style, tone).",
+            line2: "Paste text or import a .docx/.txt file, then run analysis."
+          }
+        } else if (ctx.activeTab === 'email') {
+          return {
+            line1: "I can help you draft, rewrite, and improve professional emails.",
+            line2: "Fill the fields or paste your email, then Review & Improve."
+          }
+        }
+      }
+      // Fallback if context not available yet
+      return {
+        line1: "I can help you find and fix issues in your text (grammar, clarity, style, tone).",
+        line2: "Paste text or import a .docx/.txt file, then run analysis."
+      }
     }
     return null
-  }, [pathname])
+  }, [pathname, context])
 
+  // Track previous hint key to detect tab changes
+  const previousHintKeyRef = useRef<string | null>(null)
+  
   // Show hint bubble on page load (only once per page, only if chat is closed)
   useEffect(() => {
     if (typeof window === 'undefined') return
     
-    // Reset hint state when pathname changes
-    setShowHint(false)
-    if (hintTimeoutRef.current) {
-      clearTimeout(hintTimeoutRef.current)
-      hintTimeoutRef.current = null
+    const hintMessage = getHintMessage()
+    if (!hintMessage) {
+      setShowHint(false)
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current)
+        hintTimeoutRef.current = null
+      }
+      previousHintKeyRef.current = null
+      return
     }
     
-    const hintKey = `jaz_hint_seen_${pathname}`
-    const hasSeenHint = sessionStorage.getItem(hintKey) === 'true'
+    // For /proofreading, include activeTab in the hint key
+    let hintKey = `jaz_hint_seen_${pathname}`
+    if (pathname.startsWith('/proofreading') && context && context.page === 'proofreading-workspace') {
+      const ctx = context as ProofreadingWorkspaceContext
+      hintKey = `jaz_hint_seen_${pathname}:${ctx.activeTab}`
+    }
     
-    // Only show if:
-    // 1. Chat is closed
-    // 2. User hasn't seen hint for this page
-    // 3. There's a message for this page
-    if (!isOpen && !hasSeenHint && getHintMessage()) {
+    const hasSeenHint = sessionStorage.getItem(hintKey) === 'true'
+    const isTabChangeOnProofreading = pathname.startsWith('/proofreading') && 
+                                      previousHintKeyRef.current !== null && 
+                                      previousHintKeyRef.current !== hintKey
+    
+    // If chat is open, hide hint
+    if (isOpen) {
+      setShowHint(false)
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current)
+        hintTimeoutRef.current = null
+      }
+      previousHintKeyRef.current = hintKey
+      return
+    }
+    
+    // If hint already seen for this tab, hide it
+    if (hasSeenHint) {
+      setShowHint(false)
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current)
+        hintTimeoutRef.current = null
+      }
+      previousHintKeyRef.current = hintKey
+      return
+    }
+    
+    // If hint is already showing and we're just changing tabs on /proofreading, 
+    // update message without restarting timer
+    if (showHint && isTabChangeOnProofreading) {
+      // Just update the message content, timer continues
+      previousHintKeyRef.current = hintKey
+      return
+    }
+    
+    // Reset hint state when pathname changes (not just tab change)
+    if (previousHintKeyRef.current === null || !pathname.startsWith('/proofreading')) {
+      setShowHint(false)
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current)
+        hintTimeoutRef.current = null
+      }
+    }
+    
+    // Show hint for the first time
+    if (!showHint) {
       setShowHint(true)
       
       // Auto-hide after 5 seconds
@@ -997,13 +1089,14 @@ export default function JazAssistant({}: JazAssistantProps) {
       }, 5000)
     }
     
+    previousHintKeyRef.current = hintKey
+    
+    // Cleanup: only clear timeout on pathname change (not on tab change within /proofreading)
     return () => {
-      if (hintTimeoutRef.current) {
-        clearTimeout(hintTimeoutRef.current)
-        hintTimeoutRef.current = null
-      }
+      // This cleanup runs when pathname changes, not when context changes
+      // So tab changes within /proofreading won't clear the timeout
     }
-  }, [pathname, isOpen, getHintMessage])
+  }, [pathname, isOpen, getHintMessage, context])
 
   // Hide hint when JAZ opens
   useEffect(() => {
@@ -1024,9 +1117,15 @@ export default function JazAssistant({}: JazAssistantProps) {
       hintTimeoutRef.current = null
     }
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem(`jaz_hint_seen_${pathname}`, 'true')
+      // For /proofreading, include activeTab in the hint key
+      let hintKey = `jaz_hint_seen_${pathname}`
+      if (pathname.startsWith('/proofreading') && context && context.page === 'proofreading-workspace') {
+        const ctx = context as ProofreadingWorkspaceContext
+        hintKey = `jaz_hint_seen_${pathname}:${ctx.activeTab}`
+      }
+      sessionStorage.setItem(hintKey, 'true')
     }
-  }, [pathname])
+  }, [pathname, context])
 
   // Sync local state with store
   useEffect(() => {
@@ -1606,6 +1705,128 @@ export default function JazAssistant({}: JazAssistantProps) {
     }
   }
 
+  // Get Proofreading Workspace guidance
+  const getProofreadingWorkspaceGuidance = (ctx: ProofreadingWorkspaceContext): NextBestAction | null => {
+    if (ctx.activeTab === 'proofreading') {
+      // Priority 1: No project selected
+      if (!ctx.hasProject) {
+        return {
+          action: 'FIND_JOBS' as any, // Using existing action type
+          title: 'Create or select a project',
+          message: 'Start by creating a new project or selecting an existing one to begin writing review.',
+          ctaLabel: 'Create Project',
+        }
+      }
+
+      // Priority 2: Project selected but no content
+      if (ctx.hasProject && !ctx.hasContent) {
+        return {
+          action: 'FIND_JOBS' as any,
+          title: 'Paste text or import a file',
+          message: 'Add your content by pasting text or importing a .docx or .txt file to start reviewing your writing.',
+          ctaLabel: 'Import File',
+        }
+      }
+
+      // Priority 3: Content exists but no issues (not analyzed yet)
+      if (ctx.hasContent && !ctx.hasIssues) {
+        return {
+          action: 'FIND_JOBS' as any,
+          title: 'Run analysis to detect issues',
+          message: 'Analyze your text to find grammar, style, and clarity improvements.',
+          ctaLabel: 'Run Analysis',
+        }
+      }
+
+      // Priority 4: Has open issues
+      if (ctx.hasIssues && (ctx.openIssuesCount || 0) > 0) {
+        return {
+          action: 'FIND_JOBS' as any,
+          title: 'Review issues and apply/reject changes',
+          message: `You have ${ctx.openIssuesCount} open issue${ctx.openIssuesCount === 1 ? '' : 's'} to review.`,
+          ctaLabel: 'Review Issues',
+        }
+      }
+
+      // Priority 5: Academic project with pages enabled
+      if (ctx.isAcademicProject && ctx.hasPages) {
+        return {
+          action: 'FIND_JOBS' as any,
+          title: 'Work page-by-page; save before switching pages',
+          message: 'For multi-page documents, work on one page at a time and save your changes.',
+          ctaLabel: 'Save Page',
+        }
+      }
+
+      // All good
+      return {
+        action: 'FIND_JOBS' as any,
+        title: 'Ready to review',
+        message: 'Your document is ready. Continue reviewing or start a new project.',
+        ctaLabel: 'Continue',
+      }
+    } else {
+      // Email Builder tab
+      // Priority 1: No email project selected
+      if (!ctx.hasEmailProject) {
+        return {
+          action: 'FIND_JOBS' as any,
+          title: 'Create an email project',
+          message: 'Start by creating a new email project to build your professional email.',
+          ctaLabel: 'Create Email Project',
+        }
+      }
+
+      // Priority 2: Mode is "I already wrote it" and body empty
+      if (ctx.emailMode === 'paste' && ctx.emailBodyEmpty) {
+        return {
+          action: 'FIND_JOBS' as any,
+          title: 'Paste your email and review it',
+          message: 'Paste your email content to get professional writing review suggestions.',
+          ctaLabel: 'Paste Email',
+        }
+      }
+
+      // Priority 3: Mode is "Generate" and required fields missing
+      if (ctx.emailMode === 'generate' && !ctx.emailFieldsComplete) {
+        return {
+          action: 'FIND_JOBS' as any,
+          title: 'Fill the key fields then generate',
+          message: 'Complete the required fields (purpose, recipient, tone) to generate your email.',
+          ctaLabel: 'Fill Fields',
+        }
+      }
+
+      // Priority 4: Draft exists but not proofread
+      if (ctx.emailDraftExists && !ctx.emailIsProofread) {
+        return {
+          action: 'FIND_JOBS' as any,
+          title: 'Review & Improve for a professional tone',
+          message: 'Run writing review to improve your email\'s professionalism and clarity.',
+          ctaLabel: 'Review & Improve',
+        }
+      }
+
+      // Priority 5: Draft exists and is proofread
+      if (ctx.emailDraftExists && ctx.emailIsProofread) {
+        return {
+          action: 'FIND_JOBS' as any,
+          title: 'Save or copy your final email',
+          message: 'Your email is ready. Save it or copy to use in your application.',
+          ctaLabel: 'Save Email',
+        }
+      }
+
+      // All good
+      return {
+        action: 'FIND_JOBS' as any,
+        title: 'Ready to build',
+        message: 'Your email builder is ready. Create a new email or continue editing.',
+        ctaLabel: 'Continue',
+      }
+    }
+  }
+
   // Detect Interview Coach state from DOM
   const [interviewCoachState, setInterviewCoachState] = useState<InterviewCoachContext | null>(null)
 
@@ -1820,6 +2041,10 @@ export default function JazAssistant({}: JazAssistantProps) {
       if (context.page === 'cover-letter') {
         return getCoverLetterGuidance(context)
       }
+
+      if (context.page === 'proofreading-workspace') {
+        return getProofreadingWorkspaceGuidance(context)
+      }
     }
 
     // Check Interview Coach state
@@ -1963,6 +2188,112 @@ export default function JazAssistant({}: JazAssistantProps) {
         }
       } else if (guidance.title === "You're ready") {
         router.push('/job-finder')
+      }
+    } else if (context.page === 'proofreading-workspace') {
+      const ctx = context as ProofreadingWorkspaceContext
+      
+      if (ctx.activeTab === 'proofreading') {
+        if (guidance.title === 'Create or select a project') {
+          // Focus or trigger new project form
+          const newProjectBtn = document.querySelector('[data-jaz-action="pr_new_project"]') as HTMLElement
+          if (newProjectBtn) {
+            newProjectBtn.click()
+          } else {
+            // Fallback: try to find button with "New Project" text
+            const buttons = Array.from(document.querySelectorAll('button'))
+            const newProjectButton = buttons.find(btn => btn.textContent?.includes('New Project'))
+            if (newProjectButton) {
+              newProjectButton.click()
+            }
+          }
+        } else if (guidance.title === 'Paste text or import a file') {
+          // Trigger file picker or focus editor
+          const fileInput = document.querySelector('[data-jaz-action="pr_import_file"]') as HTMLElement
+          if (fileInput) {
+            fileInput.click()
+          } else {
+            const textarea = document.querySelector('textarea[placeholder*="paste" i], textarea[placeholder*="text" i]') as HTMLTextAreaElement
+            if (textarea) {
+              textarea.focus()
+              pulseHighlight('textarea[placeholder*="paste" i], textarea[placeholder*="text" i]', 2000)
+            }
+          }
+        } else if (guidance.title === 'Run analysis to detect issues') {
+          // Trigger Run Analysis button
+          triggerButton('pr_run_analysis')
+        } else if (guidance.title === 'Review issues and apply/reject changes') {
+          // Scroll to issues panel and select Open filter
+          const issuesPanel = document.querySelector('[data-jaz-action="pr_issues_panel"]') || document.querySelector('[class*="issue"][class*="panel"], [class*="issues"]')
+          if (issuesPanel) {
+            issuesPanel.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            setTimeout(() => {
+              const openFilter = document.querySelector('[data-jaz-action="pr_filter_open"]') || document.querySelector('button:has-text("Open"), button[aria-label*="open" i]')
+              if (openFilter) {
+                (openFilter as HTMLElement).click()
+              }
+            }, 300)
+          }
+        } else if (guidance.title === 'Work page-by-page; save before switching pages') {
+          // Focus page bar or Save Page button
+          const saveBtn = document.querySelector('[data-jaz-action="pr_save_page"]')
+          if (saveBtn) {
+            saveBtn.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            pulseHighlight('[data-jaz-action="pr_save_page"]', 2000)
+          } else {
+            // Fallback: try to find Save button
+            const buttons = Array.from(document.querySelectorAll('button'))
+            const saveButton = buttons.find(btn => btn.textContent?.includes('Save'))
+            if (saveButton) {
+              saveButton.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              pulseHighlight('button', 2000)
+            }
+          }
+        }
+      } else if (ctx.activeTab === 'email') {
+        if (guidance.title === 'Create an email project') {
+          // Trigger create email project flow
+          const newEmailProjectBtn = document.querySelector('[data-jaz-action="email_new_project"]') as HTMLElement
+          if (newEmailProjectBtn) {
+            newEmailProjectBtn.click()
+          } else {
+            // Fallback: try to find button with "New Project" text in email section
+            const buttons = Array.from(document.querySelectorAll('button'))
+            const newEmailButton = buttons.find(btn => btn.textContent?.includes('New Project') || btn.textContent?.includes('New Email'))
+            if (newEmailButton) {
+              newEmailButton.click()
+            }
+          }
+        } else if (guidance.title === 'Paste your email and review it') {
+          // Focus body textarea
+          const bodyTextarea = document.querySelector('[data-jaz-action="email_body"]') || document.querySelector('textarea[placeholder*="email" i], textarea[placeholder*="body" i]') as HTMLTextAreaElement
+          if (bodyTextarea) {
+            bodyTextarea.focus()
+            pulseHighlight('[data-jaz-action="email_body"], textarea[placeholder*="email" i]', 2000)
+          }
+        } else if (guidance.title === 'Fill the key fields then generate') {
+          // Focus first missing field
+          const purposeField = document.querySelector('[data-jaz-action="email_purpose"]') || document.querySelector('select[name*="purpose" i], input[name*="purpose" i]')
+          const recipientField = document.querySelector('[data-jaz-action="email_recipient"]') || document.querySelector('select[name*="recipient" i], input[name*="recipient" i]')
+          const toneField = document.querySelector('[data-jaz-action="email_tone"]') || document.querySelector('select[name*="tone" i], input[name*="tone" i]')
+          
+          const firstMissing = purposeField || recipientField || toneField
+          if (firstMissing) {
+            (firstMissing as HTMLElement).focus()
+            pulseHighlight('[data-jaz-action^="email_"]', 2000)
+          }
+        } else if (guidance.title === 'Review & Improve for a professional tone') {
+          // Trigger Review & Improve button
+          triggerButton('email_proofread')
+        } else if (guidance.title === 'Save or copy your final email') {
+          // Focus Save/Copy actions
+          const saveBtn = document.querySelector('[data-jaz-action="email_save"]')
+          const copyBtn = document.querySelector('[data-jaz-action="email_copy"]')
+          const actionBtn = saveBtn || copyBtn
+          if (actionBtn) {
+            actionBtn.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            pulseHighlight('[data-jaz-action="email_save"], [data-jaz-action="email_copy"]', 2000)
+          }
+        }
       }
     }
   }
@@ -3056,38 +3387,49 @@ Start exploring to find the right path for you!`
   const orbContent = (
     <div className="fixed bottom-4 right-4 z-40" data-no-translate>
       {/* Hint Bubble */}
-      {showHint && !isOpen && getHintMessage() && (
-        <div 
-          className="absolute bottom-0 right-20 mb-0 w-64 md:w-72 max-w-[calc(100vw-6rem)] bg-slate-900/85 backdrop-blur-md rounded-2xl shadow-2xl border border-violet-500/20 p-4 pointer-events-auto animate-in fade-in slide-in-from-right-2 duration-300"
-          style={{ 
-            pointerEvents: 'auto',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.15), 0 0 30px rgba(124, 58, 237, 0.1)'
-          }}
-        >
-          <div className="flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-slate-100 leading-relaxed mb-2">
-                {getHintMessage()}
-              </p>
-              <p className="text-xs text-slate-400/80 leading-relaxed">
-                I can help you to translate any text on this page.
-              </p>
+      {showHint && !isOpen && (() => {
+        const hintMessage = getHintMessage()
+        if (!hintMessage) return null
+        
+        return (
+          <div 
+            className="absolute bottom-0 right-20 mb-0 w-64 md:w-72 max-w-[calc(100vw-6rem)] bg-slate-900/85 backdrop-blur-md rounded-2xl shadow-2xl border border-violet-500/20 p-4 pointer-events-auto animate-in fade-in slide-in-from-right-2 duration-300"
+            style={{ 
+              pointerEvents: 'auto',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.15), 0 0 30px rgba(124, 58, 237, 0.1)'
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-slate-100 leading-relaxed mb-2">
+                  {hintMessage.line1}
+                </p>
+                {hintMessage.line2 ? (
+                  <p className="text-xs text-slate-400/80 leading-relaxed">
+                    {hintMessage.line2}
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400/80 leading-relaxed">
+                    I can help you to translate any text on this page.
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={handleCloseHint}
+                aria-label="Close hint"
+                className="w-5 h-5 rounded-full hover:bg-slate-800/60 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors flex-shrink-0"
+                style={{ pointerEvents: 'auto' }}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <button
-              onClick={handleCloseHint}
-              aria-label="Close hint"
-              className="w-5 h-5 rounded-full hover:bg-slate-800/60 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors flex-shrink-0"
-              style={{ pointerEvents: 'auto' }}
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+            {/* Arrow pointing to JAZ button */}
+            <div className="absolute right-0 top-1/2 transform translate-x-full -translate-y-1/2 hidden md:block">
+              <div className="w-0 h-0 border-t-8 border-t-transparent border-b-8 border-b-transparent border-l-8 border-l-slate-900/85"></div>
+            </div>
           </div>
-          {/* Arrow pointing to JAZ button */}
-          <div className="absolute right-0 top-1/2 transform translate-x-full -translate-y-1/2 hidden md:block">
-            <div className="w-0 h-0 border-t-8 border-t-transparent border-b-8 border-b-transparent border-l-8 border-l-slate-900/85"></div>
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Floating Orb Button with Label */}
       <div className="flex flex-col items-center gap-2">

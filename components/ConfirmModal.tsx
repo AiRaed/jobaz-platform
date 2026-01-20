@@ -128,8 +128,10 @@ export function ConfirmModal({
                 'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950',
                 variant === 'danger'
                   ? cn(
-                      'bg-red-600/10 text-red-400 border border-red-500/30',
-                      'hover:bg-red-600/20 hover:border-red-500/50 hover:text-red-300',
+                      'bg-red-600 text-white border border-red-500',
+                      'hover:bg-red-700 hover:border-red-600',
+                      'shadow-[0_0_12px_rgba(220,38,38,0.4)]',
+                      'hover:shadow-[0_0_16px_rgba(220,38,38,0.6)]',
                       'focus:ring-red-500/50'
                     )
                   : cn(

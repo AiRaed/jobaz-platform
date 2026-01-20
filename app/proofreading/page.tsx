@@ -1295,13 +1295,37 @@ export default function ProofreadingPage() {
     return buildHighlightedMarkup(activePageContent, filteredIssues)
   }, [pages, activePageIndex, filteredIssues, buildHighlightedMarkup])
 
-  // Sync scroll between textarea and overlay
+  // Sync scroll: wrapper (overlayRef) is the ONLY scroll container
+  // Both overlay and textarea are absolute inside wrapper, so they move together
   const handleScroll = useCallback(() => {
-    if (textareaRef.current && overlayRef.current) {
-      overlayRef.current.scrollTop = textareaRef.current.scrollTop
-      overlayRef.current.scrollLeft = textareaRef.current.scrollLeft
-    }
+    // No sync needed - wrapper scrolls, both layers move together since they're absolute
+    // This callback is kept for potential future use
   }, [])
+  
+  // Get active page content (defined before useEffect that uses it)
+  const activePageContent = pages[activePageIndex]?.content || ''
+  
+  // Ensure textarea and overlay heights match content for proper scrolling
+  // CRITICAL: Wrapper is the scroll container. Both layers must match content height.
+  useEffect(() => {
+    if (textareaRef.current && overlayRef.current) {
+      const textarea = textareaRef.current
+      const wrapper = overlayRef.current
+      
+      // Reset height to calculate actual scrollHeight
+      textarea.style.height = 'auto'
+      const contentHeight = Math.max(textarea.scrollHeight, 200) // Min 200px
+      
+      // Set textarea height to match content (wrapper will scroll this)
+      textarea.style.height = `${contentHeight}px`
+      
+      // Ensure overlay div also matches height for alignment
+      const overlayDiv = wrapper.querySelector('.pf-overlay') as HTMLElement
+      if (overlayDiv) {
+        overlayDiv.style.minHeight = `${contentHeight}px`
+      }
+    }
+  }, [activePageContent, highlightedMarkup, pages, activePageIndex])
 
   const issueCounts = useMemo(() => {
     return {
@@ -1312,7 +1336,6 @@ export default function ProofreadingPage() {
     }
   }, [issues])
 
-  const activePageContent = pages[activePageIndex]?.content || ''
   const canRunAnalysis = activeProjectId && (activeDocumentId || activePageContent.trim().length > 0) && activePageContent.trim().length > 0 && !isAnalyzing
 
   // Compute JAZ context for Proofreading Workspace
@@ -1738,41 +1761,48 @@ export default function ProofreadingPage() {
                     <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
                   </div>
                 ) : (
-                  <div className="flex-1 relative min-h-0 bg-white rounded-lg border border-gray-200 overflow-hidden">
-                    {/* Highlight Overlay - Always render to maintain layout */}
+                  /* Single scroll container: wrapper handles all scrolling */
+                  <div 
+                    ref={overlayRef}
+                    className="flex-1 relative min-h-0 bg-white rounded-lg border border-gray-200 overflow-y-auto overflow-x-hidden"
+                    onScroll={handleScroll}
+                  >
+                    {/* Highlight Overlay - Absolute, no scroll, matches textarea content height */}
                     <div
-                      ref={overlayRef}
-                      className="pf-overlay absolute inset-0 p-6 md:p-8 bg-white pointer-events-none overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed"
+                      className="pf-overlay absolute top-0 left-0 right-0 p-6 md:p-8 bg-white pointer-events-none whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed"
                       aria-hidden="true"
                       dangerouslySetInnerHTML={{ __html: highlightedMarkup || '' }}
                       style={{
                         fontFamily: 'inherit',
                         fontSize: 'inherit',
                         lineHeight: 'inherit',
+                        letterSpacing: 'inherit',
                         color: '#111827',
                         wordBreak: 'break-word',
+                        width: '100%',
                       }}
                     />
-                    {/* Textarea - Above overlay, transparent text with text-shadow for visibility */}
+                    {/* Textarea - Absolute, no scroll, height matches content, wrapper handles scrolling */}
                     <textarea
                       ref={textareaRef}
                       value={activePageContent}
                       onChange={(e) => handleContentChange(e.target.value)}
-                      onScroll={handleScroll}
                       onPaste={(e) => {
                         const pastedText = e.clipboardData.getData('text')
                         handleContentChange(activePageContent + pastedText)
                       }}
                       placeholder="Enter your text here... (Document will be created automatically)"
-                      className="pf-textarea absolute inset-0 w-full h-full p-6 md:p-8 bg-transparent resize-none outline-none text-sm md:text-base leading-relaxed overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words placeholder:text-gray-400"
+                      className="pf-textarea absolute top-0 left-0 right-0 w-full p-6 md:p-8 bg-transparent resize-none outline-none text-sm md:text-base leading-relaxed overflow-hidden whitespace-pre-wrap break-words placeholder:text-gray-400"
                       style={{ 
                         caretColor: '#111827',
                         fontFamily: 'inherit',
                         fontSize: 'inherit',
                         lineHeight: 'inherit',
+                        letterSpacing: 'inherit',
                         color: 'transparent',
                         textShadow: '0 0 0 #111827', // Show black text via shadow while keeping text transparent for overlay
                         wordBreak: 'break-word',
+                        minHeight: '100%',
                       }}
                     />
                   </div>

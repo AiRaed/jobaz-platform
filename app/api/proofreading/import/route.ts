@@ -205,9 +205,10 @@ function splitIntoPages(text: string, html?: string): Page[] {
     let match: RegExpMatchArray | null
     sentenceEndRegex.lastIndex = 0
     while ((match = sentenceEndRegex.exec(searchText)) !== null) {
-      const absolutePos = searchStart + match.index + match[0].length - 1
+      const mIndex = match.index ?? 0
+      const absolutePos = searchStart + mIndex + match[0].length - 1
       if (absolutePos <= splitIndex + 100) {
-        bestSplit = searchStart + match.index + match[0].length - 1
+        bestSplit = searchStart + mIndex + match[0].length - 1
       } else {
         break
       }

@@ -544,7 +544,7 @@ export default function ProofreadingPage() {
         setContent(importedPages[0]?.content || '')
 
         // Trigger autosave by combining all pages
-        const combinedContent = importedPages.map(p => p.content).join('\n\n--- Page Break ---\n\n')
+        const combinedContent = importedPages.map((p: { title?: string; content: string }) => p.content).join('\n\n--- Page Break ---\n\n')
         if (activeProjectId) {
           // Ensure document exists and save
           const docId = await ensureDocumentExists(activeProjectId, combinedContent)

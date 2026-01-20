@@ -2265,7 +2265,7 @@ export default function JazAssistant({}: JazAssistantProps) {
           }
         } else if (guidance.title === 'Paste your email and review it') {
           // Focus body textarea
-          const bodyTextarea = document.querySelector('[data-jaz-action="email_body"]') || document.querySelector('textarea[placeholder*="email" i], textarea[placeholder*="body" i]') as HTMLTextAreaElement
+          const bodyTextarea = (document.querySelector('[data-jaz-action="email_body"]') || document.querySelector('textarea[placeholder*="email" i], textarea[placeholder*="body" i]')) as HTMLTextAreaElement | null
           if (bodyTextarea) {
             bodyTextarea.focus()
             pulseHighlight('[data-jaz-action="email_body"], textarea[placeholder*="email" i]', 2000)

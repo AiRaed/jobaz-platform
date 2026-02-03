@@ -12,7 +12,7 @@ interface AccessState {
 
 interface AccessContextType extends AccessState {
   refetchAccess: () => Promise<void>
-  incrementFreeUsed: () => Promise<void>
+  incrementFreeUsed: () => Promise<{ paid: boolean; freeUsed: number }>
   verifyPayment: () => Promise<void>
 }
 
@@ -80,7 +80,8 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
   }, [fetchAccess])
 
   // Increment freeUsed (called when user submits an answer)
-  const incrementFreeUsed = useCallback(async () => {
+  // Returns the updated state so the component can decide whether to advance
+  const incrementFreeUsed = useCallback(async (): Promise<{ paid: boolean; freeUsed: number }> => {
     try {
       setAccess(prev => ({ ...prev, loading: true }))
       
@@ -108,6 +109,8 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
         ...newState,
         loading: false,
       })
+      
+      return newState
     } catch (error) {
       console.error('[AccessProvider] Error incrementing freeUsed:', error)
       // On error, keep previous stable state but mark as not loading
@@ -115,6 +118,8 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
         ...previousStableStateRef.current,
         loading: false,
       }))
+      // Return previous state on error
+      return previousStableStateRef.current
     }
   }, [])
 

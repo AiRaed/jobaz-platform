@@ -29,6 +29,14 @@ export function PaywallOverlay({ onUnlock }: PaywallOverlayProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Practice trial limit reached. Unlock to continue."
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        // Prevent keyboard navigation when paywall is shown
+        e.stopPropagation()
+        if (e.key === 'Escape') {
+          e.preventDefault()
+        }
+      }}
     >
       <div
         className={cn(

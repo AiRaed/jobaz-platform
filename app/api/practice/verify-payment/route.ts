@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
+// Mark as dynamic since we use cookies
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   try {
     const cookieStore = await cookies()

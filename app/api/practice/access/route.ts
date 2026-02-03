@@ -3,6 +3,9 @@ import { cookies } from 'next/headers'
 
 const FREE_LIMIT = 15
 
+// Mark as dynamic since we use cookies
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   try {
     const cookieStore = await cookies()

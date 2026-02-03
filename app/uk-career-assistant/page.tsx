@@ -32,11 +32,15 @@ interface AIState {
   answers?: { [questionId: string]: any }
   step_index?: number
   last_question_id?: string | null
+  phase?: 'CLASSIFY' | 'PATH' | 'RESULT' | string
+  classification_done?: boolean
+  classification?: { [key: string]: any }
+  path?: string | null
 }
 
 interface AIResponse {
   path: string | null
-  phase: 'classification' | 'assessment' | 'recommendation'
+  phase: 'classification' | 'assessment' | 'recommendation' | 'CLASSIFY' | 'PATH' | 'RESULT' | string
   assistant_message: string
   question: Question | null
   allow_free_text: boolean
@@ -1191,10 +1195,10 @@ export default function UKCareerAssistantPage() {
                   <button
                     key={option.value}
                     onClick={() => handleOptionClick(option.value)}
-                    disabled={loading || isTyping || (current.question?.type === 'multi' && maxSelectReached && !isSelected)}
+                    disabled={loading || isTyping || (current.question?.type === 'multi' && !!maxSelectReached && !isSelected)}
                     className={cn(
                       "w-full text-left px-4 py-3 rounded-xl border transition-all",
-                      current.question.type === 'single'
+                      current.question?.type === 'single'
                         ? "bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50 hover:border-violet-500/50"
                         : isSelected
                         ? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/30"

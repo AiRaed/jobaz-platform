@@ -23,21 +23,24 @@ function PracticePageContent() {
   // Single derived boolean - do NOT tie to loading state
   const isLocked = !paid && freeUsed >= TRIAL_LIMIT
 
-  // Update showPaywall when isLocked changes
+  // Update showPaywall ONLY when isLocked becomes true (after question 15)
+  // Reset showPaywall when no longer locked (paid or freeUsed < 15)
   useEffect(() => {
+    // Only show paywall when locked AND not loading
     if (isLocked && !loading) {
       setShowPaywall(true)
-    } else if (!isLocked && paid) {
-      // Hide paywall when payment is verified
+    } 
+    // Hide paywall when no longer locked (paid or under limit)
+    else if (!isLocked && !loading) {
       setShowPaywall(false)
     }
-  }, [isLocked, loading, paid])
+    // Don't change showPaywall state while loading (prevents flicker)
+  }, [isLocked, loading])
 
   // Handle answer selection - increment freeUsed and check if we should lock
   const handleAnswerSelect = useCallback(async (answer: string) => {
-    // Block if already locked
+    // Block if already locked (after question 15)
     if (isLocked) {
-      setShowPaywall(true)
       return
     }
 
@@ -51,10 +54,11 @@ function PracticePageContent() {
     // Call increment endpoint and get updated state
     const updatedState = await incrementFreeUsed()
     
-    // Check if we should lock after incrementing
+    // Check if we should lock after incrementing (only after question 15)
+    // The useEffect will handle setting showPaywall based on isLocked
+    // DO NOT advance to next question if limit reached
     if (!updatedState.paid && updatedState.freeUsed >= TRIAL_LIMIT) {
-      setShowPaywall(true)
-      // DO NOT advance to next question - stay on current question
+      // Stay on current question - paywall will show via useEffect
       return
     }
     
@@ -64,9 +68,8 @@ function PracticePageContent() {
 
   // Handle Next button - DO NOT increment freeUsed here
   const handleNext = useCallback(() => {
-    // Block if locked
+    // Block if locked (after question 15)
     if (isLocked) {
-      setShowPaywall(true)
       return
     }
 
@@ -82,9 +85,8 @@ function PracticePageContent() {
 
   // Handle Previous button
   const handlePrevious = useCallback(() => {
-    // Block if locked
+    // Block if locked (after question 15)
     if (isLocked) {
-      setShowPaywall(true)
       return
     }
 
@@ -101,9 +103,8 @@ function PracticePageContent() {
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Block keyboard navigation when locked
+      // Block keyboard navigation when locked (after question 15)
       if (isLocked) {
-        setShowPaywall(true)
         return
       }
 
@@ -127,9 +128,12 @@ function PracticePageContent() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isLocked, loading, selectedAnswer, handleNext, handlePrevious])
 
-  // Don't show paywall while access is loading (prevents flash)
-  // Wait until access is loaded before showing paywall
-  const shouldShowPaywall = (isLocked || showPaywall) && !loading
+  // Show paywall ONLY when:
+  // 1. isLocked is true (freeUsed >= 15 AND not paid)
+  // 2. showPaywall state is true (set by useEffect when isLocked becomes true)
+  // 3. NOT loading (prevents flash during API calls)
+  // This ensures paywall only shows AFTER question 15, never during trial period
+  const shouldShowPaywall = isLocked && showPaywall && !loading
 
   // Don't render anything while loading (prevents paywall flash)
   if (loading) {

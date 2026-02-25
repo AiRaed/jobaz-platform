@@ -36,38 +36,132 @@ export default function JobFinderPage() {
   const [savedItems, setSavedItems] = useState<Array<{ job_key: string; job: Job; created_at: string }>>([]) // Full saved items from Supabase
   const [isInitialized, setIsInitialized] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [prefillLabel, setPrefillLabel] = useState<string | null>(null) // Label from Career Assistant
+  const [caSessionId, setCaSessionId] = useState<string | null>(null) // Session ID from Career Assistant
   const hasAutoSearchedRef = useRef(false)
 
   // Read query or jobTitle from URL query parameter on mount
   useEffect(() => {
-    // Priority: query param (new) > jobTitle param (legacy)
+    // Priority: q param (Career Assistant) > query param (new) > jobTitle param (legacy)
+    const qFromUrl = searchParams.get('q')
     const queryFromUrl = searchParams.get('query')
     const jobTitleFromUrl = searchParams.get('jobTitle')
     const locationFromUrl = searchParams.get('location')
+    const categoryFromUrl = searchParams.get('category')
+    const fromParam = searchParams.get('from')
+    const sessionParam = searchParams.get('ca_session')
     
-    if (queryFromUrl) {
+    // Check if coming from Career Assistant
+    if (fromParam === 'career_assistant' || sessionParam) {
+      if (sessionParam) {
+        // Verify snapshot exists before setting session
+        if (typeof window !== 'undefined') {
+          try {
+            const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
+            if (snapshot) {
+              const parsed = JSON.parse(snapshot)
+              if (parsed.sessionId === sessionParam) {
+                setCaSessionId(sessionParam)
+                localStorage.setItem('jobaz_ca_session', sessionParam)
+              }
+            }
+          } catch (err) {
+            console.error('Failed to verify/store CA session:', err)
+          }
+        }
+      } else if (typeof window !== 'undefined') {
+        // Try to restore from localStorage if param missing but we have stored session
+        try {
+          const stored = localStorage.getItem('jobaz_ca_session')
+          if (stored) {
+            // Verify snapshot still exists
+            const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
+            if (snapshot) {
+              const parsed = JSON.parse(snapshot)
+              if (parsed.sessionId === stored) {
+                setCaSessionId(stored)
+              } else {
+                // Session mismatch, clear stored session
+                localStorage.removeItem('jobaz_ca_session')
+              }
+            } else {
+              // Snapshot missing, clear stored session
+              localStorage.removeItem('jobaz_ca_session')
+            }
+          }
+        } catch (err) {
+          console.error('Failed to restore CA session:', err)
+        }
+      }
+    } else if (typeof window !== 'undefined') {
+      // Check localStorage for stored session (for refresh durability)
+      try {
+        const stored = localStorage.getItem('jobaz_ca_session')
+        if (stored) {
+          // Verify snapshot still exists
+          const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
+          if (snapshot) {
+            const parsed = JSON.parse(snapshot)
+            if (parsed.sessionId === stored) {
+              setCaSessionId(stored)
+            } else {
+              // Session mismatch, clear stored session
+              localStorage.removeItem('jobaz_ca_session')
+            }
+          } else {
+            // Snapshot missing, clear stored session
+            localStorage.removeItem('jobaz_ca_session')
+          }
+        }
+      } catch (err) {
+        console.error('Failed to restore CA session:', err)
+      }
+    }
+    
+    // If q param exists (from Career Assistant), use it and store the label
+    // Only set title if search box is empty (on first load)
+    if (qFromUrl) {
+      const decodedQ = decodeURIComponent(qFromUrl)
+      if (!title) {
+        setTitle(decodedQ)
+      }
+      setPrefillLabel(decodedQ) // Always set label for UI hint
+    } else if (queryFromUrl && !title) {
       setTitle(decodeURIComponent(queryFromUrl))
-    } else if (jobTitleFromUrl) {
+      setPrefillLabel(null) // Clear prefill label if not from Career Assistant
+    } else if (jobTitleFromUrl && !title) {
       setTitle(decodeURIComponent(jobTitleFromUrl))
+      setPrefillLabel(null) // Clear prefill label if not from Career Assistant
+    } else if (!qFromUrl && !queryFromUrl && !jobTitleFromUrl) {
+      // Clear prefill label if no Career Assistant params
+      setPrefillLabel(null)
     }
     
     // Set location if provided in URL
     if (locationFromUrl && UK_CITIES.includes(locationFromUrl as any)) {
       setLocation(locationFromUrl)
     }
+    
+    // If category param exists but no q param, we still want to show it came from Career Assistant
+    // But we won't have a label, so we'll use the category as fallback
+    if (categoryFromUrl && !qFromUrl) {
+      const decodedCategory = decodeURIComponent(categoryFromUrl)
+      setPrefillLabel(decodedCategory.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))
+    }
   }, [searchParams])
 
-  // Auto-trigger search when query param exists (only once to avoid API spam)
+  // Auto-trigger search when query param or q param exists (only once to avoid API spam)
   useEffect(() => {
     const queryFromUrl = searchParams.get('query')
+    const qFromUrl = searchParams.get('q')
     
     // Only auto-search if:
-    // 1. We have a query param
+    // 1. We have a query param or q param
     // 2. We haven't auto-searched yet
     // 3. We're not currently loading
     // 4. Title is set (from previous effect)
     // 5. We haven't already searched
-    if (queryFromUrl && !hasAutoSearchedRef.current && !loading && title && !searched) {
+    if ((queryFromUrl || qFromUrl) && !hasAutoSearchedRef.current && !loading && title && !searched) {
       hasAutoSearchedRef.current = true
       // Small delay to ensure all state is properly set before triggering search
       const timer = setTimeout(() => {
@@ -476,12 +570,98 @@ export default function JobFinderPage() {
     return savedSet.has(jobId)
   }
 
+  // Clear prefill from Career Assistant
+  const handleClearPrefill = () => {
+    setPrefillLabel(null)
+    setCaSessionId(null)
+    // Remove category, q, from, and ca_session params from URL without triggering navigation
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('category')
+    params.delete('q')
+    params.delete('from')
+    params.delete('ca_session')
+    const newUrl = params.toString() ? `/job-finder?${params.toString()}` : '/job-finder'
+    router.replace(newUrl)
+    // Clear stored session
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('jobaz_ca_session')
+      } catch (err) {
+        console.error('Failed to clear CA session:', err)
+      }
+    }
+  }
+
+  // Navigate back to Career Assistant results
+  const handleBackToResults = () => {
+    if (caSessionId) {
+      router.push(`/uk-career-assistant?resume=1&ca_session=${encodeURIComponent(caSessionId)}`)
+    }
+  }
+
   return (
     <AppShell className="max-w-7xl">
         <PageHeader
           title="Find jobs that match your skills"
           subtitle="Search for roles based on your CV and preferences"
         />
+
+        {/* Back to Career Assistant Results Banner */}
+        {caSessionId && (
+          <div className="mb-6 p-4 rounded-xl border border-purple-500/30 bg-purple-950/20 backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2 text-sm text-purple-200">
+                <span>You came from Career Assistant</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleBackToResults}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-[0_0_25px_rgba(139,92,246,0.4)]"
+                >
+                  Back to results
+                </button>
+                <button
+                  onClick={() => {
+                    // Just clear the banner, keep filters
+                    setCaSessionId(null)
+                    if (typeof window !== 'undefined') {
+                      try {
+                        localStorage.removeItem('jobaz_ca_session')
+                      } catch (err) {
+                        console.error('Failed to clear CA session:', err)
+                      }
+                    }
+                    // Remove from URL
+                    const params = new URLSearchParams(searchParams.toString())
+                    params.delete('from')
+                    params.delete('ca_session')
+                    const newUrl = params.toString() ? `/job-finder?${params.toString()}` : '/job-finder'
+                    router.replace(newUrl)
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-purple-300 hover:text-purple-100 border border-purple-500/30 hover:border-purple-400/50 rounded-lg transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Prefill Hint from Career Assistant (only show if no back banner) */}
+        {prefillLabel && !caSessionId && (
+          <div className="mb-6 p-4 rounded-xl border border-purple-500/30 bg-purple-950/20 backdrop-blur-sm flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm text-purple-200">
+              <span>Prefilled from Career Assistant:</span>
+              <span className="font-medium text-purple-100">{prefillLabel}</span>
+            </div>
+            <button
+              onClick={handleClearPrefill}
+              className="px-3 py-1.5 text-xs font-medium text-purple-300 hover:text-purple-100 border border-purple-500/30 hover:border-purple-400/50 rounded-lg transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         {/* Search Controls */}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-400/60 hover:shadow-[0_18px_50px_rgba(76,29,149,0.7)] transition p-6 mb-8">

@@ -91,9 +91,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Apply fix to content
+    // Apply fix to content (replace or delete: empty suggestion = delete range)
     let content = document.content || ''
-    const { start_index, end_index, original, suggestion } = issue
+    const start_index = issue.start_index ?? issue.startIndex
+    const end_index = issue.end_index ?? issue.endIndex
+    const original = issue.original_text ?? issue.original ?? ''
+    const suggestion = issue.suggestion_text ?? issue.suggestion ?? ''
 
     // Validate original text matches
     const actualText = content.substring(start_index, end_index)
@@ -109,13 +112,13 @@ export async function POST(req: NextRequest) {
         const after = content.substring(foundIndex + original.length)
         content = before + suggestion + after
       } else {
-        // Fallback: use original positions anyway
+        // Fallback: use original positions anyway (e.g. delete by range)
         const before = content.substring(0, start_index)
         const after = content.substring(end_index)
         content = before + suggestion + after
       }
     } else {
-      // Direct replacement
+      // Direct replacement or delete (suggestion empty = delete)
       const before = content.substring(0, start_index)
       const after = content.substring(end_index)
       content = before + suggestion + after

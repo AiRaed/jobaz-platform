@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle2, AlertTriangle, ExternalLink, FileText, MessageSquare, Mail, Search, Info } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
@@ -13,8 +13,46 @@ import { LocationSearchModal } from '@/components/LocationSearchModal'
 export default function CareerPathPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const pathId = params.pathId as string
   const path = getCareerPathById(pathId)
+  const [caSessionId, setCaSessionId] = useState<string | null>(null)
+
+  // Check for Career Assistant query params and localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const from = searchParams.get('from')
+    const sessionParam = searchParams.get('ca_session')
+    
+    // Show back button if from=career_assistant OR ca_session exists
+    if ((from === 'career_assistant' || sessionParam) && sessionParam) {
+      // Verify snapshot exists before setting session
+      try {
+        const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
+        if (snapshot) {
+          const parsed = JSON.parse(snapshot)
+          if (parsed.sessionId === sessionParam) {
+            setCaSessionId(sessionParam)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to verify CA session:', err)
+      }
+    } else {
+      // Check localStorage for stored session (for refresh durability)
+      try {
+        const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
+        if (snapshot) {
+          const parsed = JSON.parse(snapshot)
+          if (parsed.sessionId) {
+            setCaSessionId(parsed.sessionId)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to restore CA session from localStorage:', err)
+      }
+    }
+  }, [searchParams])
   const [locationModalOpen, setLocationModalOpen] = useState(false)
   const [selectedCourse, setSelectedCourse] = useState<{ 
     name: string
@@ -157,6 +195,8 @@ export default function CareerPathPage() {
         subtitle={path.description}
         showBackToDashboard={true}
         showBackToAllPaths={true}
+        showBackToCareerAssistant={!!caSessionId}
+        caSessionId={caSessionId}
       />
 
       {/* Page Content Header */}

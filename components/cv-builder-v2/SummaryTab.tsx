@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Sparkles, Loader2, Undo2, X, CheckCircle2, AlertCircle, AlertTriangle, Zap, Check, Copy } from 'lucide-react'
 import { CvData } from '@/app/cv-builder-v2/page'
+import { hasSummaryGrammarOrSpellingIssues } from '@/lib/cv-summary-grammar-detect'
 
 interface SummaryTabProps {
   summary: string
@@ -97,28 +98,21 @@ export default function SummaryTab({ summary, personalInfo, skills, experience, 
       if (status === 'strong') status = 'good'
     }
 
-    // Basic grammar checks
-    const hasCommonIssues = /\s{2,}|\.{2,}|\,{2,}/.test(text) // Multiple spaces, periods, commas
-    const hasCapitalization = /^[A-Z]/.test(text.trim()) // Starts with capital
-    const hasProperEnding = /[.!?]$/.test(text.trim()) // Ends with punctuation
-    
-    if (hasCommonIssues || !hasCapitalization || !hasProperEnding) {
-      setGrammarIssues(true)
-      if (status === 'strong') status = 'good'
-    } else {
-      setGrammarIssues(false)
-    }
+    // Real-time grammar and spelling detection (spelling, grammar, punctuation, clarity)
+    const hasIssues = hasSummaryGrammarOrSpellingIssues(text)
+    setGrammarIssues(hasIssues)
+    if (hasIssues && status === 'strong') status = 'good'
 
     // Limit feedback to 3 items
     setFeedback(feedbackItems.slice(0, 3))
     setQualityStatus(status)
   }, [])
 
-  // Debounced auto-evaluation
+  // Debounced auto-evaluation (real-time analysis after type/paste)
   useEffect(() => {
     const timer = setTimeout(() => {
       evaluateSummaryQuality(summary)
-    }, 1000) // 1 second debounce
+    }, 500) // 500ms debounce for responsive real-time feedback
 
     return () => clearTimeout(timer)
   }, [summary, evaluateSummaryQuality])
@@ -435,17 +429,23 @@ Important: If there are NO grammar or spelling issues, return the EXACT same tex
           </div>
         )}
 
-        {/* Grammar & Spelling Alert */}
-        {grammarIssues && summary.trim() && (
-          <div className="mt-2 p-2.5 bg-amber-950/20 border border-amber-500/30 rounded-lg flex items-center justify-between">
+        {/* Fix Grammar: show whenever there is text (after any type/paste); highlight when issues detected */}
+        {summary.trim() && (
+          <div className={`mt-2 p-2.5 rounded-lg flex items-center justify-between ${grammarIssues ? 'bg-amber-950/20 border border-amber-500/30' : 'bg-slate-800/30 border border-slate-700/50'}`}>
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span className="text-xs text-amber-300">Minor grammar or spelling issues detected</span>
+              {grammarIssues ? (
+                <>
+                  <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <span className="text-xs text-amber-300">Grammar, spelling, or punctuation issues detected</span>
+                </>
+              ) : (
+                <span className="text-xs text-slate-400">One-click correction for grammar and spelling</span>
+              )}
             </div>
             <button
               onClick={handleFixGrammar}
               disabled={grammarFixLoading || isSuggesting || qualityCheckLoading}
-              className="ml-2 px-2.5 py-1 text-xs font-medium rounded-md bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 hover:border-amber-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 flex-shrink-0"
+              className={`ml-2 px-2.5 py-1 text-xs font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 flex-shrink-0 ${grammarIssues ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 hover:border-amber-500/50' : 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50'}`}
             >
               {grammarFixLoading ? (
                 <>

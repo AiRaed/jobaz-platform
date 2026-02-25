@@ -33,13 +33,14 @@ interface ProofreadingDocument {
 interface ProofreadingIssue {
   id: string
   document_id: string
-  type: 'grammar' | 'spelling' | 'style' | 'clarity' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality'
+  type: 'grammar' | 'spelling' | 'style' | 'clarity' | 'word_form' | 'tense' | 'repetition' | 'preposition' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality'
   severity: 'low' | 'moderate' | 'high'
   message: string
   original_text: string
   suggestion_text: string
   start_index: number
   end_index: number
+  action?: 'replace' | 'delete' | 'insert'
   status: 'open' | 'applied' | 'rejected'
   created_at: string
   updated_at: string
@@ -1090,11 +1091,12 @@ export default function ProofreadingPage() {
     if (!activeDocumentId || !currentDocument) return
 
     try {
-      // Apply fix to active page content only
+      // Apply fix to active page content only (delete = remove range when action is delete or type is repetition)
       const activePageContent = pages[activePageIndex]?.content || ''
       const before = activePageContent.substring(0, issue.start_index)
       const after = activePageContent.substring(issue.end_index)
-      const newContent = before + (issue.suggestion_text || '') + after
+      const isDelete = issue.action === 'delete' || issue.type === 'repetition'
+      const newContent = isDelete ? before + after : before + (issue.suggestion_text || '') + after
 
       // Update active page content
       setPages(prev => {
@@ -1943,8 +1945,23 @@ export default function ProofreadingPage() {
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold text-violet-300 capitalize">{issue.type}</span>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span
+                            className={cn(
+                              "inline-block w-2 h-2 rounded-full flex-shrink-0",
+                              issue.type === 'spelling' && "bg-red-400",
+                              issue.type === 'grammar' && "bg-blue-400",
+                              issue.type === 'style' && "bg-amber-400",
+                              issue.type === 'clarity' && "bg-emerald-400",
+                              issue.type === 'word_form' && "bg-cyan-400",
+                              issue.type === 'tense' && "bg-orange-400",
+                              issue.type === 'repetition' && "bg-rose-400",
+                              issue.type === 'preposition' && "bg-teal-400",
+                              !['spelling','grammar','style','clarity','word_form','tense','repetition','preposition'].includes(issue.type) && "bg-violet-400"
+                            )}
+                            title={issue.type}
+                          />
+                          <span className="text-xs font-semibold text-violet-300 capitalize">{issue.type.replace(/_/g, ' ')}</span>
                           <span className={cn(
                             "text-xs px-1.5 py-0.5 rounded",
                             issue.severity === 'high' ? "bg-red-900/50 text-red-300" :
@@ -1953,16 +1970,24 @@ export default function ProofreadingPage() {
                           )}>
                             {issue.severity}
                           </span>
+                          {(!issue.suggestion_text || !issue.suggestion_text.trim()) && issue.type !== 'repetition' && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300">Tip</span>
+                          )}
+                          {issue.type === 'repetition' && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-rose-900/50 text-rose-300">Delete</span>
+                          )}
                         </div>
                         <div className="text-xs text-slate-300 mb-1">{issue.message}</div>
                         <div className="text-xs text-slate-400 font-mono bg-slate-900/50 p-1 rounded mb-1">
                           {issue.original_text || activePageContent.substring(issue.start_index, issue.end_index)}
                         </div>
-                        {issue.suggestion_text && (
+                        {issue.suggestion_text ? (
                           <div className="text-xs text-green-400 font-mono bg-slate-900/50 p-1 rounded">
                             → {issue.suggestion_text}
                           </div>
-                        )}
+                        ) : issue.type === 'repetition' ? (
+                          <div className="text-xs text-slate-400 italic">Apply to remove duplicate sentence.</div>
+                        ) : null}
                       </div>
                     </div>
                     
@@ -1970,7 +1995,13 @@ export default function ProofreadingPage() {
                       <div className="flex gap-2 mt-2">
                         <button
                           onClick={() => applyIssue(issue)}
-                          className="flex-1 px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-xs font-medium transition flex items-center justify-center gap-1"
+                          disabled={!(issue.suggestion_text?.trim() || issue.type === 'repetition' || issue.action === 'delete')}
+                          className={cn(
+                            "flex-1 px-2 py-1 rounded text-xs font-medium transition flex items-center justify-center gap-1",
+                            (issue.suggestion_text?.trim() || issue.type === 'repetition' || issue.action === 'delete')
+                              ? "bg-green-600 hover:bg-green-700"
+                              : "bg-slate-600 cursor-not-allowed opacity-60"
+                          )}
                         >
                           <Check className="w-3 h-3" />
                           Apply
@@ -2582,7 +2613,7 @@ function EmailBuilderContent({
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs font-semibold text-violet-300 capitalize">{issue.type}</span>
                         <span className={cn(
                           "text-xs px-1.5 py-0.5 rounded",
@@ -2592,6 +2623,9 @@ function EmailBuilderContent({
                         )}>
                           {issue.severity}
                         </span>
+                        {(!issue.suggestion_text || !issue.suggestion_text.trim()) && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300">Tip</span>
+                        )}
                       </div>
                         <div className="text-xs text-slate-300 mb-1">{issue.message}</div>
                         {issue.explanation && (
@@ -2613,7 +2647,9 @@ function EmailBuilderContent({
                   {issue.status === 'open' && (
                     <div className="flex gap-2 mt-2">
                       <button
+                        disabled={!issue.suggestion_text || !issue.suggestion_text.trim()}
                         onClick={() => {
+                          if (!issue.suggestion_text?.trim()) return
                           // Apply issue fix - issues are indexed in the fullText
                           const currentFullText = [
                             emailSubject || '',
@@ -2644,7 +2680,12 @@ function EmailBuilderContent({
                           )
                           setEmailIssues(updatedIssues)
                         }}
-                        className="flex-1 px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-xs font-medium transition flex items-center justify-center gap-1"
+                        className={cn(
+                          "flex-1 px-2 py-1 rounded text-xs font-medium transition flex items-center justify-center gap-1",
+                          issue.suggestion_text?.trim()
+                            ? "bg-green-600 hover:bg-green-700"
+                            : "bg-slate-600 cursor-not-allowed opacity-60"
+                        )}
                       >
                         <Check className="w-3 h-3" />
                         Apply

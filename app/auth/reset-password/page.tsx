@@ -18,24 +18,26 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const initializeReset = async () => {
       try {
-        // Get tokens from URL parameters
+        // Get tokens from URL parameters (query string)
         const code = searchParams?.get('code')
         const access_token = searchParams?.get('access_token')
         const refresh_token = searchParams?.get('refresh_token')
         const type = searchParams?.get('type')
 
-        // Also check hash fragment (some Supabase flows use hash)
+        // Also check hash fragment (Supabase often sends tokens in hash)
         const hash = typeof window !== 'undefined' ? window.location.hash : ''
         const hashParams = new URLSearchParams(hash.substring(1))
         const hashAccessToken = hashParams.get('access_token')
         const hashRefreshToken = hashParams.get('refresh_token')
         const hashType = hashParams.get('type')
 
-        // Determine if this is a recovery flow
-        const isRecoveryFlow = type === 'recovery' || hashType === 'recovery' ||
-                              (typeof window !== 'undefined' && window.location.href.includes('type=recovery'))
+        // Valid recovery: type=recovery (Supabase email link) OR we have tokens/code
+        const hasTypeRecovery = type === 'recovery' || hashType === 'recovery' ||
+          (typeof window !== 'undefined' && window.location.href.includes('type=recovery'))
+        const hasTokens = !!(code || access_token || hashAccessToken)
+        const hasValidRecoveryLink = hasTypeRecovery || hasTokens
 
-        if (!isRecoveryFlow) {
+        if (!hasValidRecoveryLink) {
           setError('Invalid reset link. This page is only for password reset.')
           setInitializing(false)
           return

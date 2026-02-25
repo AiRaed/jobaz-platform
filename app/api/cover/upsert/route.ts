@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { logEvent } from '@/lib/analytics/logEvent'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,6 +191,7 @@ export async function POST(req: NextRequest) {
       updatedAt = insertedRow.updated_at || new Date().toISOString()
     }
 
+    logEvent('cover_letter_generated', {}, supabase).catch(() => {})
     console.log('[COVER UPSERT]', user.id, result)
 
     return NextResponse.json({

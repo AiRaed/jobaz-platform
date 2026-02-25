@@ -8,8 +8,18 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 type WritingMode = 'general' | 'academic' | 'academic_research'
-type IssueType = 'grammar' | 'spelling' | 'style' | 'clarity' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality'
+type IssueType = 'grammar' | 'spelling' | 'style' | 'clarity' | 'word_form' | 'tense' | 'repetition' | 'preposition' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality'
 type Severity = 'low' | 'moderate' | 'high'
+
+const DISPLAY_ISSUE_TYPES: IssueType[] = ['grammar', 'spelling', 'style', 'clarity', 'word_form', 'tense', 'repetition', 'preposition', 'academic_tone', 'academic_objectivity', 'academic_hedging', 'academic_citation', 'academic_logic', 'structure', 'academic_style', 'methodology', 'evidence', 'research_quality']
+function toDisplayIssueType(type: string): IssueType {
+  if (DISPLAY_ISSUE_TYPES.includes(type as IssueType)) return type as IssueType
+  if (type.includes('grammar') || type === 'structure') return 'grammar'
+  if (type.includes('clarity') || type === 'methodology' || type === 'evidence') return 'clarity'
+  return 'style'
+}
+
+type IssueAction = 'replace' | 'delete' | 'insert'
 
 interface Issue {
   type: IssueType
@@ -85,7 +95,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { documentId, content, mode = 'general', options = {}, section } = body
+    let { documentId, content, mode = 'general', options = {}, section } = body
+
+    // General mode: always run at least spelling + grammar; clarity/style remain optional
+    if (mode === 'general') {
+      options = { ...options, spelling: true, grammar: true }
+    }
 
     // Validate required fields
     if (!documentId || typeof documentId !== 'string') {
@@ -174,13 +189,23 @@ export async function POST(req: NextRequest) {
 
     // Logging: Track mode and options
     console.log('[analyze] Mode:', mode, '| Options:', options, '| Content length:', text.length)
-    
+
+    // Dev-only: verify full text is analyzed (no segmentation)
+    const approxSentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0).length
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[analyze][dev] Full text analyzed. Length:', text.length, '| Approx sentences:', approxSentences)
+    }
+
     // Track issue counts by detector type
     const detectorCounts: Record<string, number> = {
       spelling: 0,
       grammar: 0,
       style: 0,
       clarity: 0,
+      word_form: 0,
+      tense: 0,
+      repetition: 0,
+      preposition: 0,
       academic_tone: 0,
       academic_objectivity: 0,
       academic_hedging: 0,
@@ -249,24 +274,45 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // "there" vs "their" vs "they're"
+      // "there" vs "their" vs "they're" — wrong use of "there"/"their" where "they're" (they are) is meant
+      // Skip when "there is/was" is followed by plural (many, several, etc.) — that's grammar (there is → there are), not spelling
       const thereTheirRegex = /\b(?:there|their)\s+(?:is|was|are|were)\b/gi
+      const thereIsPluralNext = /\s+(?:many|several|numerous|various|some|few|these|those)\b/i
       let thereMatch: RegExpExecArray | null
       while ((thereMatch = thereTheirRegex.exec(text)) !== null) {
         const word = thereMatch[0].split(/\s+/)[0]
-        if (word.toLowerCase() === 'there' || word.toLowerCase() === 'their') {
-          issues.push({
-            type: 'spelling',
-            severity: isAcademic ? 'moderate' : 'low',
-            message: isAcademicStandard
-              ? `Spelling: "${word}" should be "they're" (contraction of "they are")`
-              : `"${word}" should be "they're" (contraction of "they are")`,
-            original_text: word,
-            suggestion_text: "they're",
-            startIndex: thereMatch.index,
-            endIndex: thereMatch.index + word.length,
-          })
-        }
+        if (word.toLowerCase() !== 'there' && word.toLowerCase() !== 'their') continue
+        const afterMatch = text.slice(thereMatch.index + thereMatch[0].length)
+        const verb = thereMatch[0].split(/\s+/)[1]
+        if (verb && /^(is|was)$/i.test(verb) && thereIsPluralNext.test(afterMatch)) continue // grammar handles "there is many"
+        detectorCounts.spelling++
+        issues.push({
+          type: 'spelling',
+          severity: isAcademic ? 'moderate' : 'low',
+          message: isAcademicStandard
+            ? `Spelling: "${word}" should be "they're" (contraction of "they are")`
+            : `"${word}" should be "they're" (contraction of "they are")`,
+          original_text: word,
+          suggestion_text: "they're",
+          startIndex: thereMatch.index,
+          endIndex: thereMatch.index + word.length,
+        })
+      }
+      // "there"/"their" used as subject (e.g. "There going to", "Their not here") → "they're"
+      const thereTheyreWrongRegex = /\b(there|their)\s+(going|not|will|would|can|could|have|had|been|already|still|really|also)\b/gi
+      let thereTheyreMatch: RegExpExecArray | null
+      while ((thereTheyreMatch = thereTheyreWrongRegex.exec(text)) !== null) {
+        const word = thereTheyreMatch[1]
+        detectorCounts.spelling++
+        issues.push({
+          type: 'spelling',
+          severity: isAcademic ? 'moderate' : 'low',
+          message: `"${word}" should be "they're" (they are) here.`,
+          original_text: word,
+          suggestion_text: "they're",
+          startIndex: thereTheyreMatch.index,
+          endIndex: thereTheyreMatch.index + word.length,
+        })
       }
 
       // "loose" vs "lose"
@@ -306,6 +352,43 @@ export async function POST(req: NextRequest) {
           })
         }
       }
+
+      // Common misspellings (include even if browser spellcheck would catch them)
+      const commonMisspellings: { wrong: RegExp; right: string }[] = [
+        { wrong: /\binteressted\b/gi, right: 'interested' },
+        { wrong: /\boccured\b/gi, right: 'occurred' },
+        { wrong: /\brecieve\b/gi, right: 'receive' },
+        { wrong: /\brecieved\b/gi, right: 'received' },
+        { wrong: /\bseperate\b/gi, right: 'separate' },
+        { wrong: /\bdefinately\b/gi, right: 'definitely' },
+        { wrong: /\baccomodate\b/gi, right: 'accommodate' },
+        { wrong: /\boccassion\b/gi, right: 'occasion' },
+        { wrong: /\bneccessary\b/gi, right: 'necessary' },
+        { wrong: /\bacheive\b/gi, right: 'achieve' },
+        { wrong: /\bbenefitted\b/gi, right: 'benefited' },
+        { wrong: /\brefered\b/gi, right: 'referred' },
+        { wrong: /\bcommited\b/gi, right: 'committed' },
+        { wrong: /\bembarass\b/gi, right: 'embarrass' },
+        { wrong: /\bgoverment\b/gi, right: 'government' },
+        { wrong: /\benviroment\b/gi, right: 'environment' },
+        { wrong: /\barguement\b/gi, right: 'argument' },
+        { wrong: /\boccuring\b/gi, right: 'occurring' },
+      ]
+      for (const { wrong, right } of commonMisspellings) {
+        let spMatch: RegExpExecArray | null
+        while ((spMatch = wrong.exec(text)) !== null) {
+          detectorCounts.spelling++
+          issues.push({
+            type: 'spelling',
+            severity: isAcademic ? 'moderate' : 'low',
+            message: `Spelling: Use "${right}".`,
+            original_text: spMatch[0],
+            suggestion_text: right,
+            startIndex: spMatch.index,
+            endIndex: spMatch.index + spMatch[0].length,
+          })
+        }
+      }
     }
 
     // ========================================================================
@@ -335,14 +418,34 @@ export async function POST(req: NextRequest) {
       const doubleSpaceRegex = /  +/g
       let doubleSpaceMatch: RegExpExecArray | null
       while ((doubleSpaceMatch = doubleSpaceRegex.exec(text)) !== null) {
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
         issues.push({
           type: 'grammar',
           severity: 'low',
-          message: 'Multiple spaces detected',
+          message: 'Multiple spaces detected. Use a single space.',
           original_text: doubleSpaceMatch[0],
           suggestion_text: ' ',
           startIndex: doubleSpaceMatch.index,
           endIndex: doubleSpaceMatch.index + doubleSpaceMatch[0].length,
+        })
+      }
+
+      // Missing period: sentence runs into next (lowercase then space(s) then capital letter)
+      const missingPeriodRegex = /[a-z]\s+([A-Z])/g
+      let periodMatch: RegExpExecArray | null
+      while ((periodMatch = missingPeriodRegex.exec(text)) !== null) {
+        const spaceStart = periodMatch.index + 1
+        const capIndex = periodMatch.index + periodMatch[0].length - 1
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        const spacesOnly = text.substring(spaceStart, capIndex)
+        issues.push({
+          type: 'grammar',
+          severity: 'low',
+          message: 'Missing period or punctuation before this sentence.',
+          original_text: spacesOnly || ' ',
+          suggestion_text: '. ',
+          startIndex: spaceStart,
+          endIndex: capIndex,
         })
       }
 
@@ -351,6 +454,7 @@ export async function POST(req: NextRequest) {
       let studentsIsMatch: RegExpExecArray | null
       while ((studentsIsMatch = studentsIsRegex.exec(text)) !== null) {
         const isIndex = text.indexOf('is', studentsIsMatch.index)
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
         issues.push({
           type: 'grammar',
           severity: isAcademic ? 'high' : 'moderate',
@@ -423,6 +527,7 @@ export async function POST(req: NextRequest) {
       let itDistractMatch: RegExpExecArray | null
       while ((itDistractMatch = itDistractRegex.exec(text)) !== null) {
         const distractIndex = text.indexOf('distract', itDistractMatch.index)
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
         issues.push({
           type: 'grammar',
           severity: isAcademic ? 'high' : 'moderate',
@@ -434,6 +539,59 @@ export async function POST(req: NextRequest) {
           startIndex: distractIndex,
           endIndex: distractIndex + 8,
         })
+      }
+
+      // Subject-verb agreement (clear errors for General): "he/she + go/do/want", "the data show"
+      const heSheGoRegex = /\b(he|she)\s+go\b/gi
+      let heSheGoMatch: RegExpExecArray | null
+      while ((heSheGoMatch = heSheGoRegex.exec(text)) !== null) {
+        const idx = text.indexOf('go', heSheGoMatch.index)
+        if (idx >= 0) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: isAcademic ? 'high' : 'moderate',
+            message: 'Subject-verb agreement: "He/She" (singular) requires "goes".',
+            original_text: 'go',
+            suggestion_text: 'goes',
+            startIndex: idx,
+            endIndex: idx + 2,
+          })
+        }
+      }
+      const heSheDoRegex = /\b(he|she)\s+do\b/gi
+      let heSheDoMatch: RegExpExecArray | null
+      while ((heSheDoMatch = heSheDoRegex.exec(text)) !== null) {
+        const idx = text.indexOf('do', heSheDoMatch.index)
+        if (idx >= 0) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: isAcademic ? 'high' : 'moderate',
+            message: 'Subject-verb agreement: "He/She" (singular) requires "does".',
+            original_text: 'do',
+            suggestion_text: 'does',
+            startIndex: idx,
+            endIndex: idx + 2,
+          })
+        }
+      }
+      const dataShowRegex = /\b(the\s+data|the\s+result|the\s+study)\s+show\b/gi
+      let dataShowMatch: RegExpExecArray | null
+      while ((dataShowMatch = dataShowRegex.exec(text)) !== null) {
+        const idx = text.indexOf('show', dataShowMatch.index)
+        if (idx >= 0) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: isAcademic ? 'high' : 'moderate',
+            message: 'Subject-verb agreement: singular subject ("the data/result/study") requires "shows".',
+            original_text: 'show',
+            suggestion_text: 'shows',
+            startIndex: idx,
+            endIndex: idx + 4,
+          })
+        }
       }
 
       // Possessive: "students performance" -> "students' performance" or "student performance"
@@ -510,6 +668,379 @@ export async function POST(req: NextRequest) {
           })
         }
       })
+    }
+
+    // ========================================================================
+    // GENERAL MODE: Additional grammar, clarity, and style (not only spelling)
+    // Keeps General less strict than Academic but catches common grammar,
+    // clarity, and basic style issues.
+    // ========================================================================
+    if (!isAcademic && options.grammar !== false) {
+      // — Grammar: articles (a/an)
+      const aBeforeVowel = /\ba\s+([aeiouAEIOU][a-z]+)\b/g
+      let artMatch: RegExpExecArray | null
+      while ((artMatch = aBeforeVowel.exec(text)) !== null) {
+        const word = artMatch[1]
+        if (/^[aeiou]/i.test(word) && word.length > 1 && !/^eu/i.test(word)) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'low',
+            message: 'Grammar: Use "an" before a word that starts with a vowel sound (e.g. "an apple").',
+            original_text: 'a ' + word,
+            suggestion_text: 'an ' + word,
+            startIndex: artMatch.index,
+            endIndex: artMatch.index + artMatch[0].length,
+          })
+        }
+      }
+      const anBeforeConsonant = /\ban\s+([bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ][a-z]+)\b/g
+      while ((artMatch = anBeforeConsonant.exec(text)) !== null) {
+        const word = artMatch[1]
+        if (/^[bcdfghjklmnpqrstvwxyz]/i.test(word) && !/^[eu]/i.test(word)) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'low',
+            message: 'Grammar: Use "a" before a word that starts with a consonant sound (e.g. "a book").',
+            original_text: 'an ' + word,
+            suggestion_text: 'a ' + word,
+            startIndex: artMatch.index,
+            endIndex: artMatch.index + artMatch[0].length,
+          })
+        }
+      }
+
+      // — Grammar: there is/are (plural/singular)
+      const thereIsPlural = /\bthere\s+is\s+(?:many|several|numerous|various|some|few|these|those)\b/gi
+      let tipMatch: RegExpExecArray | null
+      while ((tipMatch = thereIsPlural.exec(text)) !== null) {
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'low',
+          message: 'Grammar: Use "there are" with plural ideas (e.g. "there are many").',
+          original_text: 'there is',
+          suggestion_text: 'there are',
+          startIndex: tipMatch.index,
+          endIndex: tipMatch.index + 9,
+        })
+      }
+      const thereAreSingular = /\bthere\s+are\s+(?:a|an)\s+\w+\s+(?:that|which|who)\b/gi
+      while ((tipMatch = thereAreSingular.exec(text)) !== null) {
+        const match = /there\s+are\s+/.exec(tipMatch[0])
+        if (match) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'low',
+            message: 'Grammar: Use "there is" with a singular noun (e.g. "there is a reason").',
+            original_text: 'there are',
+            suggestion_text: 'there is',
+            startIndex: tipMatch.index,
+            endIndex: tipMatch.index + 10,
+          })
+        }
+      }
+
+      // — Grammar: singular subject + "have" → "has" (e.g. "company have", "the team have")
+      const singularHaveRegex = /\b(company|organization|team|government|committee|board|group|business|firm)\s+have\b/gi
+      let shMatch: RegExpExecArray | null
+      while ((shMatch = singularHaveRegex.exec(text)) !== null) {
+        const haveIndex = shMatch.index + (shMatch[0].length - 5) // start of "have"
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'low',
+          message: 'Grammar: Singular subject requires "has" (third person), not "have".',
+          original_text: 'have',
+          suggestion_text: 'has',
+          startIndex: haveIndex,
+          endIndex: haveIndex + 4,
+        })
+      }
+
+      // — Grammar: repeated word (e.g. "the the")
+      const repeatedWord = /\b(\w+)\s+\1\b/gi
+      let rwMatch: RegExpExecArray | null
+      while ((rwMatch = repeatedWord.exec(text)) !== null) {
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'low',
+          message: 'Grammar: Repeated word. Remove the duplicate.',
+          original_text: rwMatch[0],
+          suggestion_text: rwMatch[1],
+          startIndex: rwMatch.index,
+          endIndex: rwMatch.index + rwMatch[0].length,
+        })
+      }
+
+      // — Tense (General): past time + base verb → use past tense
+      const pastTimeBaseVerb = /\b(yesterday|last\s+(?:week|month|year|night)|ago)\s+(?:he|she|it|we|they)\s+(go|do|come|run|give|take|make|see|write|say)\b/gi
+      let tenseMatch: RegExpExecArray | null
+      while ((tenseMatch = pastTimeBaseVerb.exec(text)) !== null) {
+        const verb = tenseMatch[2]?.toLowerCase()
+        const past: Record<string, string> = { go: 'went', do: 'did', come: 'came', run: 'ran', give: 'gave', take: 'took', make: 'made', see: 'saw', write: 'wrote', say: 'said' }
+        const suggestion = past[verb]
+        if (suggestion) {
+          detectorCounts.tense = (detectorCounts.tense || 0) + 1
+          const verbStart = tenseMatch.index + (tenseMatch[0].indexOf(tenseMatch[2]!) ?? 0)
+          issues.push({
+            type: 'tense',
+            severity: 'moderate',
+            message: 'Tense: Use past tense after past time (e.g. "yesterday he went").',
+            original_text: tenseMatch[2]!,
+            suggestion_text: suggestion,
+            startIndex: verbStart,
+            endIndex: verbStart + (tenseMatch[2]?.length ?? 0),
+          })
+        }
+      }
+
+      // — Word form (General): -ed vs -ing after "I am" — interest→interested, exciting→excited, boring→bored, etc.
+      const wordFormPatterns: { pattern: RegExp; original: string; suggestion: string; message: string }[] = [
+        { pattern: /\bI\s+am\s+interest\b/gi, original: 'interest', suggestion: 'interested', message: 'Word form: Use "interested" (adjective) after "I am", not "interest" (noun).' },
+        { pattern: /\bI\s+am\s+(?:very\s+)?exciting\b/gi, original: 'exciting', suggestion: 'excited', message: 'Word form: Use "excited" (how you feel) after "I am", not "exciting" (describes something else).' },
+        { pattern: /\bI\s+am\s+(?:very\s+)?boring\b/gi, original: 'boring', suggestion: 'bored', message: 'Word form: Use "bored" (how you feel) after "I am", not "boring".' },
+        { pattern: /\bI\s+am\s+(?:very\s+)?frustrating\b/gi, original: 'frustrating', suggestion: 'frustrated', message: 'Word form: Use "frustrated" (how you feel) after "I am", not "frustrating".' },
+        { pattern: /\bI\s+am\s+(?:very\s+)?interesting\b/gi, original: 'interesting', suggestion: 'interested', message: 'Word form: Use "interested" (I am interested in...) after "I am", not "interesting".' },
+      ]
+      for (const { pattern, original, suggestion, message } of wordFormPatterns) {
+        let wfMatch: RegExpExecArray | null
+        while ((wfMatch = pattern.exec(text)) !== null) {
+          const matchText = wfMatch[0]
+          const offset = matchText.toLowerCase().indexOf(original.toLowerCase())
+          const idx = wfMatch.index + (offset >= 0 ? offset : 0)
+          detectorCounts.word_form = (detectorCounts.word_form || 0) + 1
+          issues.push({
+            type: 'word_form',
+            severity: 'moderate',
+            message,
+            original_text: original,
+            suggestion_text: suggestion,
+            startIndex: idx,
+            endIndex: idx + original.length,
+          })
+        }
+      }
+
+      // — Spelling/Grammar (General): incorrect plurals — companys, familys, etc.
+      const incorrectPlurals: { wrong: RegExp; right: string }[] = [
+        { wrong: /\bcompanys\b/gi, right: 'companies' },
+        { wrong: /\bfamilys\b/gi, right: 'families' },
+        { wrong: /\bcountrys\b/gi, right: 'countries' },
+        { wrong: /\bstorys\b/gi, right: 'stories' },
+        { wrong: /\bpartys\b/gi, right: 'parties' },
+        { wrong: /\bcurrencys\b/gi, right: 'currencies' },
+      ]
+      for (const { wrong, right } of incorrectPlurals) {
+        let plMatch: RegExpExecArray | null
+        while ((plMatch = wrong.exec(text)) !== null) {
+          detectorCounts.spelling = (detectorCounts.spelling || 0) + 1
+          issues.push({
+            type: 'spelling',
+            severity: 'moderate',
+            message: `Spelling: Incorrect plural. Use "${right}".`,
+            original_text: plMatch[0],
+            suggestion_text: right,
+            startIndex: plMatch.index,
+            endIndex: plMatch.index + plMatch[0].length,
+          })
+        }
+      }
+
+      // — Grammar (General): subject-verb agreement — they was, it match, they has, etc.
+      const theyWasRegex = /\bthey\s+was\b/gi
+      let twMatch: RegExpExecArray | null
+      while ((twMatch = theyWasRegex.exec(text)) !== null) {
+        const idx = text.indexOf('was', twMatch.index)
+        if (idx >= 0) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'high',
+            message: 'Subject-verb agreement: "They" (plural) requires "were", not "was".',
+            original_text: 'was',
+            suggestion_text: 'were',
+            startIndex: idx,
+            endIndex: idx + 3,
+          })
+        }
+      }
+      const itMatchRegex = /\bit\s+match\b/gi
+      let imMatch: RegExpExecArray | null
+      while ((imMatch = itMatchRegex.exec(text)) !== null) {
+        const idx = text.indexOf('match', imMatch.index)
+        if (idx >= 0) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'high',
+            message: 'Subject-verb agreement: "It" (singular) requires "matches" (third person).',
+            original_text: 'match',
+            suggestion_text: 'matches',
+            startIndex: idx,
+            endIndex: idx + 5,
+          })
+        }
+      }
+      const theyHasRegex = /\bthey\s+has\b/gi
+      let thMatch: RegExpExecArray | null
+      while ((thMatch = theyHasRegex.exec(text)) !== null) {
+        const idx = text.indexOf('has', thMatch.index)
+        if (idx >= 0) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'high',
+            message: 'Subject-verb agreement: "They" (plural) requires "have", not "has".',
+            original_text: 'has',
+            suggestion_text: 'have',
+            startIndex: idx,
+            endIndex: idx + 3,
+          })
+        }
+      }
+
+      // — Grammar (General): infinitive vs gerund — look forward to hear → to hearing, enjoy to do → enjoy doing
+      const lookForwardToHear = /\blook(?:ing)?\s+forward\s+to\s+hear\b/gi
+      let lfMatch: RegExpExecArray | null
+      while ((lfMatch = lookForwardToHear.exec(text)) !== null) {
+        const idx = text.indexOf('hear', lfMatch.index)
+        if (idx >= 0) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'moderate',
+            message: 'Grammar: After "look forward to" use the gerund (-ing): "hearing", not "hear".',
+            original_text: 'hear',
+            suggestion_text: 'hearing',
+            startIndex: idx,
+            endIndex: idx + 4,
+          })
+        }
+      }
+      const enjoyToDo = /\benjoy\s+to\s+(\w+)\b/gi
+      let edMatch: RegExpExecArray | null
+      while ((edMatch = enjoyToDo.exec(text)) !== null) {
+        const verb = edMatch[1]!
+        const simpleGerund = verb.endsWith('e') ? verb.slice(0, -1) + 'ing' : verb + 'ing'
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'moderate',
+          message: 'Grammar: After "enjoy" use the gerund (-ing): "enjoy doing", not "enjoy to do".',
+          original_text: 'to ' + verb,
+          suggestion_text: simpleGerund,
+          startIndex: edMatch.index + (edMatch[0].indexOf('to')),
+          endIndex: edMatch.index + edMatch[0].length,
+        })
+      }
+
+      // — Repetition (General): repeated sentences or duplicated paragraphs
+      const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 10)
+      const normalizedSentences = sentences.map(s => s.toLowerCase().replace(/\s+/g, ' '))
+      const seenSentences = new Map<string, number>()
+      let cursor = 0
+      for (let i = 0; i < sentences.length; i++) {
+        const norm = normalizedSentences[i]
+        if (!norm) continue
+        const pos = text.indexOf(sentences[i], cursor)
+        if (pos < 0) continue
+        const prev = seenSentences.get(norm)
+        if (prev !== undefined) {
+          detectorCounts.repetition = (detectorCounts.repetition || 0) + 1
+          const fullSentence = sentences[i]
+          issues.push({
+            type: 'repetition',
+            severity: 'moderate',
+            message: 'Repetition: This sentence is duplicated earlier in the text. Consider removing or rephrasing.',
+            original_text: fullSentence,
+            suggestion_text: '',
+            startIndex: pos,
+            endIndex: pos + fullSentence.length,
+          })
+        } else {
+          seenSentences.set(norm, pos)
+        }
+        cursor = pos + sentences[i].length
+      }
+    }
+
+    if (!isAcademic && options.clarity !== false) {
+      // — Clarity: "the reason is because" (redundant)
+      const reasonBecause = /\bthe\s+reason\s+is\s+because\b/gi
+      let rbMatch: RegExpExecArray | null
+      while ((rbMatch = reasonBecause.exec(text)) !== null) {
+        detectorCounts.clarity = (detectorCounts.clarity || 0) + 1
+        issues.push({
+          type: 'clarity',
+          severity: 'low',
+          message: 'Clarity: "The reason is because" is redundant. Use "The reason is that" or "Because".',
+          original_text: rbMatch[0],
+          suggestion_text: 'the reason is that',
+          startIndex: rbMatch.index,
+          endIndex: rbMatch.index + rbMatch[0].length,
+        })
+      }
+
+      // — Clarity: wordy "due to the fact that"
+      const dueToFact = /\bdue\s+to\s+the\s+fact\s+that\b/gi
+      let dtMatch: RegExpExecArray | null
+      while ((dtMatch = dueToFact.exec(text)) !== null) {
+        detectorCounts.clarity = (detectorCounts.clarity || 0) + 1
+        issues.push({
+          type: 'clarity',
+          severity: 'low',
+          message: 'Clarity: Prefer "because" instead of "due to the fact that" for clearer writing.',
+          original_text: dtMatch[0],
+          suggestion_text: 'because',
+          startIndex: dtMatch.index,
+          endIndex: dtMatch.index + dtMatch[0].length,
+        })
+      }
+
+      // — Style (General): "in order to" → "to" (wordy)
+      const inOrderTo = /\bin\s+order\s+to\b/gi
+      let iotMatch: RegExpExecArray | null
+      while ((iotMatch = inOrderTo.exec(text)) !== null) {
+        detectorCounts.style = (detectorCounts.style || 0) + 1
+        issues.push({
+          type: 'style',
+          severity: 'low',
+          message: 'Style: "In order to" can often be shortened to "to" for more concise writing.',
+          original_text: 'in order to',
+          suggestion_text: 'to',
+          startIndex: iotMatch.index,
+          endIndex: iotMatch.index + iotMatch[0].length,
+        })
+      }
+
+      // — Prepositions (General)
+      const prepositionFixes: { pattern: RegExp; original: string; suggestion: string; message: string }[] = [
+        { pattern: /\bdifferent\s+than\b/gi, original: 'different than', suggestion: 'different from', message: 'Preposition: Use "different from" (not "different than") in formal writing.' },
+        { pattern: /\binterested\s+on\b/gi, original: 'interested on', suggestion: 'interested in', message: 'Preposition: Use "interested in", not "interested on".' },
+        { pattern: /\bdepend\s+of\b/gi, original: 'depend of', suggestion: 'depend on', message: 'Preposition: Use "depend on", not "depend of".' },
+        { pattern: /\bcompared\s+than\b/gi, original: 'compared than', suggestion: 'compared with', message: 'Preposition: Use "compared with" or "compared to", not "compared than".' },
+        { pattern: /\bresponsible\s+from\b/gi, original: 'responsible from', suggestion: 'responsible for', message: 'Preposition: Use "responsible for", not "responsible from".' },
+        { pattern: /\bagree\s+to\s+something\b/gi, original: 'agree to something', suggestion: 'agree with something', message: 'Preposition: Use "agree with" (a person or idea), "agree to" (a plan or proposal).' },
+      ]
+      for (const { pattern, original, suggestion, message } of prepositionFixes) {
+        let prepMatch: RegExpExecArray | null
+        while ((prepMatch = pattern.exec(text)) !== null) {
+          detectorCounts.preposition = (detectorCounts.preposition || 0) + 1
+          issues.push({
+            type: 'preposition',
+            severity: 'moderate',
+            message,
+            original_text: prepMatch[0],
+            suggestion_text: suggestion,
+            startIndex: prepMatch.index,
+            endIndex: prepMatch.index + prepMatch[0].length,
+          })
+        }
+      }
     }
 
     // ========================================================================
@@ -1412,12 +1943,22 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Sort issues by startIndex
+    // Deduplicate: same type + original + suggestion = one issue (stable key)
+    const issueKey = (i: Issue) =>
+      `${i.type}-${(i.original_text || '').trim().toLowerCase()}-${(i.suggestion_text || '').trim().toLowerCase()}`
+    const seenKeys = new Set<string>()
+    const dedupedIssues: Issue[] = []
     issues.sort((a, b) => a.startIndex - b.startIndex)
+    for (const issue of issues) {
+      const key = issueKey(issue)
+      if (seenKeys.has(key)) continue
+      seenKeys.add(key)
+      dedupedIssues.push(issue)
+    }
 
     // Remove overlapping issues (keep first, skip later)
     const nonOverlapping: Issue[] = []
-    for (const issue of issues) {
+    for (const issue of dedupedIssues) {
       const overlaps = nonOverlapping.some(existing => {
         return (
           (issue.startIndex >= existing.startIndex && issue.startIndex < existing.endIndex) ||
@@ -1430,9 +1971,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Ensure all issues have required fields (original_text must never be null)
-    const validatedIssues = nonOverlapping.slice(0, 50).map(issue => {
-      // Clamp indices to valid range
+    // Ensure all issues have required fields (original_text must never be null). General: no limit on number of issues.
+    const maxIssues = mode === 'general' ? undefined : 50
+    const capped = maxIssues != null ? nonOverlapping.slice(0, maxIssues) : nonOverlapping
+    const validatedIssues = capped.map(issue => {
+      // Clamp indices to valid range (0-based character offsets)
       const start = Math.max(0, Math.min(issue.startIndex, text.length))
       const end = Math.max(start, Math.min(issue.endIndex, text.length))
       
@@ -1451,18 +1994,29 @@ export async function POST(req: NextRequest) {
       
       // Final validation: if original_text is still empty/null, skip this issue
       if (!originalText || originalText.trim() === '') {
-        console.warn('[analyze] Skipping issue with empty original_text:', issue.type, issue.message)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[analyze][dev] Filtered out issue: reason=empty original_text, type=', issue.type, 'message=', issue.message?.slice(0, 50))
+        }
         return null
       }
       
+      // Repetition: action = delete, suggestion_text = ''
+      const isRepetition = issue.type === 'repetition'
+      const suggestionText = isRepetition ? '' : (issue.suggestion_text || '')
+      const action: IssueAction = isRepetition ? 'delete' : 'replace'
+      
       return {
-        type: issue.type,
+        id: crypto.randomUUID(),
+        type: toDisplayIssueType(issue.type),
         severity: issue.severity,
         message: issue.message || '',
-        original_text: originalText, // Guaranteed non-empty
-        suggestion_text: issue.suggestion_text || '', // Can be empty for clarity issues
+        original_text: originalText,
+        suggestion_text: suggestionText,
+        start,
+        end,
         startIndex: start,
         endIndex: end,
+        action,
       }
     }).filter((issue): issue is NonNullable<typeof issue> => issue !== null) // Remove nulls
 
@@ -1477,6 +2031,11 @@ export async function POST(req: NextRequest) {
     console.log('[analyze] Returned issue types:', [...new Set(validatedIssues.map(i => i.type))])
     console.log('[analyze] Issue type counts:', issueTypeCounts)
     console.log('[analyze] Total issues:', validatedIssues.length)
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[analyze][dev] Issues by category:', issueTypeCounts)
+      console.log('[analyze][dev] Issues with no suggestion (Tip-only):', validatedIssues.filter(i => !(i.suggestion_text && i.suggestion_text.trim())).length)
+    }
 
     return NextResponse.json({
       ok: true,

@@ -272,18 +272,19 @@ For EACH error found, provide:
    - "projects[0].name", "projects[0].description" for projects
    - "certifications[0]", "languages[0]" for certifications/languages
    - "publications[0].title", "publications[0].notes" for publications
-2. original: The original text with the error (exact text from the field)
-3. suggestion: The corrected text (the fixed version to apply)
+2. original: ONLY the exact word or minimal phrase that contains the error (the span to be replaced). Do NOT return the entire field or sentence — only the wrong word/phrase, e.g. "experiance", "i", "have" (when it should be "has"), "recieve".
+3. suggestion: ONLY the corrected word or phrase (same length of span as original when possible). Do NOT return the full sentence or full field — only the replacement for "original", e.g. "experience", "I", "has", "receive".
 4. confidence: A number between 0.0 and 1.0 indicating how confident you are (1.0 = very confident, 0.5 = uncertain)
 5. isSafeFix: true if this is a safe fix (clear spelling mistake, capitalization, spacing, punctuation) OR false if risky (may alter meaning, proper nouns, technical terms)
 
 CRITICAL RULES:
+- original and suggestion must be MINIMAL: only the erroneous word/phrase and its correction. The system will replace only that span in the text; never send the full field content.
 - NEVER suggest changes to emails or URLs
 - For proper nouns (company names, locations): only mark as safe if it's clearly a common typo (e.g., "enimator" -> "Animator" for job title)
 - For job titles: be more lenient with suggestions (common titles like Animator, Designer, Developer)
 - For skills: be very conservative (technical terms should not be changed)
 - Capitalization errors (e.g., "i" -> "I") are always safe
-- Double spaces, punctuation errors are safe
+- Double spaces, punctuation errors are safe (original could be "  " and suggestion " ")
 - Changes that might alter meaning are risky (isSafeFix: false)
 
 Return ONLY a valid JSON array of issues in this exact format:
@@ -297,8 +298,15 @@ Return ONLY a valid JSON array of issues in this exact format:
   },
   {
     "fieldPath": "summary",
-    "original": "i work hard",
-    "suggestion": "I work hard",
+    "original": "i",
+    "suggestion": "I",
+    "confidence": 1.0,
+    "isSafeFix": true
+  },
+  {
+    "fieldPath": "experience[0].bullets[1]",
+    "original": "recieve",
+    "suggestion": "receive",
     "confidence": 1.0,
     "isSafeFix": true
   }

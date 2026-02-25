@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { generateEmail } from '@/lib/email-templates'
+import { logEvent } from '@/lib/analytics/logEvent'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
         ...additionalFields,
       })
 
+      logEvent('email_generated', {}, supabase).catch(() => {})
       return NextResponse.json({ ok: true, email })
     } catch (error: any) {
       console.error('[Email Generate] Generation error:', error)

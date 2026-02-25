@@ -9,6 +9,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 
 export default function LandingPage() {
   const router = useRouter()
@@ -70,6 +71,7 @@ export default function LandingPage() {
         password: loginPassword,
       })
       if (error) throw error
+      trackEvent('auth_login', { method: 'email_password' }).catch(() => {})
       router.push('/dashboard')
     } catch (error: any) {
       setLoginError(error.message || 'Sign in failed')
@@ -409,7 +411,7 @@ export default function LandingPage() {
                   <span className="hover:text-violet-300 transition-colors">Created by Raed Mahfoud — Independent AI product creator.</span>
                 </li>
                 <li>
-                  <a href="mailto:jobaz.app@outlook.com" className="hover:text-violet-300 transition-colors">jobaz.app@outlook.com</a>
+                  <a href="mailto:support@jobaz.io" className="hover:text-violet-300 transition-colors">support@jobaz.io</a>
                 </li>
               </ul>
             </div>

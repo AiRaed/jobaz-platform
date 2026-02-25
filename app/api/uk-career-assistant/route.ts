@@ -2,8 +2,49 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { SYSTEM_PROMPT, PATH_MODULES } from '@/lib/uk-career-assistant/prompts'
 import { buildReasons } from '@/lib/uk-career-assistant/reasons'
+import { scoreAllDirections } from '@/lib/uk-career-assistant/scoring'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * UK CAREER BRAIN - DEV NOTE
+ * 
+ * SCORING WEIGHTS & DECISION FLOW:
+ * 
+ * The Career Brain uses a weighted scoring model (see lib/uk-career-assistant/scoring.ts):
+ * - Education factors: level (0.8), field_match (1.2), alignment (1.0)
+ * - Experience factors: field_match (1.5), years (0.5), alignment (1.0)
+ * - Goal factors: goal_type_match (1.3), priorities_match (1.0)
+ * - Constraint penalties: stress_tolerance (-1.2), burnout_signals (-1.5), 
+ *   physical_ability (-1.0), customer_comfort (-1.1), constraints_to_avoid (-1.4)
+ * - Enablers: transport_match (0.9), training_openness (0.7), desire_for_change (0.6)
+ * 
+ * DECISION FLOW:
+ * 1. Classification phase: Server-driven, deterministic (edu -> exp -> rel -> goal_gate)
+ * 2. Path assignment: Computed from classification (PATH_1 through PATH_5)
+ * 3. PATH phase: Adaptive questioning with information gain
+ *    - Questions selected based on canonical sequence + dependencies
+ *    - Finalization check: confidence >= 0.8 OR (required fields answered + confidence >= 0.6) OR (6+ answers + confidence >= 0.5)
+ *    - Hard cap: max 12 questions
+ * 4. RESULT phase: Scoring engine ranks all directions, filters conflicts, generates personalized recommendations
+ * 
+ * LOOP PREVENTION:
+ * - Server-side: Track asked_question_ids, never repeat if answered
+ * - Client-side: Track asked/answered sets, auto-skip duplicates
+ * - Question locking: Once answered, field is locked in state.answers
+ * 
+ * TRANSITIONS:
+ * - One short phrase (max 60 chars) before each question
+ * - Context-aware based on question type
+ * - Never duplicates (tracked in state.last_transition)
+ * 
+ * OUTPUT QUALITY:
+ * - Work Now: 2-4 directions, each with 2-3 personalized reasons referencing user answers
+ * - Improve Later: 1-3 directions, only if training_openness allows
+ * - Avoid: 2-4 items, logically derived from conflicts
+ * - Confidence score: 1-10 scale (computed from answered questions)
+ * - Follow-up: Optional suggested question for engagement
+ */
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -17,13 +58,16 @@ interface AIResponse {
     id: string
     text: string
     type: 'single' | 'multi'
-    options: Array<{ value: string; label: string }>
+    options: Array<{ value: string; label: string; id?: string; text?: string; tag?: string }>
     max_select?: number
+    allow_free_text?: boolean
   } | null
   allow_free_text: boolean
+  transitions?: string // Optional short phrase, max 60 chars
   state_updates: Record<string, any>
   done: boolean
-  confidence_score?: number // Optional: 0.0-1.0, computed server-side if missing
+  confidence_score?: number // Optional: 1-10 scale, computed server-side if missing
+  follow_up?: string // Optional: one suggested follow-up question user can ask
   result: {
     summary: string
     work_now: {
@@ -43,7 +87,11 @@ interface AIResponse {
       }>
     } | null
     avoid: Array<string>
-    next_step: string
+    next_step: string | {
+      action: 'CREATE_CV' | 'JOB_FINDER' | 'BUILD_YOUR_PATH'
+      label: string
+      href?: string
+    }
   } | null
 }
 
@@ -335,6 +383,14 @@ function getCanonicalSequence(path: string | null, phase: string, state: any): r
           seq3.push('it_focus')
         } else if (educationField === 'healthcare_care') {
           seq3.push('care_focus')
+        } else if (educationField === 'design_creative') {
+          seq3.push('design_focus')
+        } else if (educationField === 'engineering') {
+          seq3.push('engineering_focus')
+        } else if (educationField === 'education') {
+          seq3.push('education_focus')
+        } else if (educationField === 'business_administration') {
+          seq3.push('business_focus')
         } else if (educationField === 'other') {
           seq3.push('education_field_other')
         }
@@ -367,6 +423,14 @@ function getCanonicalSequence(path: string | null, phase: string, state: any): r
           seq.push('it_focus')
         } else if (educationField === 'healthcare_care') {
           seq.push('care_focus')
+        } else if (educationField === 'design_creative') {
+          seq.push('design_focus')
+        } else if (educationField === 'engineering') {
+          seq.push('engineering_focus')
+        } else if (educationField === 'education') {
+          seq.push('education_focus')
+        } else if (educationField === 'business_administration') {
+          seq.push('business_focus')
         } else if (educationField === 'other') {
           seq.push('education_field_other')
         }
@@ -412,6 +476,124 @@ function getCanonicalSequence(path: string | null, phase: string, state: any): r
 function isQuestionAnswered(state: any, questionId: string): boolean {
   const answers = state?.answers || {}
   return answers[questionId] !== undefined
+}
+
+/**
+ * Generate a transition message before asking the next question
+ * Returns a short, natural phrase (max 60 chars) that doesn't repeat
+ */
+function generateTransitionMessage(
+  questionId: string | null,
+  previousQuestionId: string | null,
+  phase: string,
+  state: any
+): string | null {
+  // Don't generate transitions for classification questions
+  if (phase === 'CLASSIFY' || questionId === 'edu' || questionId === 'exp' || questionId === 'rel') {
+    return null
+  }
+  
+  // Track last transition to avoid duplicates
+  const lastTransition = state?.last_transition || ''
+  
+  // Generate context-aware transitions based on question type
+  const transitions: Record<string, string[]> = {
+    'goal_gate': ['Got it — checking what you\'re looking for...', 'Okay — understanding your goal...'],
+    'priorities': ['Thanks — mapping your priorities...', 'Got it — checking what matters most...'],
+    'physical_ability': ['Okay — checking physical requirements...', 'Thanks — mapping physical options...'],
+    'people_comfort': ['Got it — checking people interaction needs...', 'Okay — understanding your comfort level...'],
+    'language': ['Thanks — checking language requirements...', 'Got it — mapping communication needs...'],
+    'transport': ['Okay — checking transport options...', 'Thanks — understanding your transport situation...'],
+    'training_openness': ['Got it — checking training opportunities...', 'Okay — mapping training paths...'],
+    'experience_field': ['Thanks — understanding your background...', 'Got it — mapping your experience...'],
+    'education_field': ['Okay — checking your education...', 'Thanks — understanding your qualifications...'],
+    'change_reason': ['Got it — understanding why you want to change...', 'Thanks — checking your transition goals...'],
+    'move_away': ['Okay — mapping what to avoid...', 'Got it — checking constraints...']
+  }
+  
+  const questionTransitions = transitions[questionId || '']
+  if (!questionTransitions || questionTransitions.length === 0) {
+    // Generic fallback
+    const generic = ['Got it — next question...', 'Thanks — one more thing...', 'Okay — checking options...']
+    const selected = generic[Math.floor(Math.random() * generic.length)]
+    return selected !== lastTransition ? selected : generic.find(t => t !== lastTransition) || null
+  }
+  
+  // Pick a transition that's different from the last one
+  const available = questionTransitions.filter(t => t !== lastTransition)
+  if (available.length > 0) {
+    return available[Math.floor(Math.random() * available.length)]
+  }
+  
+  // If all were used, return the first one anyway (better than nothing)
+  return questionTransitions[0]
+}
+
+/**
+ * Determine if we have enough information to finalize recommendations
+ * Uses information gain: stop when confidence is high OR when asking more won't change ranking significantly
+ */
+function shouldFinalize(state: any): { should: boolean; reason: string; confidence: number } {
+  const path = state?.path
+  if (!path) {
+    return { should: false, reason: 'No path assigned', confidence: 0 }
+  }
+  
+  const confidence = computeConfidence(state)
+  const answers = state?.answers || {}
+  const askedQuestionIds = state?.asked_question_ids || []
+  
+  // Hard cap: never ask more than 12 questions
+  if (askedQuestionIds.length >= 12) {
+    return { should: true, reason: 'Question limit reached', confidence }
+  }
+  
+  // High confidence threshold: if confidence >= 0.8, we can finalize
+  if (confidence >= 0.8) {
+    return { should: true, reason: 'High confidence reached', confidence }
+  }
+  
+  // Check if we have minimum required signals
+  const requiredFieldsAnswered = areAllRequiredFieldsAnswered(state)
+  if (requiredFieldsAnswered && confidence >= 0.6) {
+    // We have all required fields and decent confidence
+    return { should: true, reason: 'Required fields answered with sufficient confidence', confidence }
+  }
+  
+  // Check if next question would provide meaningful information gain
+  // For now, if we have 6+ answered questions and confidence >= 0.5, finalize
+  const answeredCount = Object.keys(answers).filter(k => answers[k] !== undefined).length
+  if (answeredCount >= 6 && confidence >= 0.5) {
+    return { should: true, reason: 'Sufficient signals collected', confidence }
+  }
+  
+  return { should: false, reason: 'Need more information', confidence }
+}
+
+/**
+ * Get the next best question based on information gain
+ * Prioritizes questions that will most impact the ranking
+ */
+function getNextBestQuestion(state: any): AIResponse['question'] | null {
+  const path = state?.path
+  const phase = getCurrentPhase(state)
+  
+  if (phase === 'CLASSIFY') {
+    return classifyIfNeeded(state)
+  }
+  
+  if (phase === 'PATH') {
+    // Try preference gate first
+    const pgQuestion = maybeTriggerPreferenceGate(state)
+    if (pgQuestion) {
+      return pgQuestion
+    }
+    
+    // Then try path questions
+    return getNextPathQuestion(state)
+  }
+  
+  return null
 }
 
 
@@ -576,6 +758,14 @@ function getNextPathQuestion(state: any): AIResponse['question'] | null {
         seq.push('it_focus')
       } else if (educationField === 'healthcare_care') {
         seq.push('care_focus')
+      } else if (educationField === 'design_creative') {
+        seq.push('design_focus')
+      } else if (educationField === 'engineering') {
+        seq.push('engineering_focus')
+      } else if (educationField === 'education') {
+        seq.push('education_focus')
+      } else if (educationField === 'business_administration') {
+        seq.push('business_focus')
       } else if (educationField === 'other') {
         seq.push('education_field_other')
       }
@@ -611,6 +801,14 @@ function getNextPathQuestion(state: any): AIResponse['question'] | null {
         seq.push('it_focus')
       } else if (educationField === 'healthcare_care') {
         seq.push('care_focus')
+      } else if (educationField === 'design_creative') {
+        seq.push('design_focus')
+      } else if (educationField === 'engineering') {
+        seq.push('engineering_focus')
+      } else if (educationField === 'education') {
+        seq.push('education_focus')
+      } else if (educationField === 'business_administration') {
+        seq.push('business_focus')
       } else if (educationField === 'other') {
         seq.push('education_field_other')
       }
@@ -1087,9 +1285,61 @@ function getQuestionById(questionId: string): AIResponse['question'] | null {
       text: 'What care focus area?',
       type: 'single',
       options: [
-        { id: 'care_support_non_medical', text: 'Care support (non-medical)', label: 'Care support (non-medical)', value: 'care_support_non_medical' },
-        { id: 'nhs_support_roles', text: 'NHS support roles', label: 'NHS support roles', value: 'nhs_support_roles' },
+        { id: 'care_assistant', text: 'Care assistant', label: 'Care assistant', value: 'care_assistant' },
+        { id: 'support_worker', text: 'Support worker', label: 'Support worker', value: 'support_worker' },
         { id: 'admin_in_healthcare', text: 'Admin in healthcare', label: 'Admin in healthcare', value: 'admin_in_healthcare' },
+        { id: 'non_clinical_roles', text: 'Non-clinical roles', label: 'Non-clinical roles', value: 'non_clinical_roles' },
+        { id: 'not_sure', text: 'Not sure', label: 'Not sure', value: 'not_sure' }
+      ]
+    },
+    'design_focus': {
+      id: 'design_focus',
+      text: 'What design focus area?',
+      type: 'single',
+      options: [
+        { id: 'graphic_design', text: 'Graphic design', label: 'Graphic design', value: 'graphic_design' },
+        { id: 'ui_ux', text: 'UI/UX', label: 'UI/UX', value: 'ui_ux' },
+        { id: 'video_editing', text: 'Video editing', label: 'Video editing', value: 'video_editing' },
+        { id: 'animation', text: 'Animation', label: 'Animation', value: 'animation' },
+        { id: 'content_creation', text: 'Content creation', label: 'Content creation', value: 'content_creation' },
+        { id: 'social_media', text: 'Social media', label: 'Social media', value: 'social_media' },
+        { id: 'not_sure', text: 'Not sure', label: 'Not sure', value: 'not_sure' }
+      ]
+    },
+    'engineering_focus': {
+      id: 'engineering_focus',
+      text: 'What engineering focus area?',
+      type: 'single',
+      options: [
+        { id: 'civil', text: 'Civil', label: 'Civil', value: 'civil' },
+        { id: 'mechanical', text: 'Mechanical', label: 'Mechanical', value: 'mechanical' },
+        { id: 'electrical', text: 'Electrical', label: 'Electrical', value: 'electrical' },
+        { id: 'cad_tech_drawing', text: 'CAD / Tech drawing', label: 'CAD / Tech drawing', value: 'cad_tech_drawing' },
+        { id: 'site_roles', text: 'Site roles', label: 'Site roles', value: 'site_roles' },
+        { id: 'not_sure', text: 'Not sure', label: 'Not sure', value: 'not_sure' }
+      ]
+    },
+    'education_focus': {
+      id: 'education_focus',
+      text: 'What education focus area?',
+      type: 'single',
+      options: [
+        { id: 'teaching_assistant', text: 'Teaching assistant', label: 'Teaching assistant', value: 'teaching_assistant' },
+        { id: 'tutor', text: 'Tutor', label: 'Tutor', value: 'tutor' },
+        { id: 'admin', text: 'Admin', label: 'Admin', value: 'admin' },
+        { id: 'sen_support', text: 'SEN support', label: 'SEN support', value: 'sen_support' },
+        { id: 'not_sure', text: 'Not sure', label: 'Not sure', value: 'not_sure' }
+      ]
+    },
+    'business_focus': {
+      id: 'business_focus',
+      text: 'What business focus area?',
+      type: 'single',
+      options: [
+        { id: 'admin_support', text: 'Admin support', label: 'Admin support', value: 'admin_support' },
+        { id: 'customer_service', text: 'Customer service', label: 'Customer service', value: 'customer_service' },
+        { id: 'finance_admin', text: 'Finance admin', label: 'Finance admin', value: 'finance_admin' },
+        { id: 'hr_admin', text: 'HR admin', label: 'HR admin', value: 'hr_admin' },
         { id: 'not_sure', text: 'Not sure', label: 'Not sure', value: 'not_sure' }
       ]
     },
@@ -1263,8 +1513,105 @@ function isResponseInvalid(parsed: any, state: any): { invalid: boolean; reason?
 }
 
 /**
- * Refine result based on user preferences
- * Applies preference-based filtering and prioritization to work_now directions
+ * Check for conflicts between user's stated issues and recommended directions
+ * Returns true if direction conflicts with user's constraints
+ */
+function hasConflict(directionId: string, answers: any): boolean {
+  const changeReason = answers['change_reason']
+  const moveAway = Array.isArray(answers['move_away']) ? answers['move_away'] : []
+  const pressureSource = answers['pressure_source']
+  const adjustmentGoal = answers['adjustment_goal']
+  
+  // Conflict: User says burnout/stress/customer pressure but direction is high-pressure customer-facing
+  if ((changeReason === 'burnout_stress' || 
+       moveAway.includes('customer_pressure') || 
+       moveAway.includes('high_stress') ||
+       pressureSource === 'customer_pressure') &&
+      (directionId.includes('hospitality') || 
+       directionId.includes('care') || 
+       directionId.includes('customer') ||
+       directionId.includes('retail'))) {
+    return true
+  }
+  
+  // Conflict: User says long hours but direction requires long hours
+  if ((moveAway.includes('long_hours') || pressureSource === 'long_hours') &&
+      (directionId.includes('hospitality') || 
+       directionId.includes('warehouse') ||
+       directionId.includes('construction'))) {
+    // Only conflict if user explicitly wants to avoid long hours
+    if (adjustmentGoal === 'better_balance' || adjustmentGoal === 'lighter_workload') {
+      return true
+    }
+  }
+  
+  // Conflict: User wants to move away from physical work but direction is physical
+  if (moveAway.includes('physical_work') || changeReason === 'physical_strain') {
+    if (directionId.includes('construction') || 
+        directionId.includes('warehouse') ||
+        directionId.includes('cleaning') ||
+        directionId.includes('trades')) {
+      return true
+    }
+  }
+  
+  // Conflict: User has physical limitations but direction requires physical work
+  const physicalAbility = answers['physical_ability']
+  if ((physicalAbility === 'prefer_non_physical' || physicalAbility === 'health_limitations') &&
+      (directionId.includes('construction') || 
+       directionId.includes('warehouse') ||
+       directionId.includes('cleaning') ||
+       directionId.includes('trades') ||
+       directionId.includes('driving'))) {
+    return true
+  }
+  
+  // Conflict: User prefers not to work with people but direction is people-facing
+  const peopleComfort = answers['people_comfort']
+  if (peopleComfort === 'prefer_not' &&
+      (directionId.includes('hospitality') || 
+       directionId.includes('care') ||
+       directionId.includes('support') ||
+       directionId.includes('front') ||
+       directionId.includes('customer') ||
+       directionId.includes('teaching'))) {
+    return true
+  }
+  
+  // Conflict: User has no licence but direction requires driving
+  const transport = answers['transport']
+  if (transport === 'no_licence' &&
+      (directionId.includes('driving') || 
+       directionId.includes('transport') ||
+       directionId.includes('delivery'))) {
+    return true
+  }
+  
+  // Conflict: User says no training but direction requires licence/training
+  const trainingOpenness = answers['training_openness']
+  if (trainingOpenness === 'no_work_soon' &&
+      (directionId.includes('security') || 
+       directionId.includes('electrician') ||
+       directionId.includes('plumbing') ||
+       directionId.includes('handyman'))) {
+    return true
+  }
+  
+  // Conflict: User says no driving interest but direction is driving-related
+  const drivingInterest = answers['driving_interest']
+  if (drivingInterest === 'no' &&
+      (directionId.includes('driving') || 
+       directionId.includes('transport') ||
+       directionId.includes('delivery'))) {
+    return true
+  }
+  
+  return false
+}
+
+/**
+ * Refine result based on user preferences and conflict detection
+ * Applies preference-based filtering, conflict detection, and prioritization to work_now directions
  */
 function refineResultWithPreferences(result: AIResponse['result'], state: any): AIResponse['result'] {
   if (!result || !result.work_now || !result.work_now.directions) {
@@ -1274,6 +1621,9 @@ function refineResultWithPreferences(result: AIResponse['result'], state: any): 
   const preferences = state?.preferences || {}
   const answers = state?.answers || {}
   let directions = [...result.work_now.directions]
+  
+  // CONFLICT DETECTION: Remove directions that conflict with user's stated issues
+  directions = directions.filter(dir => !hasConflict(dir.direction_id, answers))
   
   // Apply work_style preferences
   if (preferences.work_style === 'fixed_place') {
@@ -1324,6 +1674,26 @@ function refineResultWithPreferences(result: AIResponse['result'], state: any): 
       !dir.direction_id.includes('driving') && 
       !dir.direction_id.includes('transport') &&
       !dir.direction_id.includes('delivery')
+    )
+  }
+  
+  // Additional conflict checks: transport constraints
+  if (answers['transport'] === 'no_licence') {
+    directions = directions.filter(dir => 
+      !dir.direction_id.includes('driving') && 
+      !dir.direction_id.includes('transport') &&
+      !dir.direction_id.includes('delivery')
+    )
+  }
+  
+  // Additional conflict checks: training openness
+  if (answers['training_openness'] === 'no_work_soon') {
+    // Remove licence-based routes from Work Now (they should be in Improve Later)
+    directions = directions.filter(dir => 
+      !dir.direction_id.includes('security') && 
+      !dir.direction_id.includes('electrician') &&
+      !dir.direction_id.includes('plumbing') &&
+      !dir.direction_id.includes('handyman')
     )
   }
   
@@ -2517,10 +2887,131 @@ function recommendForPath(state: any): AIResponse['result'] {
 
 /**
  * Generate a simple result when AI fails to provide one
+ * Uses scoring engine for context-aware recommendations
  */
 function generateSimpleResult(state: any): AIResponse['result'] {
-  // Use path-specific recommendation router
-  return recommendForPath(state)
+  const path = state?.path
+  const answers = state?.answers || {}
+  
+  // Use scoring engine to rank all directions
+  const scored = scoreAllDirections(state)
+  
+  // Convert scored directions to result format
+  const workNowDirections = scored.workNow.slice(0, 4).map(dir => ({
+    direction_id: dir.direction_id,
+    direction_title: dir.direction_title,
+    why: dir.reasons.length > 0 ? dir.reasons : buildReasons(state, dir.direction_id).bullets,
+    chips: dir.tags.length > 0 ? dir.tags : buildReasons(state, dir.direction_id).chips
+  }))
+  
+  const improveLaterDirections = scored.improveLater.slice(0, 3).map(dir => ({
+    direction_id: dir.direction_id,
+    direction_title: dir.direction_title,
+    why: dir.reasons.length > 0 ? dir.reasons : buildReasons(state, dir.direction_id).bullets,
+    chips: dir.tags.length > 0 ? dir.tags : buildReasons(state, dir.direction_id).chips
+  }))
+  
+  // Generate avoid items from conflicts
+  const avoid: string[] = []
+  scored.avoid.forEach(dir => {
+    if (dir.conflicts && dir.conflicts.length > 0) {
+      dir.conflicts.forEach(conflict => {
+        if (!avoid.includes(conflict)) {
+          avoid.push(conflict)
+        }
+      })
+    }
+  })
+  
+  // Add constraint-based avoid items
+  if (answers['transport'] === 'no_licence') {
+    if (!avoid.some(a => a.toLowerCase().includes('driving') || a.toLowerCase().includes('transport'))) {
+      avoid.push('Jobs requiring driving licence or travel between sites')
+    }
+  }
+  if (answers['people_comfort'] === 'prefer_not') {
+    if (!avoid.some(a => a.toLowerCase().includes('customer') || a.toLowerCase().includes('people'))) {
+      avoid.push('Customer-facing roles with constant interaction')
+    }
+  }
+  if (answers['physical_ability'] === 'prefer_non_physical' || answers['physical_ability'] === 'health_limitations') {
+    if (!avoid.some(a => a.toLowerCase().includes('physical') || a.toLowerCase().includes('manual'))) {
+      avoid.push('Heavy manual roles requiring physical strength')
+    }
+  }
+  
+  // Ensure at least 2 avoid items
+  while (avoid.length < 2) {
+    avoid.push('Roles requiring extensive training or qualifications')
+  }
+  
+  // Generate personalized summary
+  const summaryParts: string[] = []
+  const goalType = answers['goal_gate']
+  const educationField = answers['education_field']
+  const experienceField = answers['experience_field']
+  
+  if (path === 'PATH_1') {
+    summaryParts.push('Starting from scratch with no formal education or work experience,')
+    summaryParts.push('we recommend focusing on entry-level roles that offer immediate work opportunities.')
+  } else if (path === 'PATH_2') {
+    if (experienceField) {
+      summaryParts.push(`With your experience in ${experienceField.replace(/_/g, ' ')},`)
+    } else {
+      summaryParts.push('With your work experience,')
+    }
+    summaryParts.push('we recommend focusing on roles that build on your background while addressing your transition goals.')
+  } else if (path === 'PATH_3') {
+    summaryParts.push('With your education but no work experience,')
+    if (answers['study_status'] === 'studying') {
+      summaryParts.push('we recommend part-time friendly roles that work around your studies.')
+    } else {
+      summaryParts.push('we recommend entry-level roles that leverage your education while building practical experience.')
+    }
+  } else if (path === 'PATH_4') {
+    summaryParts.push('You have education and experience in different fields.')
+    summaryParts.push('We focused on transferable directions that don\'t require starting from zero.')
+  } else if (path === 'PATH_5') {
+    summaryParts.push('You\'re looking to adjust your current role or environment, not restart.')
+    summaryParts.push('These recommendations focus on lighter responsibilities and better work-life balance.')
+  }
+  
+  if (goalType === 'side_income') {
+    summaryParts.push('These options offer flexible scheduling for side income.')
+  } else if (goalType === 'study_work') {
+    summaryParts.push('These directions work well while studying.')
+  }
+  
+  // Determine next_step
+  let nextStep: string | { action: 'CREATE_CV' | 'JOB_FINDER' | 'BUILD_YOUR_PATH'; label: string } = 'CREATE_CV'
+  if (path === 'PATH_1' || path === 'PATH_2') {
+    nextStep = {
+      action: 'CREATE_CV',
+      label: 'Create a simple CV based on your situation'
+    }
+  } else if (path === 'PATH_3' || path === 'PATH_4' || path === 'PATH_5') {
+    nextStep = {
+      action: 'CREATE_CV',
+      label: 'Create a skills-based CV aligned to your direction'
+    }
+  }
+  
+  return {
+    summary: summaryParts.join(' '),
+    work_now: {
+      directions: workNowDirections.length > 0 ? workNowDirections : [{
+        direction_id: 'office-admin',
+        direction_title: 'Office & Admin Support',
+        why: buildReasons(state, 'office-admin').bullets,
+        chips: buildReasons(state, 'office-admin').chips
+      }]
+    },
+    improve_later: improveLaterDirections.length > 0 ? {
+      directions: improveLaterDirections
+    } : null,
+    avoid: avoid.slice(0, 4),
+    next_step: nextStep
+  }
 }
 
 /**
@@ -2985,8 +3476,16 @@ function validateAIResponse(data: any): data is AIResponse {
   if (typeof data.assistant_message !== 'string') return false
   if (typeof data.allow_free_text !== 'boolean') return false
   if (typeof data.done !== 'boolean') return false
-  if (!['classification', 'assessment', 'recommendation'].includes(data.phase)) return false
+  // Support both old and new phase names
+  const validPhases = ['classification', 'assessment', 'recommendation', 'CLASSIFY', 'PATH', 'RESULT']
+  if (!validPhases.includes(data.phase)) return false
   if (data.path !== null && typeof data.path !== 'string') return false
+  
+  // Validate transitions (optional, max 60 chars)
+  if (data.transitions !== undefined && data.transitions !== null) {
+    if (typeof data.transitions !== 'string') return false
+    if (data.transitions.length > 60) return false
+  }
   
   // Validate question (can be null)
   if (data.question !== null) {
@@ -3005,6 +3504,8 @@ function validateAIResponse(data: any): data is AIResponse {
     if (data.question.max_select !== null && data.question.max_select !== undefined) {
       if (typeof data.question.max_select !== 'number') return false
     }
+    // allow_free_text is optional - can be boolean
+    if (data.question.allow_free_text !== undefined && typeof data.question.allow_free_text !== 'boolean') return false
   }
   
   // Validate state_updates (must be object)
@@ -3021,7 +3522,14 @@ function validateAIResponse(data: any): data is AIResponse {
     if (data.result === null || data.result === undefined) return false
     if (typeof data.result !== 'object') return false
     if (typeof data.result.summary !== 'string') return false
-    if (typeof data.result.next_step !== 'string') return false
+    // next_step can be string (legacy) or object (new format)
+    if (typeof data.result.next_step !== 'string' && typeof data.result.next_step !== 'object') return false
+    if (typeof data.result.next_step === 'object') {
+      if (typeof data.result.next_step.action !== 'string') return false
+      if (!['CREATE_CV', 'JOB_FINDER', 'BUILD_YOUR_PATH'].includes(data.result.next_step.action)) return false
+      if (typeof data.result.next_step.label !== 'string') return false
+      if (data.result.next_step.href !== undefined && typeof data.result.next_step.href !== 'string') return false
+    }
     if (!Array.isArray(data.result.avoid)) return false
     if (data.result.avoid.length !== 2) return false
     if (!Array.isArray(data.result.work_now?.directions)) return false
@@ -3550,6 +4058,65 @@ export async function POST(req: NextRequest) {
     }
     if (normalizedState.classification) {
       parsed.state_updates.classification = normalizedState.classification
+    }
+    
+    // ============================================
+    // CAREER BRAIN: Add transitions and check finalization
+    // ============================================
+    // Generate transition message if we have a question
+    if (parsed.question?.id && !parsed.done) {
+      const transition = generateTransitionMessage(
+        parsed.question.id,
+        normalizedState.last_question_id || null,
+        parsed.phase || 'PATH',
+        normalizedState
+      )
+      if (transition) {
+        parsed.transitions = transition
+        // Store last transition to avoid duplicates
+        if (!parsed.state_updates) {
+          parsed.state_updates = {}
+        }
+        parsed.state_updates.last_transition = transition
+      }
+    }
+    
+    // Check if we should finalize (Career Brain logic)
+    if (!parsed.done) {
+      const finalizeCheck = shouldFinalize(normalizedState)
+      if (finalizeCheck.should) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[Career Brain] Finalizing: ${finalizeCheck.reason} (confidence: ${finalizeCheck.confidence.toFixed(2)})`)
+        }
+        parsed.done = true
+        parsed.phase = 'RESULT'
+        parsed.question = null
+        if (!parsed.result) {
+          parsed.result = generateSimpleResult(normalizedState)
+        }
+        parsed.assistant_message = 'Here are your recommendations:'
+      }
+    }
+    
+    // Ensure confidence_score is set (1-10 scale)
+    if (parsed.done && parsed.result) {
+      const confidence = computeConfidence(normalizedState)
+      parsed.confidence_score = Math.round(confidence * 10) // Convert 0-1 to 1-10
+      
+      // Add optional follow_up question
+      const answers = normalizedState.answers || {}
+      if (answers['goal_gate'] === 'side_income') {
+        parsed.follow_up = 'What kind of flexible hours work best for you?'
+      } else if (answers['training_openness'] === 'yes_short') {
+        parsed.follow_up = 'Which training or licence interests you most?'
+      } else if (answers['experience_field']) {
+        parsed.follow_up = 'Would you like to explore roles similar to your experience?'
+      } else {
+        parsed.follow_up = 'What questions do you have about these recommendations?'
+      }
+    } else if (!parsed.confidence_score) {
+      const confidence = computeConfidence(normalizedState)
+      parsed.confidence_score = Math.round(confidence * 10)
     }
 
     // ============================================

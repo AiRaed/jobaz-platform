@@ -10,43 +10,43 @@ export interface ActionMapEntry {
 
 export const ACTION_MAP: Record<string, ActionMapEntry> = {
   warehouse_logistics: {
-    jobFinderUrl: "/jobs?query=warehouse%20operative",
+    jobFinderUrl: "/job-finder?query=warehouse%20operative",
     buildPathUrl: "/build-your-path/warehouse-logistics"
   },
   security_facilities: {
-    jobFinderUrl: "/jobs?query=security%20sia",
+    jobFinderUrl: "/job-finder?query=security%20sia",
     buildPathUrl: "/build-your-path/security-facilities"
   },
   cleaning: {
-    jobFinderUrl: "/jobs?query=cleaner",
+    jobFinderUrl: "/job-finder?query=cleaner",
     buildPathUrl: "/build-your-path/cleaning"
   },
   hospitality_front: {
-    jobFinderUrl: "/jobs?query=hospitality%20front%20of%20house",
+    jobFinderUrl: "/job-finder?query=hospitality%20front%20of%20house",
     buildPathUrl: "/build-your-path/hospitality-front"
   },
   care_support: {
-    jobFinderUrl: "/jobs?query=care%20support",
+    jobFinderUrl: "/job-finder?query=care%20support",
     buildPathUrl: "/build-your-path/care-support"
   },
   driving_transport: {
-    jobFinderUrl: "/jobs?query=driver%20delivery",
+    jobFinderUrl: "/job-finder?query=driver%20delivery",
     buildPathUrl: "/build-your-path/driving-transport"
   },
   maintenance_facilities: {
-    jobFinderUrl: "/jobs?query=maintenance%20facilities",
+    jobFinderUrl: "/job-finder?query=maintenance%20facilities",
     buildPathUrl: "/build-your-path/maintenance-facilities"
   },
   office_admin_support: {
-    jobFinderUrl: "/jobs?query=admin%20assistant",
+    jobFinderUrl: "/job-finder?query=admin%20assistant",
     buildPathUrl: "/build-your-path/office-admin"
   },
   digital_ai_adjacent: {
-    jobFinderUrl: "/jobs?query=junior%20digital%20support",
+    jobFinderUrl: "/job-finder?query=junior%20digital%20support",
     buildPathUrl: "/build-your-path/digital-ai-adjacent"
   },
   construction_trades: {
-    jobFinderUrl: "/jobs?query=construction%20labour",
+    jobFinderUrl: "/job-finder?query=construction%20labour",
     buildPathUrl: "/build-your-path/construction-trades"
   }
 }
@@ -75,7 +75,7 @@ export function getActionUrls(catalogId: string, directionTitle?: string): Actio
     : encodeURIComponent(catalogId.replace(/-/g, ' '))
   
   return {
-    jobFinderUrl: `/jobs?query=${fallbackQuery}`,
+    jobFinderUrl: `/job-finder?query=${fallbackQuery}`,
     buildPathUrl: `/build-your-path?tag=${encodeURIComponent(catalogId)}`
   }
 }

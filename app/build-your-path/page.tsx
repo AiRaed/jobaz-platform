@@ -1,6 +1,7 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowRight, GraduationCap, Target, Sparkles } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
@@ -10,6 +11,83 @@ import { cn } from '@/lib/utils'
 
 export default function BuildYourPathPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [caSessionId, setCaSessionId] = useState<string | null>(null)
+  const [highlightedPathId, setHighlightedPathId] = useState<string | null>(null)
+  const highlightedCardRef = useRef<HTMLAnchorElement | null>(null)
+
+  // Check for Career Assistant query params and localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const from = searchParams.get('from')
+    const sessionParam = searchParams.get('ca_session')
+    
+    // Show back button if from=career_assistant OR ca_session exists
+    if ((from === 'career_assistant' || sessionParam) && sessionParam) {
+      // Verify snapshot exists before setting session
+      try {
+        const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
+        if (snapshot) {
+          const parsed = JSON.parse(snapshot)
+          if (parsed.sessionId === sessionParam) {
+            setCaSessionId(sessionParam)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to verify CA session:', err)
+      }
+    } else {
+      // Check localStorage for stored session (for refresh durability)
+      try {
+        const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
+        if (snapshot) {
+          const parsed = JSON.parse(snapshot)
+          if (parsed.sessionId) {
+            setCaSessionId(parsed.sessionId)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to restore CA session from localStorage:', err)
+      }
+    }
+  }, [searchParams])
+
+  // Handle tag prefilter and highlight matching card
+  useEffect(() => {
+    const tag = searchParams.get('tag')
+    if (!tag) return
+
+    // Normalize tag for matching (kebab-case, lowercase, remove spaces)
+    const normalizedTag = tag.toLowerCase().replace(/_/g, '-').replace(/\s+/g, '-').trim()
+
+    // Find matching path by id or title
+    const matchingPath = CAREER_PATHS.find(path => {
+      const normalizedId = path.id.toLowerCase()
+      const normalizedTitle = path.title.toLowerCase().replace(/\s+/g, '-')
+      const titleWords = path.title.toLowerCase().split(/\s+/)
+      
+      // Check various matching strategies
+      return normalizedId === normalizedTag ||
+             normalizedId.includes(normalizedTag) ||
+             normalizedTag.includes(normalizedId) ||
+             normalizedTitle.includes(normalizedTag) ||
+             normalizedTag.includes(normalizedTitle) ||
+             titleWords.some(word => word === normalizedTag || normalizedTag.includes(word) || word.includes(normalizedTag))
+    })
+
+    if (matchingPath) {
+      setHighlightedPathId(matchingPath.id)
+      // Auto-scroll to highlighted card after a brief delay
+      setTimeout(() => {
+        if (highlightedCardRef.current) {
+          highlightedCardRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          })
+        }
+      }, 300)
+    }
+  }, [searchParams])
 
   return (
     <AppShell>
@@ -17,6 +95,8 @@ export default function BuildYourPathPage() {
         title="Build Your Path" 
         subtitle="Not ready to apply for a job yet? Explore career paths, build your skills, and prepare for the right opportunity."
         showBackToDashboard={true}
+        showBackToCareerAssistant={!!caSessionId}
+        caSessionId={caSessionId}
       />
 
       {/* Intro reassurance */}
@@ -38,14 +118,26 @@ export default function BuildYourPathPage() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {CAREER_PATHS.map((path) => (
+          {CAREER_PATHS.map((path) => {
+            // Preserve query params when navigating to individual path pages
+            const pathHref = caSessionId 
+              ? `/build-your-path/${path.id}?from=career_assistant&ca_session=${encodeURIComponent(caSessionId)}`
+              : `/build-your-path/${path.id}`
+            
+            const isHighlighted = highlightedPathId === path.id
+            
+            return (
             <Link
               key={path.id}
-              href={`/build-your-path/${path.id}`}
+              ref={isHighlighted ? highlightedCardRef : null}
+              href={pathHref}
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/50",
+                "group relative overflow-hidden rounded-2xl border bg-slate-950/50",
                 "p-6 hover:border-violet-500/50 hover:shadow-[0_0_40px_rgba(139,92,246,0.3)]",
-                "transition-all duration-300 cursor-pointer"
+                "transition-all duration-300 cursor-pointer",
+                isHighlighted 
+                  ? "border-violet-500/60 ring-2 ring-violet-500/30 shadow-[0_0_20px_rgba(139,92,246,0.4)]"
+                  : "border-slate-700/60"
               )}
             >
               <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
@@ -81,7 +173,8 @@ export default function BuildYourPathPage() {
                 </p>
               </div>
             </Link>
-          ))}
+            )
+          })}
         </div>
       </div>
 

@@ -9,6 +9,8 @@ type Props = {
   showBackToDashboard?: boolean // default true
   showBackToJobFinder?: boolean // default false
   showBackToAllPaths?: boolean // default false
+  showBackToCareerAssistant?: boolean // default false
+  caSessionId?: string | null // Session ID for Career Assistant round-trip navigation
   jobId?: string | null
   mode?: string | null
   from?: string // query param to add when navigating back to job details
@@ -17,7 +19,7 @@ type Props = {
   notice?: string // notice text to show on right side of header (smaller, for beta/under development)
 }
 
-export default function PageHeader({ title, subtitle, showBackToDashboard = true, showBackToJobFinder = false, showBackToAllPaths = false, jobId, mode, from, horizontalLayout = false, disclaimer, notice }: Props) {
+export default function PageHeader({ title, subtitle, showBackToDashboard = true, showBackToJobFinder = false, showBackToAllPaths = false, showBackToCareerAssistant = false, caSessionId, jobId, mode, from, horizontalLayout = false, disclaimer, notice }: Props) {
   const router = useRouter()
 
   const handleBackToJobDetails = () => {
@@ -25,6 +27,11 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
     const modeParam = mode || 'tailorCv'
     const url = `/job-details/${jobId}?mode=${modeParam}${from ? `&from=${from}` : ''}`
     router.push(url)
+  }
+
+  const handleBackToCareerAssistant = () => {
+    if (!caSessionId) return
+    router.push(`/uk-career-assistant?resume=1&ca_session=${encodeURIComponent(caSessionId)}`)
   }
 
   const backButtonClass = horizontalLayout 
@@ -39,8 +46,18 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
             {/* LEFT: Title block with back button */}
             <div className="flex-1 min-w-0">
-              {(showBackToDashboard !== false || showBackToJobFinder || showBackToAllPaths || jobId) && (
+              {(showBackToDashboard !== false || showBackToJobFinder || showBackToAllPaths || showBackToCareerAssistant || jobId) && (
                 <div className="mb-1">
+                  {showBackToCareerAssistant && (
+                    <button
+                      type="button"
+                      onClick={handleBackToCareerAssistant}
+                      className={backButtonClass}
+                    >
+                      <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
+                      Back to Career Assistant results
+                    </button>
+                  )}
                   {showBackToDashboard !== false && (
                     <button
                       type="button"
@@ -113,8 +130,17 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
       ) : (
         // Vertical layout: back button above title (original layout)
         <div className="flex flex-col gap-1">
-          {(showBackToDashboard !== false || showBackToJobFinder || showBackToAllPaths || jobId) && (
+          {(showBackToDashboard !== false || showBackToJobFinder || showBackToAllPaths || showBackToCareerAssistant || jobId) && (
             <div className="flex items-center gap-4 text-xs md:text-sm text-slate-400 mb-3">
+              {showBackToCareerAssistant && (
+                <button
+                  type="button"
+                  onClick={handleBackToCareerAssistant}
+                  className={backButtonClass}
+                >
+                  ← Back to Career Assistant results
+                </button>
+              )}
               {showBackToDashboard !== false && (
                 <button
                   type="button"

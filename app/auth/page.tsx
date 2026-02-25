@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { SITE_URL } from '@/lib/site-url'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 
 type AuthMode = 'signup' | 'login' | 'forgot'
 
@@ -152,6 +153,7 @@ export default function AuthPage() {
           return
         }
         // Email confirmed - redirect to dashboard
+        trackEvent('auth_login', { method: 'email_password' }).catch(() => {})
         router.replace('/dashboard')
       }
     } catch (err: any) {

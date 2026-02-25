@@ -21,6 +21,7 @@ import { useJazContext } from '@/contexts/JazContextContext'
 import type { CvBuilderContext } from '@/components/JazAssistant'
 import { getUserScopedKeySync, getCurrentUserIdSync, initUserStorageCache } from '@/lib/user-storage'
 import { computeCvScore } from '@/lib/cv-score'
+import { logEvent } from '@/lib/analytics/logEvent'
 
 export type CvTemplateId = 'atsClassic' | 'twoColumnPro' | 'customizeStyle'
 
@@ -79,12 +80,14 @@ function GrammarSectionAccordion({
   section,
   issues,
   selectedIssues,
+  appliedFieldPaths,
   onToggleIssue,
   onApplyFix,
 }: {
   section: string
   issues: GrammarIssue[]
   selectedIssues: Set<string>
+  appliedFieldPaths: Set<string>
   onToggleIssue: (fieldPath: string) => void
   onApplyFix: (issue: GrammarIssue) => void
 }) {
@@ -135,7 +138,10 @@ function GrammarSectionAccordion({
                 </div>
                 <button
                   onClick={() => onApplyFix(issue)}
-                  className="rounded-full border border-violet-500/60 text-violet-200 bg-violet-500/10 hover:bg-violet-500/20 px-2 py-1 text-[10px] font-semibold transition flex-shrink-0"
+                  className={cn(
+                    'apply-button rounded-full border border-violet-500/60 text-violet-200 bg-violet-500/10 hover:bg-violet-500/20 px-2 py-1 text-[10px] font-semibold transition flex-shrink-0',
+                    appliedFieldPaths.has(issue.fieldPath) && 'checked'
+                  )}
                 >
                   Apply
                 </button>
@@ -523,11 +529,13 @@ export default function CvBuilderV2Page() {
   }
 
   const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set<string>())
+  const [appliedGrammarFieldPaths, setAppliedGrammarFieldPaths] = useState<Set<string>>(new Set<string>())
 
   const handleGrammarCheck = async () => {
     setShowGrammar(true)
     setGrammarResult(null)
     setSelectedIssues(new Set<string>())
+    setAppliedGrammarFieldPaths(new Set<string>())
     setGrammarLoading(true)
     try {
       const response = await fetch('/api/cv/grammar-check', {
@@ -577,133 +585,162 @@ export default function CvBuilderV2Page() {
     return groups
   }, [grammarResult])
 
-  // Apply a single fix by fieldPath
-  const applySingleFix = (issue: GrammarIssue) => {
+  // Replace only the first occurrence of the error span with the suggestion (preserves rest of text)
+  const replaceFirstSpan = (text: string, original: string, suggestion: string): string => {
+    if (!original) return text
+    const idx = text.indexOf(original)
+    if (idx === -1) return text
+    return text.slice(0, idx) + suggestion + text.slice(idx + original.length)
+  }
+
+  // Compute updates for one fix applied to a given state (used for single apply and batch apply)
+  const computeFixUpdates = (state: CvData, issue: GrammarIssue): Partial<CvData> => {
     const updates: Partial<CvData> = {}
-    
-    try {
-      const fieldPath = issue.fieldPath
+    const fieldPath = issue.fieldPath
+    const { original, suggestion } = issue
       
-      // Personal Info
-      if (fieldPath.startsWith('personalInfo.')) {
-        const field = fieldPath.replace('personalInfo.', '') as keyof typeof cvData.personalInfo
-        if (field && field in cvData.personalInfo) {
-          updates.personalInfo = {
-            ...cvData.personalInfo,
-            [field]: issue.suggestion
-          }
-        }
-      } 
-      // Summary
-      else if (fieldPath === 'summary') {
-        updates.summary = issue.suggestion
-      } 
-      // Experience
-      else if (fieldPath.startsWith('experience[')) {
-        const expMatch = fieldPath.match(/experience\[(\d+)\]\.(\w+)(?:\[(\d+)\])?/)
-        if (expMatch && cvData.experience[parseInt(expMatch[1], 10)]) {
-          const expIdx = parseInt(expMatch[1], 10)
-          const field = expMatch[2]
-          const bulletIdx = expMatch[3] ? parseInt(expMatch[3], 10) : null
-          const newExperience = [...cvData.experience]
+    // Personal Info
+    if (fieldPath.startsWith('personalInfo.')) {
+      const field = fieldPath.replace('personalInfo.', '') as keyof typeof state.personalInfo
+      if (field && field in state.personalInfo) {
+        const current = String(state.personalInfo[field as keyof typeof state.personalInfo] ?? '')
+        const newValue = replaceFirstSpan(current, original, suggestion)
+        updates.personalInfo = { ...state.personalInfo, [field]: newValue }
+      }
+    } 
+    // Summary
+    else if (fieldPath === 'summary') {
+      const current = state.summary ?? ''
+      updates.summary = replaceFirstSpan(current, original, suggestion)
+    } 
+    // Experience
+    else if (fieldPath.startsWith('experience[')) {
+      const expMatch = fieldPath.match(/experience\[(\d+)\]\.(\w+)(?:\[(\d+)\])?/)
+      if (expMatch && state.experience[parseInt(expMatch[1], 10)]) {
+        const expIdx = parseInt(expMatch[1], 10)
+        const field = expMatch[2]
+        const bulletIdx = expMatch[3] ? parseInt(expMatch[3], 10) : null
+        const newExperience = [...state.experience]
           
           if (field === 'jobTitle') {
-            newExperience[expIdx] = { ...newExperience[expIdx], jobTitle: issue.suggestion }
+            const current = newExperience[expIdx].jobTitle ?? ''
+            newExperience[expIdx] = { ...newExperience[expIdx], jobTitle: replaceFirstSpan(current, original, suggestion) }
           } else if (field === 'company') {
-            newExperience[expIdx] = { ...newExperience[expIdx], company: issue.suggestion }
+            const current = newExperience[expIdx].company ?? ''
+            newExperience[expIdx] = { ...newExperience[expIdx], company: replaceFirstSpan(current, original, suggestion) }
           } else if (field === 'location') {
-            newExperience[expIdx] = { ...newExperience[expIdx], location: issue.suggestion }
+            const current = newExperience[expIdx].location ?? ''
+            newExperience[expIdx] = { ...newExperience[expIdx], location: replaceFirstSpan(current, original, suggestion) }
           } else if (field === 'bullets' && bulletIdx !== null && newExperience[expIdx].bullets[bulletIdx]) {
             const newBullets = [...newExperience[expIdx].bullets]
-            newBullets[bulletIdx] = issue.suggestion
+            const current = newBullets[bulletIdx] ?? ''
+            newBullets[bulletIdx] = replaceFirstSpan(current, original, suggestion)
             newExperience[expIdx] = { ...newExperience[expIdx], bullets: newBullets }
           }
           updates.experience = newExperience
         }
       } 
-      // Education
-      else if (fieldPath.startsWith('education[')) {
-        const eduMatch = fieldPath.match(/education\[(\d+)\]\.(\w+)/)
-        if (eduMatch && cvData.education[parseInt(eduMatch[1], 10)]) {
-          const eduIdx = parseInt(eduMatch[1], 10)
-          const field = eduMatch[2]
-          const newEducation = [...cvData.education]
+    // Education
+    else if (fieldPath.startsWith('education[')) {
+      const eduMatch = fieldPath.match(/education\[(\d+)\]\.(\w+)/)
+      if (eduMatch && state.education[parseInt(eduMatch[1], 10)]) {
+        const eduIdx = parseInt(eduMatch[1], 10)
+        const field = eduMatch[2]
+        const newEducation = [...state.education]
           
           if (field === 'degree') {
-            newEducation[eduIdx] = { ...newEducation[eduIdx], degree: issue.suggestion }
+            const current = newEducation[eduIdx].degree ?? ''
+            newEducation[eduIdx] = { ...newEducation[eduIdx], degree: replaceFirstSpan(current, original, suggestion) }
           } else if (field === 'school') {
-            newEducation[eduIdx] = { ...newEducation[eduIdx], school: issue.suggestion }
+            const current = newEducation[eduIdx].school ?? ''
+            newEducation[eduIdx] = { ...newEducation[eduIdx], school: replaceFirstSpan(current, original, suggestion) }
           } else if (field === 'details') {
-            newEducation[eduIdx] = { ...newEducation[eduIdx], details: issue.suggestion }
+            const current = newEducation[eduIdx].details ?? ''
+            newEducation[eduIdx] = { ...newEducation[eduIdx], details: replaceFirstSpan(current, original, suggestion) }
           }
           updates.education = newEducation
         }
       } 
-      // Skills
-      else if (fieldPath.startsWith('skills[')) {
-        const skillMatch = fieldPath.match(/skills\[(\d+)\]/)
-        if (skillMatch && cvData.skills[parseInt(skillMatch[1], 10)]) {
-          const idx = parseInt(skillMatch[1], 10)
-          const newSkills = [...cvData.skills]
-          newSkills[idx] = issue.suggestion
+    // Skills
+    else if (fieldPath.startsWith('skills[')) {
+      const skillMatch = fieldPath.match(/skills\[(\d+)\]/)
+      if (skillMatch && state.skills[parseInt(skillMatch[1], 10)]) {
+        const idx = parseInt(skillMatch[1], 10)
+        const newSkills = [...state.skills]
+          const current = newSkills[idx] ?? ''
+          newSkills[idx] = replaceFirstSpan(current, original, suggestion)
           updates.skills = newSkills
         }
       } 
-      // Projects
-      else if (fieldPath.startsWith('projects[')) {
-        const projMatch = fieldPath.match(/projects\[(\d+)\]\.(\w+)/)
-        if (projMatch && cvData.projects && cvData.projects[parseInt(projMatch[1], 10)]) {
-          const idx = parseInt(projMatch[1], 10)
-          const field = projMatch[2]
-          const newProjects = [...cvData.projects]
+    // Projects
+    else if (fieldPath.startsWith('projects[')) {
+      const projMatch = fieldPath.match(/projects\[(\d+)\]\.(\w+)/)
+      if (projMatch && state.projects && state.projects[parseInt(projMatch[1], 10)]) {
+        const idx = parseInt(projMatch[1], 10)
+        const field = projMatch[2]
+        const newProjects = [...state.projects]
           
           if (field === 'name') {
-            newProjects[idx] = { ...newProjects[idx], name: issue.suggestion }
+            const current = newProjects[idx].name ?? ''
+            newProjects[idx] = { ...newProjects[idx], name: replaceFirstSpan(current, original, suggestion) }
           } else if (field === 'description') {
-            newProjects[idx] = { ...newProjects[idx], description: issue.suggestion }
+            const current = newProjects[idx].description ?? ''
+            newProjects[idx] = { ...newProjects[idx], description: replaceFirstSpan(current, original, suggestion) }
           }
           updates.projects = newProjects
         }
       } 
-      // Certifications
-      else if (fieldPath.startsWith('certifications[')) {
-        const certMatch = fieldPath.match(/certifications\[(\d+)\]/)
-        if (certMatch && cvData.certifications && cvData.certifications[parseInt(certMatch[1], 10)]) {
-          const idx = parseInt(certMatch[1], 10)
-          const newCertifications = [...cvData.certifications]
-          newCertifications[idx] = issue.suggestion
+    // Certifications
+    else if (fieldPath.startsWith('certifications[')) {
+      const certMatch = fieldPath.match(/certifications\[(\d+)\]/)
+      if (certMatch && state.certifications && state.certifications[parseInt(certMatch[1], 10)]) {
+        const idx = parseInt(certMatch[1], 10)
+        const newCertifications = [...state.certifications]
+          const current = newCertifications[idx] ?? ''
+          newCertifications[idx] = replaceFirstSpan(current, original, suggestion)
           updates.certifications = newCertifications
         }
       } 
-      // Languages
-      else if (fieldPath.startsWith('languages[')) {
-        const langMatch = fieldPath.match(/languages\[(\d+)\]/)
-        if (langMatch && cvData.languages && cvData.languages[parseInt(langMatch[1], 10)]) {
-          const idx = parseInt(langMatch[1], 10)
-          const newLanguages = [...cvData.languages]
-          newLanguages[idx] = issue.suggestion
+    // Languages
+    else if (fieldPath.startsWith('languages[')) {
+      const langMatch = fieldPath.match(/languages\[(\d+)\]/)
+      if (langMatch && state.languages && state.languages[parseInt(langMatch[1], 10)]) {
+        const idx = parseInt(langMatch[1], 10)
+        const newLanguages = [...state.languages]
+          const current = newLanguages[idx] ?? ''
+          newLanguages[idx] = replaceFirstSpan(current, original, suggestion)
           updates.languages = newLanguages
         }
       } 
-      // Publications
-      else if (fieldPath.startsWith('publications[')) {
-        const pubMatch = fieldPath.match(/publications\[(\d+)\]\.(\w+)/)
-        if (pubMatch && cvData.publications && cvData.publications[parseInt(pubMatch[1], 10)]) {
-          const idx = parseInt(pubMatch[1], 10)
-          const field = pubMatch[2]
-          const newPublications = [...cvData.publications]
+    // Publications
+    else if (fieldPath.startsWith('publications[')) {
+      const pubMatch = fieldPath.match(/publications\[(\d+)\]\.(\w+)/)
+      if (pubMatch && state.publications && state.publications[parseInt(pubMatch[1], 10)]) {
+        const idx = parseInt(pubMatch[1], 10)
+        const field = pubMatch[2]
+        const newPublications = [...state.publications]
           
           if (field === 'title') {
-            newPublications[idx] = { ...newPublications[idx], title: issue.suggestion }
+            const current = newPublications[idx].title ?? ''
+            newPublications[idx] = { ...newPublications[idx], title: replaceFirstSpan(current, original, suggestion) }
           } else if (field === 'notes') {
-            newPublications[idx] = { ...newPublications[idx], notes: issue.suggestion }
+            const current = newPublications[idx].notes ?? ''
+            newPublications[idx] = { ...newPublications[idx], notes: replaceFirstSpan(current, original, suggestion) }
           }
           updates.publications = newPublications
         }
       }
-      
+    
+    return updates
+  }
+
+  // Apply a single fix by replacing only the erroneous span (original → suggestion) in the field
+  const applySingleFix = (issue: GrammarIssue) => {
+    try {
+      const updates = computeFixUpdates(cvData, issue)
       if (Object.keys(updates).length > 0) {
         updateCvData(updates)
+        setAppliedGrammarFieldPaths((prev) => new Set(prev).add(issue.fieldPath))
         showToast('success', 'Applied fix. Review your CV to confirm.')
       }
     } catch (error) {
@@ -712,7 +749,7 @@ export default function CvBuilderV2Page() {
     }
   }
 
-  // Apply all selected fixes
+  // Apply all selected fixes in one state update (so each fix sees the result of the previous)
   const applySelectedFixes = () => {
     if (!grammarResult?.ok || !grammarResult.issues) return
     
@@ -723,12 +760,15 @@ export default function CvBuilderV2Page() {
       return
     }
     
-    // Apply fixes one by one (they update the same state)
-    issuesToApply.forEach(issue => {
-      applySingleFix(issue)
+    setCvData((prev) => {
+      let next = prev
+      for (const issue of issuesToApply) {
+        const updates = computeFixUpdates(next, issue)
+        next = { ...next, ...updates }
+      }
+      return next
     })
-    
-    showToast('success', `Applied ${issuesToApply.length} fix${issuesToApply.length > 1 ? 'es' : ''}. Review your CV to confirm.`)
+    showToast('success', `Applied ${issuesToApply.length} fix${issuesToApply.length > 1 ? 'es' : ''}. Only the words with errors were corrected.`)
     setShowGrammar(false)
   }
 
@@ -744,6 +784,7 @@ export default function CvBuilderV2Page() {
       if (format === 'pdf') {
         await exportToPDF('cv-preview', filename)
         showToast('success', 'PDF exported successfully!')
+        logEvent('cv_downloaded', { format: 'pdf' })
       } else {
         // Prepare sections for DOCX export
         const sections: Array<{ title: string; content: string[] }> = []
@@ -828,6 +869,7 @@ export default function CvBuilderV2Page() {
 
         await exportToDocx(name, sections, filename)
         showToast('success', 'DOCX exported successfully!')
+        logEvent('cv_downloaded', { format: 'docx' })
       }
     } catch (error: any) {
       console.error('Export error:', error)
@@ -1590,6 +1632,7 @@ export default function CvBuilderV2Page() {
                         section={section}
                         issues={issues}
                         selectedIssues={selectedIssues}
+                        appliedFieldPaths={appliedGrammarFieldPaths}
                         onToggleIssue={(fieldPath) => {
                           const newSelected = new Set<string>(selectedIssues)
                           if (newSelected.has(fieldPath)) {

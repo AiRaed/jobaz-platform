@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { logEvent } from '@/lib/analytics/logEvent'
 
 export const dynamic = 'force-dynamic'
 
@@ -191,6 +192,7 @@ export async function POST(req: NextRequest) {
 
       cvRow = insertedRow
       console.log('[UPSERT] inserted new CV with updated_at', insertedRow.updated_at)
+      logEvent('cv_created', {}, supabase).catch(() => {})
     }
 
     console.log('[CV Upsert] Successfully saved CV for user:', user.id)

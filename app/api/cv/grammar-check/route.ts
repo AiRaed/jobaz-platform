@@ -136,6 +136,123 @@ function shouldSkipField(fieldPath: string, value: string): boolean {
   return false
 }
 
+// Get current string value for a field path (so we can filter already-fixed issues)
+function getFieldValue(data: CvData, fieldPath: string): string {
+  if (!fieldPath) return ''
+  // Personal Info
+  if (fieldPath.startsWith('personalInfo.')) {
+    const field = fieldPath.replace('personalInfo.', '') as keyof typeof data.personalInfo
+    return String(data.personalInfo?.[field] ?? '')
+  }
+  if (fieldPath === 'summary') return data.summary ?? ''
+  // Experience
+  const expMatch = fieldPath.match(/^experience\[(\d+)\]\.(\w+)(?:\[(\d+)\])?$/)
+  if (expMatch) {
+    const expIdx = parseInt(expMatch[1], 10)
+    const field = expMatch[2]
+    const bulletIdx = expMatch[3] != null ? parseInt(expMatch[3], 10) : null
+    const exp = data.experience?.[expIdx]
+    if (!exp) return ''
+    if (field === 'jobTitle') return exp.jobTitle ?? ''
+    if (field === 'company') return exp.company ?? ''
+    if (field === 'location') return exp.location ?? ''
+    if (field === 'bullets' && bulletIdx != null) return exp.bullets?.[bulletIdx] ?? ''
+    return ''
+  }
+  // Education
+  const eduMatch = fieldPath.match(/^education\[(\d+)\]\.(\w+)$/)
+  if (eduMatch) {
+    const eduIdx = parseInt(eduMatch[1], 10)
+    const field = eduMatch[2]
+    const edu = data.education?.[eduIdx]
+    if (!edu) return ''
+    if (field === 'degree') return edu.degree ?? ''
+    if (field === 'school') return edu.school ?? ''
+    if (field === 'details') return edu.details ?? ''
+    return ''
+  }
+  // Skills, certifications, languages (single index)
+  const skillMatch = fieldPath.match(/^skills\[(\d+)\]$/)
+  if (skillMatch) return data.skills?.[parseInt(skillMatch[1], 10)] ?? ''
+  const certMatch = fieldPath.match(/^certifications\[(\d+)\]$/)
+  if (certMatch) return data.certifications?.[parseInt(certMatch[1], 10)] ?? ''
+  const langMatch = fieldPath.match(/^languages\[(\d+)\]$/)
+  if (langMatch) return data.languages?.[parseInt(langMatch[1], 10)] ?? ''
+  // Projects, publications
+  const projMatch = fieldPath.match(/^projects\[(\d+)\]\.(\w+)$/)
+  if (projMatch) {
+    const proj = data.projects?.[parseInt(projMatch[1], 10)]
+    if (!proj) return ''
+    if (projMatch[2] === 'name') return proj.name ?? ''
+    if (projMatch[2] === 'description') return proj.description ?? ''
+    return ''
+  }
+  const pubMatch = fieldPath.match(/^publications\[(\d+)\]\.(\w+)$/)
+  if (pubMatch) {
+    const pub = data.publications?.[parseInt(pubMatch[1], 10)]
+    if (!pub) return ''
+    if (pubMatch[2] === 'title') return pub.title ?? ''
+    if (pubMatch[2] === 'notes') return pub.notes ?? ''
+    return ''
+  }
+  return ''
+}
+
+// Normalize for comparison: trim + collapse spaces (exact casing kept for capitalization checks)
+function normalizeForCompare(s: string): string {
+  return (s ?? '').trim().replace(/\s+/g, ' ')
+}
+
+// Replace only the first occurrence (used to detect "no change" = already fixed)
+function replaceFirstSpan(text: string, original: string, suggestion: string): string {
+  if (!original) return text
+  const idx = text.indexOf(original)
+  if (idx === -1) return text
+  return text.slice(0, idx) + suggestion + text.slice(idx + original.length)
+}
+
+// Field path prefixes that are TITLE fields (Title Case / first letter uppercase)
+// For these we do not flag capitalization if the first character is already uppercase
+const TITLE_FIELD_PATTERNS = [
+  'personalInfo.fullName',
+  'experience[', 'education[', 'projects[', 'publications[',
+  'certifications[', 'languages[',
+]
+function isTitleField(fieldPath: string): boolean {
+  return TITLE_FIELD_PATTERNS.some(p => fieldPath === p || fieldPath.startsWith(p))
+}
+
+// Filter out issues that are already fixed or redundant (e.g. capitalization when already capitalized)
+function filterAlreadyFixedAndRedundant(data: CvData, issues: GrammarIssue[]): GrammarIssue[] {
+  return issues.filter((issue) => {
+    const current = getFieldValue(data, issue.fieldPath)
+    const trimmed = current.trim()
+    const suggestion = issue.suggestion?.trim() ?? ''
+    const original = issue.original?.trim() ?? ''
+    // Already fixed: applying the fix would change nothing
+    if (replaceFirstSpan(current, issue.original, issue.suggestion) === current) {
+      return false
+    }
+    // Already equals suggestion (exact or normalized)
+    if (normalizeForCompare(current) === normalizeForCompare(suggestion)) {
+      return false
+    }
+    // Capitalization-only: original and suggestion same when lowercased
+    const isCapitalizationOnly = original.toLowerCase() === suggestion.toLowerCase()
+    if (isCapitalizationOnly && isTitleField(issue.fieldPath)) {
+      if (trimmed.length > 0 && trimmed[0] === trimmed[0].toUpperCase() && trimmed[0] !== trimmed[0].toLowerCase()) {
+        return false // First character already uppercase
+      }
+    }
+    if (isCapitalizationOnly) {
+      if (trimmed.length > 0 && trimmed[0] === suggestion[0]) {
+        return false // Already has correct first letter
+      }
+    }
+    return true
+  })
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -357,7 +474,9 @@ If no errors are found, return an empty array []. Return ONLY the JSON array, no
       if (exp.jobTitle && !shouldSkipField(`experience[${idx}].jobTitle`, exp.jobTitle)) {
         const dictSuggestion = suggestJobTitle(exp.jobTitle)
         if (dictSuggestion) {
-          // Check if AI already found this issue
+          if (normalizeForCompare(exp.jobTitle) === normalizeForCompare(dictSuggestion.suggestion)) {
+            return // Already correct (e.g. "Animator" vs "Animator")
+          }
           const existingIssue = aiIssues.find(
             issue => issue.fieldPath === `experience[${idx}].jobTitle`
           )
@@ -373,6 +492,9 @@ If no errors are found, return an empty array []. Return ONLY the JSON array, no
         }
       }
     })
+
+    // Remove issues that are already fixed or redundant (e.g. capitalization when already capitalized)
+    aiIssues = filterAlreadyFixedAndRedundant(data, aiIssues)
 
     // Count safe fixes
     const safeCount = aiIssues.filter(issue => issue.isSafeFix).length

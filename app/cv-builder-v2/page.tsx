@@ -79,16 +79,20 @@ const STORAGE_KEY = 'jobaz-cv-v2-draft'
 function GrammarSectionAccordion({
   section,
   issues,
-  selectedIssues,
-  appliedFieldPaths,
+  getIssueId,
+  selectedIssueIds,
+  applyingIssueId,
+  errorByIssueId,
   onToggleIssue,
   onApplyFix,
 }: {
   section: string
   issues: GrammarIssue[]
-  selectedIssues: Set<string>
-  appliedFieldPaths: Set<string>
-  onToggleIssue: (fieldPath: string) => void
+  getIssueId: (issue: GrammarIssue) => string
+  selectedIssueIds: Set<string>
+  applyingIssueId: string | null
+  errorByIssueId: Record<string, string>
+  onToggleIssue: (issueId: string) => void
   onApplyFix: (issue: GrammarIssue) => void
 }) {
   const [isOpen, setIsOpen] = useState(true)
@@ -107,47 +111,60 @@ function GrammarSectionAccordion({
       </button>
       {isOpen && (
         <div className="px-3 pb-2 space-y-2">
-          {issues.map((issue, idx) => (
-            <div key={idx} className="rounded-lg border border-slate-700/40 bg-slate-950/60 p-2.5">
-              <div className="flex items-start gap-2 mb-2">
-                <input
-                  type="checkbox"
-                  checked={selectedIssues.has(issue.fieldPath)}
-                  onChange={() => onToggleIssue(issue.fieldPath)}
-                  disabled={!issue.isSafeFix}
-                  className="mt-0.5 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 disabled:opacity-40"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[11px] font-medium text-slate-300 mb-1 break-all">{issue.fieldPath}</div>
-                  <div className="text-xs text-slate-400 mb-1">
-                    <span className="text-slate-500 line-through">{issue.original}</span>
-                    <span className="mx-2">→</span>
-                    <span className="text-violet-300">{issue.suggestion}</span>
+          {issues.map((issue, idx) => {
+            const issueId = getIssueId(issue)
+            const isApplying = applyingIssueId === issueId
+            const rowError = errorByIssueId[issueId]
+            return (
+              <div key={issueId} className="rounded-lg border border-slate-700/40 bg-slate-950/60 p-2.5">
+                <div className="flex items-start gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedIssueIds.has(issueId)}
+                    onChange={() => onToggleIssue(issueId)}
+                    disabled={!issue.isSafeFix}
+                    className="mt-0.5 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 disabled:opacity-40"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-medium text-slate-300 mb-1 break-all">{issue.fieldPath}</div>
+                    <div className="text-xs text-slate-400 mb-1">
+                      <span className="text-slate-500 line-through">{issue.original}</span>
+                      <span className="mx-2">→</span>
+                      <span className="text-violet-300">{issue.suggestion}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded',
+                        issue.isSafeFix ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'
+                      )}>
+                        {issue.isSafeFix ? 'Safe' : 'Review'}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        Confidence: {Math.round(issue.confidence * 100)}%
+                      </span>
+                    </div>
+                    {rowError && (
+                      <div className="text-[10px] text-red-400 mt-1">{rowError}</div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className={cn(
-                      'text-[10px] px-1.5 py-0.5 rounded',
-                      issue.isSafeFix ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'
-                    )}>
-                      {issue.isSafeFix ? 'Safe' : 'Review'}
-                    </span>
-                    <span className="text-[10px] text-slate-500">
-                      Confidence: {Math.round(issue.confidence * 100)}%
-                    </span>
-                  </div>
+                  <button
+                    onClick={() => onApplyFix(issue)}
+                    disabled={isApplying}
+                    className="apply-button rounded-full border border-violet-500/60 text-violet-200 bg-violet-500/10 hover:bg-violet-500/20 px-2 py-1 text-[10px] font-semibold transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                  >
+                    {isApplying ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Applying…
+                      </>
+                    ) : (
+                      'Apply'
+                    )}
+                  </button>
                 </div>
-                <button
-                  onClick={() => onApplyFix(issue)}
-                  className={cn(
-                    'apply-button rounded-full border border-violet-500/60 text-violet-200 bg-violet-500/10 hover:bg-violet-500/20 px-2 py-1 text-[10px] font-semibold transition flex-shrink-0',
-                    appliedFieldPaths.has(issue.fieldPath) && 'checked'
-                  )}
-                >
-                  Apply
-                </button>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -173,6 +190,68 @@ type GrammarIssue = {
   suggestion: string
   confidence: number
   isSafeFix: boolean
+}
+
+// Stable unique id for an issue (fieldPath + span + suggestion)
+function getIssueId(issue: GrammarIssue): string {
+  return `${issue.fieldPath}\0${issue.original}\0${issue.suggestion}`
+}
+
+// Get current string value for a field path (for already-fixed invalidation)
+function getFieldValue(state: CvData, fieldPath: string): string {
+  if (!fieldPath) return ''
+  if (fieldPath.startsWith('personalInfo.')) {
+    const field = fieldPath.replace('personalInfo.', '') as keyof typeof state.personalInfo
+    return String(state.personalInfo?.[field] ?? '')
+  }
+  if (fieldPath === 'summary') return state.summary ?? ''
+  const expMatch = fieldPath.match(/^experience\[(\d+)\]\.(\w+)(?:\[(\d+)\])?$/)
+  if (expMatch) {
+    const expIdx = parseInt(expMatch[1], 10)
+    const field = expMatch[2]
+    const bulletIdx = expMatch[3] != null ? parseInt(expMatch[3], 10) : null
+    const exp = state.experience?.[expIdx]
+    if (!exp) return ''
+    if (field === 'jobTitle') return exp.jobTitle ?? ''
+    if (field === 'company') return exp.company ?? ''
+    if (field === 'location') return exp.location ?? ''
+    if (field === 'bullets' && bulletIdx != null) return exp.bullets?.[bulletIdx] ?? ''
+    return ''
+  }
+  const eduMatch = fieldPath.match(/^education\[(\d+)\]\.(\w+)$/)
+  if (eduMatch) {
+    const eduIdx = parseInt(eduMatch[1], 10)
+    const field = eduMatch[2]
+    const edu = state.education?.[eduIdx]
+    if (!edu) return ''
+    if (field === 'degree') return edu.degree ?? ''
+    if (field === 'school') return edu.school ?? ''
+    if (field === 'details') return edu.details ?? ''
+    return ''
+  }
+  const skillMatch = fieldPath.match(/^skills\[(\d+)\]$/)
+  if (skillMatch) return state.skills?.[parseInt(skillMatch[1], 10)] ?? ''
+  const certMatch = fieldPath.match(/^certifications\[(\d+)\]$/)
+  if (certMatch) return state.certifications?.[parseInt(certMatch[1], 10)] ?? ''
+  const langMatch = fieldPath.match(/^languages\[(\d+)\]$/)
+  if (langMatch) return state.languages?.[parseInt(langMatch[1], 10)] ?? ''
+  const projMatch = fieldPath.match(/^projects\[(\d+)\]\.(\w+)$/)
+  if (projMatch) {
+    const proj = state.projects?.[parseInt(projMatch[1], 10)]
+    if (!proj) return ''
+    if (projMatch[2] === 'name') return proj.name ?? ''
+    if (projMatch[2] === 'description') return proj.description ?? ''
+    return ''
+  }
+  const pubMatch = fieldPath.match(/^publications\[(\d+)\]\.(\w+)$/)
+  if (pubMatch) {
+    const pub = state.publications?.[parseInt(pubMatch[1], 10)]
+    if (!pub) return ''
+    if (pubMatch[2] === 'title') return pub.title ?? ''
+    if (pubMatch[2] === 'notes') return pub.notes ?? ''
+    return ''
+  }
+  return ''
 }
 
 type GrammarResult = {
@@ -528,14 +607,18 @@ export default function CvBuilderV2Page() {
     }
   }
 
-  const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set<string>())
-  const [appliedGrammarFieldPaths, setAppliedGrammarFieldPaths] = useState<Set<string>>(new Set<string>())
+  const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set<string>())
+  const [appliedIssueIds, setAppliedIssueIds] = useState<Set<string>>(new Set<string>())
+  const [applyingIssueId, setApplyingIssueId] = useState<string | null>(null)
+  const [errorByIssueId, setErrorByIssueId] = useState<Record<string, string>>({})
+  const rescanAfterApplyRef = useRef(false)
 
   const handleGrammarCheck = async () => {
     setShowGrammar(true)
     setGrammarResult(null)
-    setSelectedIssues(new Set<string>())
-    setAppliedGrammarFieldPaths(new Set<string>())
+    setSelectedIssueIds(new Set<string>())
+    setAppliedIssueIds(new Set<string>())
+    setErrorByIssueId({})
     setGrammarLoading(true)
     try {
       const response = await fetch('/api/cv/grammar-check', {
@@ -545,14 +628,14 @@ export default function CvBuilderV2Page() {
       })
       const data = await response.json() as GrammarResult
       setGrammarResult(data)
-      // Auto-select all safe fixes
+      // Auto-select all safe fixes (by issue id so multiple issues in same field are independent)
       if (data.ok && data.issues) {
-        const safeIssuePaths = new Set<string>(
+        const safeIds = new Set<string>(
           data.issues
             .filter((issue: GrammarIssue) => issue.isSafeFix && typeof issue.fieldPath === 'string')
-            .map((issue: GrammarIssue) => issue.fieldPath as string)
+            .map((issue: GrammarIssue) => getIssueId(issue))
         )
-        setSelectedIssues(safeIssuePaths)
+        setSelectedIssueIds(safeIds)
       }
     } catch (error: any) {
       setGrammarResult({ ok: false, error: error?.message || 'Failed to check grammar' })
@@ -561,12 +644,54 @@ export default function CvBuilderV2Page() {
     }
   }
 
-  // Group issues by section
+  // After applying a fix, re-run grammar check once state has committed so the list stays in sync
+  useEffect(() => {
+    if (!rescanAfterApplyRef.current || !showGrammar) return
+    rescanAfterApplyRef.current = false
+    let cancelled = false
+    setGrammarLoading(true)
+    fetch('/api/cv/grammar-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cvData }),
+    })
+      .then((res) => res.json() as Promise<GrammarResult>)
+      .then((data) => {
+        if (!cancelled) setGrammarResult(data)
+      })
+      .catch(() => {
+        if (!cancelled) setGrammarResult((prev) => prev ? { ...prev, ok: false, error: 'Re-scan failed' } : null)
+      })
+      .finally(() => {
+        if (!cancelled) setGrammarLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [cvData, showGrammar])
+
+  // Replace only the first occurrence of the error span with the suggestion (preserves rest of text)
+  const replaceFirstSpan = (text: string, original: string, suggestion: string): string => {
+    if (!original) return text
+    const idx = text.indexOf(original)
+    if (idx === -1) return text
+    return text.slice(0, idx) + suggestion + text.slice(idx + original.length)
+  }
+
+  // Only show issues that are not applied AND still need fixing (invalidate already-fixed)
+  const visibleIssues = useMemo(() => {
+    if (!grammarResult?.ok || !grammarResult.issues) return []
+    return grammarResult.issues.filter((issue) => {
+      if (appliedIssueIds.has(getIssueId(issue))) return false
+      const current = getFieldValue(cvData, issue.fieldPath)
+      const afterFix = replaceFirstSpan(current, issue.original, issue.suggestion)
+      if (afterFix === current) return false // Already fixed or original not present
+      return true
+    })
+  }, [grammarResult, appliedIssueIds, cvData])
+
+  // Group visible issues by section
   const groupedIssues = useMemo(() => {
-    if (!grammarResult?.ok || !grammarResult.issues) return {}
-    
     const groups: Record<string, GrammarIssue[]> = {}
-    grammarResult.issues.forEach((issue) => {
+    visibleIssues.forEach((issue) => {
       let section = 'Other'
       if (issue.fieldPath.startsWith('personalInfo')) section = 'Personal Info'
       else if (issue.fieldPath.startsWith('summary')) section = 'Summary'
@@ -577,21 +702,11 @@ export default function CvBuilderV2Page() {
       else if (issue.fieldPath.startsWith('certifications')) section = 'Certifications'
       else if (issue.fieldPath.startsWith('languages')) section = 'Languages'
       else if (issue.fieldPath.startsWith('publications')) section = 'Publications'
-      
       if (!groups[section]) groups[section] = []
       groups[section].push(issue)
     })
-    
     return groups
-  }, [grammarResult])
-
-  // Replace only the first occurrence of the error span with the suggestion (preserves rest of text)
-  const replaceFirstSpan = (text: string, original: string, suggestion: string): string => {
-    if (!original) return text
-    const idx = text.indexOf(original)
-    if (idx === -1) return text
-    return text.slice(0, idx) + suggestion + text.slice(idx + original.length)
-  }
+  }, [visibleIssues])
 
   // Compute updates for one fix applied to a given state (used for single apply and batch apply)
   const computeFixUpdates = (state: CvData, issue: GrammarIssue): Partial<CvData> => {
@@ -734,32 +849,47 @@ export default function CvBuilderV2Page() {
     return updates
   }
 
-  // Apply a single fix by replacing only the erroneous span (original → suggestion) in the field
+  // Apply a single fix: use latest CV state (functional update) so we never patch stale data
   const applySingleFix = (issue: GrammarIssue) => {
+    const issueId = getIssueId(issue)
+    setApplyingIssueId(issueId)
+    setErrorByIssueId((prev) => {
+      const next = { ...prev }
+      delete next[issueId]
+      return next
+    })
     try {
-      const updates = computeFixUpdates(cvData, issue)
-      if (Object.keys(updates).length > 0) {
-        updateCvData(updates)
-        setAppliedGrammarFieldPaths((prev) => new Set(prev).add(issue.fieldPath))
-        showToast('success', 'Applied fix. Review your CV to confirm.')
-      }
+      let didUpdate = false
+      setCvData((prev) => {
+        const updates = computeFixUpdates(prev, issue)
+        if (Object.keys(updates).length > 0) {
+          didUpdate = true
+          return { ...prev, ...updates }
+        }
+        return prev
+      })
+      setAppliedIssueIds((prev) => new Set(prev).add(issueId))
+      showToast('success', 'Applied fix. Review your CV to confirm.')
+      rescanAfterApplyRef.current = true
     } catch (error) {
       console.error('Error applying fix:', error)
+      setErrorByIssueId((prev) => ({ ...prev, [issueId]: 'Failed to apply. Please try again.' }))
       showToast('error', 'Failed to apply fix. Please try again.')
+    } finally {
+      setApplyingIssueId(null)
     }
   }
 
-  // Apply all selected fixes in one state update (so each fix sees the result of the previous)
+  // Apply all selected fixes: one state update, each fix uses previous result (per-issue target only)
   const applySelectedFixes = () => {
     if (!grammarResult?.ok || !grammarResult.issues) return
-    
-    const issuesToApply = grammarResult.issues.filter(issue => selectedIssues.has(issue.fieldPath))
-    
+    const issuesToApply = grammarResult.issues.filter(
+      (issue) => selectedIssueIds.has(getIssueId(issue)) && !appliedIssueIds.has(getIssueId(issue))
+    )
     if (issuesToApply.length === 0) {
       showToast('error', 'No fixes selected.')
       return
     }
-    
     setCvData((prev) => {
       let next = prev
       for (const issue of issuesToApply) {
@@ -768,11 +898,17 @@ export default function CvBuilderV2Page() {
       }
       return next
     })
-    showToast('success', `Applied ${issuesToApply.length} fix${issuesToApply.length > 1 ? 'es' : ''}. Only the words with errors were corrected.`)
-    setShowGrammar(false)
+    setAppliedIssueIds((prev) => {
+      const next = new Set(prev)
+      issuesToApply.forEach((issue) => next.add(getIssueId(issue)))
+      return next
+    })
+    showToast('success', `Applied ${issuesToApply.length} fix${issuesToApply.length > 1 ? 'es' : ''}.`)
+    rescanAfterApplyRef.current = true
   }
 
-  const canApplySafeFixes = !!(grammarResult?.ok && grammarResult.summary && grammarResult.summary.safeCount > 0)
+  const canApplySafeFixes = visibleIssues.some((issue) => issue.isSafeFix && selectedIssueIds.has(getIssueId(issue)))
+  const selectedCount = visibleIssues.filter((issue) => selectedIssueIds.has(getIssueId(issue))).length
 
   const handleExport = async (format: 'pdf' | 'docx') => {
     setLoading((prev) => ({ ...prev, export: true }))
@@ -1584,10 +1720,10 @@ export default function CvBuilderV2Page() {
                 {canApplySafeFixes && (
                   <button
                     onClick={applySelectedFixes}
-                    disabled={grammarLoading || selectedIssues.size === 0}
+                    disabled={grammarLoading || selectedCount === 0}
                     className="rounded-full border border-violet-500/60 text-violet-200 bg-violet-500/10 hover:bg-violet-500/20 px-3 py-1 text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Apply safe fixes ({selectedIssues.size})
+                    Apply safe fixes ({selectedCount})
                   </button>
                 )}
                 <button
@@ -1609,17 +1745,17 @@ export default function CvBuilderV2Page() {
 
             {!grammarLoading && grammarResult?.ok && (
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-                {/* Summary stats */}
+                {/* Summary stats (from visible / unapplied issues only) */}
                 <div className="flex items-center justify-between pb-2 border-b border-slate-700/60">
                   <span className="text-xs text-slate-400">Total Issues</span>
-                  <span className={cn('text-sm font-semibold', (grammarResult.summary?.issueCount || 0) === 0 ? 'text-green-400' : 'text-yellow-300')}>
-                    {(grammarResult.summary?.issueCount || 0) === 0 ? 'No issues found' : `${grammarResult.summary?.issueCount || 0} issue${(grammarResult.summary?.issueCount || 0) > 1 ? 's' : ''}`}
+                  <span className={cn('text-sm font-semibold', visibleIssues.length === 0 ? 'text-green-400' : 'text-yellow-300')}>
+                    {visibleIssues.length === 0 ? 'No issues found' : `${visibleIssues.length} issue${visibleIssues.length > 1 ? 's' : ''}`}
                   </span>
                 </div>
-                {grammarResult.summary && grammarResult.summary.safeCount > 0 && (
+                {visibleIssues.filter((i) => i.isSafeFix).length > 0 && (
                   <div className="flex items-center justify-between pb-2 border-b border-slate-700/60">
                     <span className="text-xs text-slate-400">Safe fixes available</span>
-                    <span className="text-xs font-semibold text-green-400">{grammarResult.summary.safeCount}</span>
+                    <span className="text-xs font-semibold text-green-400">{visibleIssues.filter((i) => i.isSafeFix).length}</span>
                   </div>
                 )}
 
@@ -1631,16 +1767,18 @@ export default function CvBuilderV2Page() {
                         key={section}
                         section={section}
                         issues={issues}
-                        selectedIssues={selectedIssues}
-                        appliedFieldPaths={appliedGrammarFieldPaths}
-                        onToggleIssue={(fieldPath) => {
-                          const newSelected = new Set<string>(selectedIssues)
-                          if (newSelected.has(fieldPath)) {
-                            newSelected.delete(fieldPath)
+                        getIssueId={getIssueId}
+                        selectedIssueIds={selectedIssueIds}
+                        applyingIssueId={applyingIssueId}
+                        errorByIssueId={errorByIssueId}
+                        onToggleIssue={(issueId) => {
+                          const newSelected = new Set<string>(selectedIssueIds)
+                          if (newSelected.has(issueId)) {
+                            newSelected.delete(issueId)
                           } else {
-                            newSelected.add(fieldPath)
+                            newSelected.add(issueId)
                           }
-                          setSelectedIssues(newSelected)
+                          setSelectedIssueIds(newSelected)
                         }}
                         onApplyFix={applySingleFix}
                       />

@@ -283,6 +283,9 @@ export default function AuthPage() {
           {successMessage && (
             <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
               <p className="text-green-400 text-sm">{successMessage}</p>
+              <p className="text-gray-400 text-xs mt-2 text-center">
+                Please check your inbox. If you don&apos;t see the email, check your Spam/Junk folder (especially for Hotmail/Outlook users).
+              </p>
             </div>
           )}
 

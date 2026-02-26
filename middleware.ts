@@ -1,70 +1,34 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+/**
+ * Edge-safe middleware: no Node-only APIs (no @supabase/ssr here).
+ * Auth is inferred from Supabase auth cookie presence; session refresh
+ * happens in Node (auth callback and API routes using createServerClient).
+ */
+function getSupabaseAuthCookieName(): string {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!url) return ''
+  try {
+    const ref = new URL(url).hostname.split('.')[0]
+    return ref ? `sb-${ref}-auth-token` : ''
+  } catch {
+    return ''
+  }
+}
+
+function hasAuthCookie(request: NextRequest): boolean {
+  const name = getSupabaseAuthCookieName()
+  if (!name) return false
+  const value = request.cookies.get(name)?.value
+  return Boolean(value && value.length > 0)
+}
+
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+  const response = NextResponse.next({
+    request: { headers: request.headers },
   })
 
-  // Create Supabase client for middleware
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-        },
-      },
-    }
-  )
-
-  // Get the current user (more reliable than getSession for middleware)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  // Get session for email confirmation checks
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
+  const user = hasAuthCookie(request)
   const { pathname } = request.nextUrl
 
   // Handle /sitemap.xml - always allow, never redirect (must return XML)
@@ -120,26 +84,10 @@ export async function middleware(request: NextRequest) {
 
   // Handle protected routes
   if (isProtectedRoute) {
-    // If user is not logged in, redirect to landing page
     if (!user) {
       return NextResponse.redirect(new URL('/', request.url))
     }
-    
-    // Check if email is confirmed (session should exist if user exists)
-    if (session?.user && !session.user.email_confirmed_at) {
-      // For dashboard, redirect to auth page with email confirmation message
-      if (pathname.startsWith('/dashboard')) {
-        const url = new URL('/auth', request.url)
-        url.searchParams.set('error', 'email_not_confirmed')
-        url.searchParams.set('message', 'Please confirm your email address before accessing the dashboard.')
-        return NextResponse.redirect(url)
-      }
-      // For other protected routes, redirect to auth page
-      const url = new URL('/auth', request.url)
-      url.searchParams.set('error', 'email_not_confirmed')
-      url.searchParams.set('message', 'Please confirm your email address to continue.')
-      return NextResponse.redirect(url)
-    }
+    // Email confirmation is enforced in auth callback and dashboard (Node); not checked in Edge middleware
   }
   
   // Handle other routes (not explicitly public or protected)

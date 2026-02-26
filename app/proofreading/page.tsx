@@ -33,7 +33,7 @@ interface ProofreadingDocument {
 interface ProofreadingIssue {
   id: string
   document_id: string
-  type: 'grammar' | 'spelling' | 'style' | 'clarity' | 'word_form' | 'tense' | 'repetition' | 'preposition' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality' | 'agreement' | 'article' | 'uncountable' | 'research_grammar' | 'punctuation'
+  type: 'grammar' | 'spelling' | 'style' | 'clarity' | 'word_form' | 'tense' | 'tense_consistency' | 'repetition' | 'preposition' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality' | 'agreement' | 'article' | 'uncountable' | 'research_grammar' | 'punctuation'
   severity: 'low' | 'moderate' | 'high'
   message: string
   original_text: string
@@ -1655,10 +1655,11 @@ export default function ProofreadingPage() {
         return
       }
       setAiProofreadOriginal(editorText)
+      type AiIssue = { type: string; original: string; correction: string; explanation: string }
       setAiProofreadResult({
         corrected_text: data.corrected_text ?? editorText,
         improved_text: data.improved_text ?? data.corrected_text ?? editorText,
-        issues: Array.isArray(data.issues) ? data.issues : [],
+        issues: (Array.isArray(data.issues) ? data.issues : []) as AiIssue[],
         confidence_score: typeof data.confidence_score === 'number' ? data.confidence_score : 0,
       })
       addToast?.({ title: 'AI Proofread complete', description: `Confidence: ${data.confidence_score ?? 0}%`, variant: 'success' })

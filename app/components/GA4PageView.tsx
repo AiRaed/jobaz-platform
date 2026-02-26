@@ -12,7 +12,7 @@ declare global {
 const MAX_GTAG_WAIT_MS = 5000
 const GTAG_POLL_MS = 100
 
-/** Sends page_view events only; does not load or reinitialize GA. */
+/** Sends page_view events only. Does NOT load any script – gtag is provided by layout. */
 export default function GA4PageView({ measurementId }: { measurementId: string }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()

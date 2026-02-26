@@ -9,6 +9,8 @@ const inter = Inter({ subsets: ['latin'] })
 
 const appUrl = 'https://jobaz.io'
 const GA_MEASUREMENT_ID = 'G-XYH878PXVQ'
+/** Single GA4 script URL – must be absolute so the browser never requests /js?id=... from our domain */
+const GA_GTAG_SCRIPT_URL = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -116,11 +118,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${inter.className} transition-colors duration-300 bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 min-h-screen`}
       >
-        {/* GA4 – load gtag.js first, then init (single init, no duplicate) */}
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-          strategy="afterInteractive"
-        />
+        {/* GA4 – single code-based implementation; only source of gtag.js */}
+        <Script src={GA_GTAG_SCRIPT_URL} strategy="afterInteractive" />
         <Script id="ga4-init" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
@@ -131,7 +130,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           `}
         </Script>
 
-        {/* GA page_view tracker for App Router route changes */}
+        {/* Page-view only; does not load any script */}
         <GA4PageView measurementId={GA_MEASUREMENT_ID} />
 
         <ClientProviders>{children}</ClientProviders>

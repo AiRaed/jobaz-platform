@@ -8,10 +8,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 type WritingMode = 'general' | 'academic' | 'academic_research'
-type IssueType = 'grammar' | 'spelling' | 'style' | 'clarity' | 'word_form' | 'tense' | 'repetition' | 'preposition' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality'
+type IssueType = 'grammar' | 'spelling' | 'style' | 'clarity' | 'word_form' | 'tense' | 'tense_consistency' | 'repetition' | 'preposition' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality' | 'agreement' | 'article' | 'uncountable' | 'research_grammar' | 'punctuation'
 type Severity = 'low' | 'moderate' | 'high'
 
-const DISPLAY_ISSUE_TYPES: IssueType[] = ['grammar', 'spelling', 'style', 'clarity', 'word_form', 'tense', 'repetition', 'preposition', 'academic_tone', 'academic_objectivity', 'academic_hedging', 'academic_citation', 'academic_logic', 'structure', 'academic_style', 'methodology', 'evidence', 'research_quality']
+const DISPLAY_ISSUE_TYPES: IssueType[] = ['grammar', 'spelling', 'style', 'clarity', 'word_form', 'tense', 'tense_consistency', 'repetition', 'preposition', 'academic_tone', 'academic_objectivity', 'academic_hedging', 'academic_citation', 'academic_logic', 'structure', 'academic_style', 'methodology', 'evidence', 'research_quality', 'agreement', 'article', 'uncountable', 'research_grammar', 'punctuation']
 function toDisplayIssueType(type: string): IssueType {
   if (DISPLAY_ISSUE_TYPES.includes(type as IssueType)) return type as IssueType
   if (type.includes('grammar') || type === 'structure') return 'grammar'
@@ -21,6 +21,8 @@ function toDisplayIssueType(type: string): IssueType {
 
 type IssueAction = 'replace' | 'delete' | 'insert'
 
+type RuleType = 'grammar' | 'spelling' | 'repetition' | 'wordForm' | 'agreement' | 'modal' | 'tense' | 'style' | 'clarity' | 'preposition' | 'article' | 'uncountable' | 'research_grammar' | 'punctuation'
+
 interface Issue {
   type: IssueType
   severity: Severity
@@ -29,6 +31,7 @@ interface Issue {
   suggestion_text: string
   startIndex: number
   endIndex: number
+  ruleType?: RuleType
 }
 
 /**
@@ -216,6 +219,11 @@ export async function POST(req: NextRequest) {
       methodology: 0,
       evidence: 0,
       research_quality: 0,
+      agreement: 0,
+      article: 0,
+      uncountable: 0,
+      research_grammar: 0,
+      punctuation: 0,
     }
 
     // VERIFICATION TEST: Add test string that MUST produce specific issue types
@@ -233,6 +241,17 @@ export async function POST(req: NextRequest) {
         return ''
       }
       return text.substring(start, end)
+    }
+
+    // Tokenizer: split by whitespace and punctuation, track start/end for each token (Phase 2 — word-boundary safety)
+    const tokenize = (str: string): { token: string; start: number; end: number }[] => {
+      const tokens: { token: string; start: number; end: number }[] = []
+      const re = /\b\w+\b|[^\w\s]|\s+/g
+      let match: RegExpExecArray | null
+      while ((match = re.exec(str)) !== null) {
+        tokens.push({ token: match[0], start: match.index, end: match.index + match[0].length })
+      }
+      return tokens
     }
 
     // ========================================================================
@@ -274,10 +293,28 @@ export async function POST(req: NextRequest) {
         })
       }
 
+      // "they're are" → "There are" (wrong: "they're" = they are, so "they're are" is redundant/wrong; use "There are")
+      const theyreAreRegex = /\bthey're\s+are\b/gi
+      let theyreAreMatch: RegExpExecArray | null
+      while ((theyreAreMatch = theyreAreRegex.exec(text)) !== null) {
+        detectorCounts.spelling++
+        issues.push({
+          type: 'spelling',
+          severity: isAcademic ? 'moderate' : 'low',
+          message: 'Use "There are" (referring to things/reasons), not "they\'re are".',
+          original_text: "they're",
+          suggestion_text: 'There',
+          startIndex: theyreAreMatch.index,
+          endIndex: theyreAreMatch.index + "they're".length,
+        })
+      }
+
       // "there" vs "their" vs "they're" — wrong use of "there"/"their" where "they're" (they are) is meant
-      // Skip when "there is/was" is followed by plural (many, several, etc.) — that's grammar (there is → there are), not spelling
+      // IMPORTANT: Never suggest "they're" for correct existential "There are" / "There is" (e.g. "There are many reasons", "There is a reason")
       const thereTheirRegex = /\b(?:there|their)\s+(?:is|was|are|were)\b/gi
       const thereIsPluralNext = /\s+(?:many|several|numerous|various|some|few|these|those)\b/i
+      const thereAreExistential = /\s+(?:many|several|numerous|various|some|few|these|those|reasons|things|ways|people|others|a\s+few)\b/i
+      const thereIsExistential = /\s+(?:a|an|one|something|someone|no)\b/i
       let thereMatch: RegExpExecArray | null
       while ((thereMatch = thereTheirRegex.exec(text)) !== null) {
         const word = thereMatch[0].split(/\s+/)[0]
@@ -285,6 +322,10 @@ export async function POST(req: NextRequest) {
         const afterMatch = text.slice(thereMatch.index + thereMatch[0].length)
         const verb = thereMatch[0].split(/\s+/)[1]
         if (verb && /^(is|was)$/i.test(verb) && thereIsPluralNext.test(afterMatch)) continue // grammar handles "there is many"
+        if (word.toLowerCase() === 'there' && verb) {
+          if (/^are$/i.test(verb) && thereAreExistential.test(afterMatch)) continue // "There are many reasons" — correct, do not change
+          if (/^is$/i.test(verb) && thereIsExistential.test(afterMatch)) continue // "There is a reason" — correct, do not change
+        }
         detectorCounts.spelling++
         issues.push({
           type: 'spelling',
@@ -356,6 +397,8 @@ export async function POST(req: NextRequest) {
       // Common misspellings (include even if browser spellcheck would catch them)
       const commonMisspellings: { wrong: RegExp; right: string }[] = [
         { wrong: /\binteressted\b/gi, right: 'interested' },
+        { wrong: /\bexperiance\b/gi, right: 'experience' },
+        { wrong: /\bfoward\b/gi, right: 'forward' },
         { wrong: /\boccured\b/gi, right: 'occurred' },
         { wrong: /\brecieve\b/gi, right: 'receive' },
         { wrong: /\brecieved\b/gi, right: 'received' },
@@ -388,6 +431,22 @@ export async function POST(req: NextRequest) {
             endIndex: spMatch.index + spMatch[0].length,
           })
         }
+      }
+
+      // Typo: "has e a" → "has a"
+      const hasEARegex = /\bhas\s+e\s+a\b/gi
+      let hasEAMatch: RegExpExecArray | null
+      while ((hasEAMatch = hasEARegex.exec(text)) !== null) {
+        detectorCounts.spelling++
+        issues.push({
+          type: 'spelling',
+          severity: 'low',
+          message: 'Remove the extra "e". Use "has a".',
+          original_text: hasEAMatch[0],
+          suggestion_text: 'has a',
+          startIndex: hasEAMatch.index,
+          endIndex: hasEAMatch.index + hasEAMatch[0].length,
+        })
       }
     }
 
@@ -446,6 +505,48 @@ export async function POST(req: NextRequest) {
           suggestion_text: '. ',
           startIndex: spaceStart,
           endIndex: capIndex,
+        })
+      }
+
+      // Trailing multiple periods: consecutive (".....") or with spaces (". . . . .") or trailing line of only dots/spaces
+      const trailingConsecutiveDotsRegex = /[\s.]*\.{2,}\s*$/
+      const trailingSpacedDotsRegex = /(?:\.\s*){2,}\s*$/
+      const trailingLineOnlyDotsRegex = /[\r\n][\s.]*$/
+      const matchConsecutive = trailingConsecutiveDotsRegex.exec(text)
+      const matchSpaced = trailingSpacedDotsRegex.exec(text)
+      const lineOnlyMatch = trailingLineOnlyDotsRegex.exec(text)
+      if (matchConsecutive) {
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'low',
+          message: 'Remove extra dots at the end of the text. Use a single period.',
+          original_text: matchConsecutive[0],
+          suggestion_text: '.',
+          startIndex: matchConsecutive.index,
+          endIndex: text.length,
+        })
+      } else if (matchSpaced) {
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'low',
+          message: 'Remove extra dots at the end of the text. Use a single period.',
+          original_text: matchSpaced[0],
+          suggestion_text: '.',
+          startIndex: matchSpaced.index,
+          endIndex: text.length,
+        })
+      } else if (lineOnlyMatch) {
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'low',
+          message: 'Remove trailing line that contains only dots or spaces.',
+          original_text: lineOnlyMatch[0],
+          suggestion_text: '',
+          startIndex: lineOnlyMatch.index,
+          endIndex: text.length,
         })
       }
 
@@ -671,11 +772,10 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================================
-    // GENERAL MODE: Additional grammar, clarity, and style (not only spelling)
-    // Keeps General less strict than Academic but catches common grammar,
-    // clarity, and basic style issues.
+    // GENERAL + ACADEMIC STANDARD: Additional grammar (there is/are, a/an, agreement, etc.)
+    // Academic Standard extends General rules, so both modes run this block.
     // ========================================================================
-    if (!isAcademic && options.grammar !== false) {
+    if (options.grammar !== false && (mode === 'general' || mode === 'academic')) {
       // — Grammar: articles (a/an)
       const aBeforeVowel = /\ba\s+([aeiouAEIOU][a-z]+)\b/g
       let artMatch: RegExpExecArray | null
@@ -742,6 +842,21 @@ export async function POST(req: NextRequest) {
           })
         }
       }
+      // There are + a/an + singular noun (e.g. "there are a reason") → There is
+      const thereAreASingular = /\bthere\s+are\s+(?:a|an)\s+(?:reason|way|thing|point|issue|factor|problem|solution)\b/gi
+      let taasMatch: RegExpExecArray | null
+      while ((taasMatch = thereAreASingular.exec(text)) !== null) {
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'low',
+          message: 'Grammar: Use "there is" with a singular noun (e.g. "there is a reason").',
+          original_text: 'there are',
+          suggestion_text: 'there is',
+          startIndex: taasMatch.index,
+          endIndex: taasMatch.index + 10,
+        })
+      }
 
       // — Grammar: singular subject + "have" → "has" (e.g. "company have", "the team have")
       const singularHaveRegex = /\b(company|organization|team|government|committee|board|group|business|firm)\s+have\b/gi
@@ -757,7 +872,191 @@ export async function POST(req: NextRequest) {
           suggestion_text: 'has',
           startIndex: haveIndex,
           endIndex: haveIndex + 4,
+          ruleType: 'agreement',
         })
+      }
+
+      // ========== General + Academic Standard: agreement, modal, plural, past tense ==========
+      if (mode === 'general' || mode === 'academic') {
+        // I has -> I have (subject-verb agreement)
+        const iHasRegex = /\bI\s+has\b/gi
+        let iHasMatch: RegExpExecArray | null
+        while ((iHasMatch = iHasRegex.exec(text)) !== null) {
+          const hasIdx = iHasMatch.index + (iHasMatch[0].length - 3)
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'moderate',
+            message: 'Subject-verb agreement: "I" requires "have", not "has".',
+            original_text: 'has',
+            suggestion_text: 'have',
+            startIndex: hasIdx,
+            endIndex: hasIdx + 3,
+            ruleType: 'agreement',
+          })
+        }
+
+        // He/She/It have -> has
+        const thirdPersonHaveRegex = /\b(he|she|it)\s+have\b/gi
+        let tphMatch: RegExpExecArray | null
+        while ((tphMatch = thirdPersonHaveRegex.exec(text)) !== null) {
+          const haveIdx = tphMatch.index + (tphMatch[0].length - 5)
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'moderate',
+            message: 'Subject-verb agreement: "He/She/It" requires "has", not "have".',
+            original_text: 'have',
+            suggestion_text: 'has',
+            startIndex: haveIdx,
+            endIndex: haveIdx + 4,
+            ruleType: 'agreement',
+          })
+        }
+
+        // Third person singular: manager say -> says (exclude "say that" — handled by past tense rule)
+        const thirdPersonSayRegex = /\b(manager|employee|employer|company|team|he|she|it)\s+say(?!\s+that)\b/gi
+        let tpsMatch: RegExpExecArray | null
+        while ((tpsMatch = thirdPersonSayRegex.exec(text)) !== null) {
+          const sayIdx = tpsMatch.index + (tpsMatch[0].length - 3)
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'moderate',
+            message: 'Subject-verb agreement: third person singular requires "says".',
+            original_text: 'say',
+            suggestion_text: 'says',
+            startIndex: sayIdx,
+            endIndex: sayIdx + 3,
+            ruleType: 'agreement',
+          })
+        }
+
+        // Past tense: manager say that -> said that
+        const sayThatRegex = /\b(manager|employee|employer|previous\s+manager|my\s+manager)\s+say\s+that\b/gi
+        let stMatch: RegExpExecArray | null
+        while ((stMatch = sayThatRegex.exec(text)) !== null) {
+          const sayIdx = stMatch.index + (stMatch[0].length - 8) // " say that" -> start of "say"
+          const sayEnd = sayIdx + 3
+          detectorCounts.tense = (detectorCounts.tense || 0) + 1
+          issues.push({
+            type: 'tense',
+            severity: 'moderate',
+            message: 'Use past tense "said" when reporting what someone said in the past.',
+            original_text: 'say',
+            suggestion_text: 'said',
+            startIndex: sayIdx,
+            endIndex: sayEnd,
+            ruleType: 'tense',
+          })
+        }
+
+        // Modal + base form: can works -> can work, can handles -> can handle, should goes -> should go
+        const modalBaseRegex = /\b(can|should|would|could|must|may|might)\s+(works|goes|says|makes|takes|comes|does|has|handles|manages|provides|requires|allows|enables)\b/gi
+        const modalBaseForm: Record<string, string> = {
+          works: 'work', goes: 'go', says: 'say', makes: 'make', takes: 'take', comes: 'come', does: 'do', has: 'have',
+          handles: 'handle', manages: 'manage', provides: 'provide', requires: 'require', allows: 'allow', enables: 'enable',
+        }
+        let mbMatch: RegExpExecArray | null
+        while ((mbMatch = modalBaseRegex.exec(text)) !== null) {
+          const verb = mbMatch[2]!.toLowerCase()
+          const base = modalBaseForm[verb]
+          if (base) {
+            const verbIdx = mbMatch.index + (mbMatch[0].length - verb.length)
+            detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+            issues.push({
+              type: 'grammar',
+              severity: 'moderate',
+              message: 'After modal verbs (can, should, etc.) use the base form of the verb (e.g. "can work").',
+              original_text: mbMatch[2]!,
+              suggestion_text: base,
+              startIndex: verbIdx,
+              endIndex: verbIdx + verb.length,
+              ruleType: 'modal',
+            })
+          }
+        }
+
+        // many + singular noun -> plural: many company -> many companies, many reason -> many reasons
+        const manySingular: { singular: RegExp; plural: string }[] = [
+          { singular: /\bmany\s+company\b/gi, plural: 'companies' },
+          { singular: /\bmany\s+reason\b/gi, plural: 'reasons' },
+          { singular: /\bmany\s+skill\b/gi, plural: 'skills' },
+          { singular: /\bmany\s+employee\b/gi, plural: 'employees' },
+          { singular: /\bmany\s+opportunity\b/gi, plural: 'opportunities' },
+          { singular: /\bmany\s+way\b/gi, plural: 'ways' },
+          { singular: /\bmany\s+thing\b/gi, plural: 'things' },
+          { singular: /\bmany\s+situation\b/gi, plural: 'situations' },
+          { singular: /\bstrong\s+communication\s+skill\b/gi, plural: 'skills' },
+          { singular: /\bone\s+of\s+the\s+best\s+employee\b/gi, plural: 'employees' },
+          { singular: /\b(?:several|few)\s+situation\b/gi, plural: 'situations' },
+          { singular: /\ba\s+number\s+of\s+situation\b/gi, plural: 'situations' },
+          { singular: /\b(?:several|few)\s+reason\b/gi, plural: 'reasons' },
+          { singular: /\ba\s+number\s+of\s+reason\b/gi, plural: 'reasons' },
+          { singular: /\b(?:handle|handling|managed|managing)\s+(?:a\s+)?difficult\s+situation\b/gi, plural: 'situations' },
+        ]
+        // many + uncountable noun → use "much" or "a lot of" (many experience → much experience / a lot of experience)
+        const manyUncountable: { pattern: RegExp; suggestion: string }[] = [
+          { pattern: /\bmany\s+experience\b/gi, suggestion: 'much experience' },
+          { pattern: /\bmany\s+information\b/gi, suggestion: 'much information' },
+          { pattern: /\bmany\s+advice\b/gi, suggestion: 'much advice' },
+          { pattern: /\bmany\s+knowledge\b/gi, suggestion: 'much knowledge' },
+          { pattern: /\bmany\s+research\b/gi, suggestion: 'much research' },
+        ]
+        for (const { pattern, suggestion } of manyUncountable) {
+          let muMatch: RegExpExecArray | null
+          pattern.lastIndex = 0
+          while ((muMatch = pattern.exec(text)) !== null) {
+            detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+            issues.push({
+              type: 'grammar',
+              severity: 'moderate',
+              message: `Use "much" with uncountable nouns (e.g. "${suggestion}").`,
+              original_text: muMatch[0],
+              suggestion_text: suggestion,
+              startIndex: muMatch.index,
+              endIndex: muMatch.index + muMatch[0].length,
+            })
+          }
+        }
+        for (const { singular, plural } of manySingular) {
+          let msMatch: RegExpExecArray | null
+          singular.lastIndex = 0
+          while ((msMatch = singular.exec(text)) !== null) {
+            const matchText = msMatch[0]
+            const lastWord = matchText.split(/\s+/).pop()!
+            const lastWordStart = msMatch.index + (matchText.length - lastWord.length)
+            detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+            issues.push({
+              type: 'grammar',
+              severity: 'moderate',
+              message: `Use plural noun after "many" or in plural context: "${lastWord}" → "${plural}".`,
+              original_text: lastWord,
+              suggestion_text: plural,
+              startIndex: lastWordStart,
+              endIndex: lastWordStart + lastWord.length,
+              ruleType: 'grammar',
+            })
+          }
+        }
+
+        // I has worked -> I have worked (present perfect)
+        const iHasWorkedRegex = /\bI\s+has\s+(?:worked|been|had|done|seen|written|made)\b/gi
+        let ihwMatch: RegExpExecArray | null
+        while ((ihwMatch = iHasWorkedRegex.exec(text)) !== null) {
+          const hasIdx = ihwMatch.index + 2 // after "I "
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'moderate',
+            message: 'Present perfect with "I" requires "have", not "has" (e.g. "I have worked").',
+            original_text: 'has',
+            suggestion_text: 'have',
+            startIndex: hasIdx,
+            endIndex: hasIdx + 3,
+            ruleType: 'agreement',
+          })
+        }
       }
 
       // — Grammar: repeated word (e.g. "the the")
@@ -903,6 +1202,88 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // — Grammar (General): adjective after verb → adverb (work efficient → work efficiently, act calm → act calmly)
+      if (mode === 'general') {
+        const verbAdjPairs: { pattern: RegExp; adverb: string }[] = [
+          { pattern: /\b(?:work|works|worked|working)\s+efficient\b/gi, adverb: 'efficiently' },
+          { pattern: /\b(?:act|acts|acted|acting)\s+calm\b/gi, adverb: 'calmly' },
+          { pattern: /\b(?:respond|responds|responded|responding)\s+calm\b/gi, adverb: 'calmly' },
+          { pattern: /\b(?:communicate|communicates|communicated|communicating)\s+efficient\b/gi, adverb: 'efficiently' },
+        ]
+        for (const { pattern, adverb } of verbAdjPairs) {
+          let vaMatch: RegExpExecArray | null
+          pattern.lastIndex = 0
+          while ((vaMatch = pattern.exec(text)) !== null) {
+            const adjStart = vaMatch.index + (vaMatch[0].length - (vaMatch[0].match(/\w+$/)![0].length))
+            const adjWord = (vaMatch[0].match(/\w+$/)!)[0]
+            detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+            issues.push({
+              type: 'grammar',
+              severity: 'moderate',
+              message: `Use the adverb "${adverb}" after a verb (e.g. "work ${adverb}").`,
+              original_text: adjWord,
+              suggestion_text: adverb,
+              startIndex: adjStart,
+              endIndex: adjStart + adjWord.length,
+            })
+          }
+        }
+      }
+
+      // — Grammar (General): "very good" used as adverb → "very well" (verb + adjective → suggest adverb)
+      const veryGoodAdverbRegex = /\b(?:situation|situations|difficult\s+situation|pressure|it|things|job|work|them)\s+very\s+good\b/gi
+      let vgMatch: RegExpExecArray | null
+      while ((vgMatch = veryGoodAdverbRegex.exec(text)) !== null) {
+        const veryGoodStart = vgMatch.index + vgMatch[0].indexOf('very good')
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'moderate',
+          message: 'Use "very well" (adverb) here, not "very good" (adjective).',
+          original_text: 'very good',
+          suggestion_text: 'very well',
+          startIndex: veryGoodStart,
+          endIndex: veryGoodStart + 9,
+        })
+      }
+
+      // — Grammar (General): "and develop" in past context (e.g. "have worked...and develop strong") → "and developed"
+      const andDevelopRegex = /\band\s+develop\s+(?:strong|communication|key|many)\b/gi
+      let adMatch: RegExpExecArray | null
+      while ((adMatch = andDevelopRegex.exec(text)) !== null) {
+        const developIdx = adMatch.index + adMatch[0].indexOf('develop')
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'moderate',
+          message: 'Use past tense "developed" to match "have worked" (e.g. "I have worked...and developed").',
+          original_text: 'develop',
+          suggestion_text: 'developed',
+          startIndex: developIdx,
+          endIndex: developIdx + 7,
+        })
+      }
+
+      // — Grammar (General): "responsible to" + verb → "responsible for" + gerund (e.g. responsible to manage → responsible for managing)
+      if (mode === 'general') {
+        const responsibleToRegex = /\bresponsible\s+to\s+(\w+)\b/gi
+        let respMatch: RegExpExecArray | null
+        while ((respMatch = responsibleToRegex.exec(text)) !== null) {
+          const verb = respMatch[1]!
+          const gerund = verb.endsWith('e') ? verb.slice(0, -1) + 'ing' : verb + 'ing'
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'moderate',
+            message: 'Grammar: Use "responsible for" + gerund (e.g. "responsible for managing").',
+            original_text: 'to ' + verb,
+            suggestion_text: 'for ' + gerund,
+            startIndex: respMatch.index + (respMatch[0].indexOf('to')),
+            endIndex: respMatch.index + respMatch[0].length,
+          })
+        }
+      }
+
       // — Grammar (General): infinitive vs gerund — look forward to hear → to hearing, enjoy to do → enjoy doing
       const lookForwardToHear = /\blook(?:ing)?\s+forward\s+to\s+hear\b/gi
       let lfMatch: RegExpExecArray | null
@@ -938,33 +1319,103 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // — Repetition (General): repeated sentences or duplicated paragraphs
+      // — General only: paragraph-start capitalization — replace entire first word, not single character (avoids "T here" spacing bug)
+      if (mode === 'general') {
+        const paragraphStartRegex = /(^|[\r\n]{2,})(\s*)([a-z][a-z]*)/g
+        let capMatch: RegExpExecArray | null
+        while ((capMatch = paragraphStartRegex.exec(text)) !== null) {
+          const wordStart = capMatch.index + capMatch[1].length + capMatch[2].length
+          const word = capMatch[3]!
+          if (!word) continue
+          const capitalized = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          if (capitalized === word) continue
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'low',
+            message: 'Capitalize the first letter at the start of a paragraph.',
+            original_text: word,
+            suggestion_text: capitalized,
+            startIndex: wordStart,
+            endIndex: wordStart + word.length,
+          })
+        }
+        // — Style (General, low): "in the team" → "on the team" (common CV phrasing)
+        const inTheTeamRegex = /\bin\s+the\s+team\b/gi
+        let teamMatch: RegExpExecArray | null
+        while ((teamMatch = inTheTeamRegex.exec(text)) !== null) {
+          detectorCounts.style = (detectorCounts.style || 0) + 1
+          issues.push({
+            type: 'style',
+            severity: 'low',
+            message: 'Style: "on the team" is more common in professional writing (e.g. "one of the best employees on the team").',
+            original_text: 'in the team',
+            suggestion_text: 'on the team',
+            startIndex: teamMatch.index,
+            endIndex: teamMatch.index + teamMatch[0].length,
+          })
+        }
+      }
+
+      // — Repetition (General): repeated sentences — normalize and only flag if similarity > 90%
+      function normalizeForRepetition(s: string): string {
+        return s
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .replace(/[^\w\s]/g, '')
+          .trim()
+      }
+      function editDistance(a: string, b: string): number {
+        const m = a.length
+        const n = b.length
+        const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0))
+        for (let i = 0; i <= m; i++) dp[i][0] = i
+        for (let j = 0; j <= n; j++) dp[0][j] = j
+        for (let i = 1; i <= m; i++) {
+          for (let j = 1; j <= n; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1
+            dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+          }
+        }
+        return dp[m][n]
+      }
+      function similarity(a: string, b: string): number {
+        if (a.length === 0 && b.length === 0) return 1
+        const maxLen = Math.max(a.length, b.length)
+        if (maxLen === 0) return 1
+        const dist = editDistance(a, b)
+        return 1 - dist / maxLen
+      }
       const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 10)
-      const normalizedSentences = sentences.map(s => s.toLowerCase().replace(/\s+/g, ' '))
-      const seenSentences = new Map<string, number>()
+      const normalizedSentences = sentences.map(s => normalizeForRepetition(s))
+      const seenSentences: { norm: string; pos: number; raw: string }[] = []
       let cursor = 0
       for (let i = 0; i < sentences.length; i++) {
+        const raw = sentences[i]
         const norm = normalizedSentences[i]
-        if (!norm) continue
-        const pos = text.indexOf(sentences[i], cursor)
+        if (!norm || norm.length < 15) continue
+        const pos = text.indexOf(raw, cursor)
         if (pos < 0) continue
-        const prev = seenSentences.get(norm)
-        if (prev !== undefined) {
+        const SIMILARITY_THRESHOLD = 0.9
+        const duplicate = seenSentences.find(
+          (s) => s.norm.length > 0 && (s.norm === norm || similarity(s.norm, norm) >= SIMILARITY_THRESHOLD)
+        )
+        if (duplicate !== undefined) {
           detectorCounts.repetition = (detectorCounts.repetition || 0) + 1
-          const fullSentence = sentences[i]
           issues.push({
             type: 'repetition',
             severity: 'moderate',
-            message: 'Repetition: This sentence is duplicated earlier in the text. Consider removing or rephrasing.',
-            original_text: fullSentence,
+            message: 'Repetition: This sentence is very similar to one earlier in the text. Consider removing or rephrasing.',
+            original_text: raw,
             suggestion_text: '',
             startIndex: pos,
-            endIndex: pos + fullSentence.length,
+            endIndex: pos + raw.length,
+            ruleType: 'repetition',
           })
         } else {
-          seenSentences.set(norm, pos)
+          seenSentences.push({ norm, pos, raw })
         }
-        cursor = pos + sentences[i].length
+        cursor = pos + raw.length
       }
     }
 
@@ -1183,9 +1634,266 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================================
-    // ACADEMIC RESEARCH / PhD SPECIFIC CHECKS
+    // ACADEMIC RESEARCH / PhD SPECIFIC CHECKS (strictest rule-based layer)
     // ========================================================================
     if (isAcademicResearch) {
+      // ========== STRICT RESEARCH RULES (PhD-ONLY) ==========
+      // 1. Advanced Subject–Verb Agreement
+      const phdAgreementPatterns: { pattern: RegExp; suggestion: string; message: string }[] = [
+        { pattern: /\bstudies\s+has\b/gi, suggestion: 'have', message: 'Agreement: Use "have" with plural subject "studies".' },
+        { pattern: /\bsystems\s+increases\b/gi, suggestion: 'increase', message: 'Agreement: Use plural verb with plural subject "systems".' },
+        { pattern: /\bmodels\s+that\s+explains\b/gi, suggestion: 'explain', message: 'Agreement: Relative clause verb must agree with plural "models".' },
+        { pattern: /\bfindings\s+indicates\b/gi, suggestion: 'indicate', message: 'Agreement: Use plural verb with plural subject "findings".' },
+        { pattern: /\bimpact\s+remain\b/gi, suggestion: 'remains', message: 'Agreement: Use singular verb with singular subject "impact".' },
+        { pattern: /\bimplementation\s+pose\b/gi, suggestion: 'poses', message: 'Agreement: Use singular verb with singular subject "implementation".' },
+        { pattern: /\bcan\s+provides\b/gi, suggestion: 'provide', message: 'Research grammar: After modal "can", use base form "provide".' },
+        { pattern: /\bmay\s+leads\b/gi, suggestion: 'lead', message: 'Research grammar: After modal "may", use base form "lead".' },
+      ]
+      phdAgreementPatterns.forEach(({ pattern, suggestion, message }) => {
+        let m: RegExpExecArray | null
+        while ((m = pattern.exec(text)) !== null) {
+          const orig = m[0]
+          const sug = orig.replace(/\b(has|have|increases?|explains?|indicates?|remain|remains?|pose|poses?|provides?|leads?)\b/gi, (verb) => {
+            const v = verb.toLowerCase()
+            if (v === 'has') return 'have'
+            if (v === 'increases') return 'increase'
+            if (v === 'explains') return 'explain'
+            if (v === 'indicates') return 'indicate'
+            if (v === 'remain') return 'remains'
+            if (v === 'pose') return 'poses'
+            if (v === 'provides') return 'provide'
+            if (v === 'leads') return 'lead'
+            return verb
+          })
+          if (sug !== orig) {
+            detectorCounts.agreement = (detectorCounts.agreement || 0) + 1
+            issues.push({ type: 'agreement', severity: 'moderate', message, original_text: orig, suggestion_text: sug, startIndex: m.index, endIndex: m.index + orig.length })
+          }
+        }
+      })
+
+      // 2. Relative clause precision (that/which + wrong verb number)
+      const relativeClausePatterns: { pattern: RegExp; suggestion: string; message: string }[] = [
+        { pattern: /\b(?:models|systems|methods|findings|results|data)\s+that\s+explains\b/gi, suggestion: 'explain', message: 'Research grammar: Use plural verb in relative clause (antecedent is plural).' },
+        { pattern: /\b(?:systems|models|factors)\s+that\s+alters\b/gi, suggestion: 'alter', message: 'Research grammar: Use plural verb in relative clause.' },
+        { pattern: /\bwhich\s+undermine\s+(?:the\s+)?(?:validity|reliability|finding)\b/gi, suggestion: 'undermines', message: 'Research grammar: Use singular verb when "which" refers to singular antecedent (e.g. "finding which undermines").' },
+      ]
+      relativeClausePatterns.forEach(({ pattern, suggestion, message }) => {
+        let r: RegExpExecArray | null
+        while ((r = pattern.exec(text)) !== null) {
+          const orig = r[0]
+          const sug = orig.replace(/\b(explains|alters|undermine)\b/gi, suggestion)
+          if (sug !== orig) {
+            detectorCounts.research_grammar = (detectorCounts.research_grammar || 0) + 1
+            issues.push({ type: 'research_grammar', severity: 'moderate', message, original_text: orig, suggestion_text: sug, startIndex: r.index, endIndex: r.index + orig.length })
+          }
+        }
+      })
+
+      // 3. Research methodology strictness: data was → were (plural), research were → was (uncountable)
+      const dataWasRe = /\bdata\s+was\s+(analysed|analyzed|collected|gathered|obtained)\b/gi
+      let dm: RegExpExecArray | null
+      while ((dm = dataWasRe.exec(text)) !== null) {
+        detectorCounts.research_grammar = (detectorCounts.research_grammar || 0) + 1
+        issues.push({
+          type: 'research_grammar',
+          severity: 'moderate',
+          message: 'Research grammar: In formal research writing, "data" is often treated as plural. Use "data were analysed" (or "data was analysed" only if consistently treating data as singular).',
+          original_text: dm[0],
+          suggestion_text: dm[0].replace(/\bwas\b/, 'were'),
+          startIndex: dm.index,
+          endIndex: dm.index + dm[0].length,
+        })
+      }
+      const researchWereRe = /\bresearch\s+were\b/gi
+      let rw: RegExpExecArray | null
+      while ((rw = researchWereRe.exec(text)) !== null) {
+        detectorCounts.agreement = (detectorCounts.agreement || 0) + 1
+        issues.push({
+          type: 'agreement',
+          severity: 'moderate',
+          message: 'Agreement: "Research" is uncountable; use singular verb "was".',
+          original_text: rw[0],
+          suggestion_text: 'research was',
+          startIndex: rw.index,
+          endIndex: rw.index + rw[0].length,
+        })
+      }
+      // staff → uncountable warning (tip-only when used with plural verb)
+      const staffWereRe = /\bstaff\s+were\s+(asked|interviewed|recruited|included)\b/gi
+      let sp: RegExpExecArray | null
+      while ((sp = staffWereRe.exec(text)) !== null) {
+        detectorCounts.uncountable = (detectorCounts.uncountable || 0) + 1
+        issues.push({
+          type: 'uncountable',
+          severity: 'low',
+          message: 'Usage: "Staff" can be used with plural verb when meaning the group (e.g. "staff were asked"). If you mean uncountable, use "staff was". Ensure consistency.',
+          original_text: sp[0],
+          suggestion_text: '',
+          startIndex: sp.index,
+          endIndex: sp.index + sp[0].length,
+        })
+      }
+
+      // 4. Hedging & overclaim (high sensitivity): absolute claims → cautious alternatives
+      const strictHedgingPatterns: { pattern: RegExp; suggestion: string; message: string }[] = [
+        { pattern: /\bIt\s+is\s+strongly\s+argued\b/gi, suggestion: 'It has been argued', message: 'Hedging: Softer academic tone. Use "It has been argued" or "Scholars suggest" rather than "strongly argued".' },
+        { pattern: /\bmust\s+immediately\b/gi, suggestion: 'may need to', message: 'Hedging: Avoid overclaim. Use "may need to" or "could" to reflect uncertainty.' },
+        { pattern: /\bproves\s+that\b/gi, suggestion: 'suggests that', message: 'Hedging: Use "suggests that" or "indicates that" instead of "proves that" for academic caution.' },
+        { pattern: /\bprove\s+that\b/gi, suggestion: 'suggest that', message: 'Hedging: Use "suggest that" or "indicate that" instead of "prove that".' },
+        { pattern: /\bunquestionably\b/gi, suggestion: 'is likely', message: 'Hedging: Replace absolute "unquestionably" with cautious phrasing (e.g. "is likely", "appears to").' },
+        { pattern: /\binevitably\s+(?:leads?|results?|means?)\b/gi, suggestion: 'may lead', message: 'Hedging: Replace "inevitably" with "may" or "tends to" to reflect uncertainty.' },
+        { pattern: /\bwill\s+permanently\s+(?:change|alter|affect)\b/gi, suggestion: 'may have lasting effects on', message: 'Hedging: Avoid overclaim. Use "may have lasting effects" or "could alter".' },
+        { pattern: /\bclearly\s+demonstrates?\b/gi, suggestion: 'suggests', message: 'Hedging: Use "suggests", "indicates", or "appears to demonstrate" instead of "clearly demonstrates".' },
+        { pattern: /\bclearly\s+shows?\b/gi, suggestion: 'suggests', message: 'Hedging: Use "suggests" or "indicates" instead of "clearly shows".' },
+        { pattern: /\bdefinitely\s+(?:proves?|shows?|demonstrates?)\b/gi, suggestion: 'suggests', message: 'Hedging: Use "suggests" or "indicates" to reflect academic caution.' },
+      ]
+      strictHedgingPatterns.forEach(({ pattern, suggestion, message }) => {
+        let h: RegExpExecArray | null
+        while ((h = pattern.exec(text)) !== null) {
+          detectorCounts.academic_hedging = (detectorCounts.academic_hedging || 0) + 1
+          issues.push({
+            type: 'academic_hedging',
+            severity: 'high',
+            message,
+            original_text: h[0],
+            suggestion_text: suggestion,
+            startIndex: h.index,
+            endIndex: h.index + h[0].length,
+          })
+        }
+      })
+
+      // 5. Citation sensitivity: claims requiring academic support → "Citation may be required."
+      const citationPhrasePatterns: RegExp[] = [
+        /\bPrevious\s+research\b/gi,
+        /\bRecent\s+studies\b/gi,
+        /\bIt\s+has\s+been\s+demonstrated\b/gi,
+        /\b(?:studies|research|evidence|data|findings)\s+(?:show|prove|demonstrate|indicate|suggest|reveal)\b/gi,
+        /\b(?:according\s+to|as\s+(?:shown|demonstrated|indicated)\s+by)\s+(?:studies|research|evidence)\b/gi,
+        /\b(?:previous|prior|earlier)\s+(?:studies|research|work|findings)\b/gi,
+      ]
+      citationPhrasePatterns.forEach((pattern) => {
+        let c: RegExpExecArray | null
+        while ((c = pattern.exec(text)) !== null) {
+          detectorCounts.academic_citation = (detectorCounts.academic_citation || 0) + 1
+          issues.push({
+            type: 'academic_citation',
+            severity: 'moderate',
+            message: 'Citation may be required.',
+            original_text: c[0],
+            suggestion_text: '',
+            startIndex: c.index,
+            endIndex: c.index + c[0].length,
+          })
+        }
+      })
+
+      // 6. Formal punctuation: comma before "however" in mid-sentence, comma splice
+      const commaBeforeHowever = /\b(\w+)\s+however\b/gi
+      let cb: RegExpExecArray | null
+      while ((cb = commaBeforeHowever.exec(text)) !== null) {
+        const full = cb[0]
+        const beforeWord = cb[1]
+        if (beforeWord.toLowerCase() === 'however') continue
+        const fix = beforeWord + ', however'
+        detectorCounts.punctuation = (detectorCounts.punctuation || 0) + 1
+        issues.push({
+          type: 'punctuation',
+          severity: 'moderate',
+          message: 'Punctuation: Use a comma before "however" when it appears in the middle of a sentence.',
+          original_text: full,
+          suggestion_text: fix,
+          startIndex: cb.index,
+          endIndex: cb.index + full.length,
+        })
+      }
+      const commaSplice = /\b([a-z]+)\s+,\s+([A-Z][a-z]+)\s+(?:was|were|is|are|has|have|had|will|would|can|could)\b/gi
+      let cs: RegExpExecArray | null
+      while ((cs = commaSplice.exec(text)) !== null) {
+        const full = cs[0]
+        const semicolonFix = full.replace(/\s+,\s+/, '; ')
+        detectorCounts.punctuation = (detectorCounts.punctuation || 0) + 1
+        issues.push({
+          type: 'punctuation',
+          severity: 'moderate',
+          message: 'Punctuation: Comma splice detected. Use a semicolon or split into two sentences.',
+          original_text: full,
+          suggestion_text: semicolonFix,
+          startIndex: cs.index,
+          endIndex: cs.index + full.length,
+        })
+      }
+
+      // 7. Abstract noun enforcement (PhD: evidences, informations, researches, knowledges)
+      const phdUncountable: [RegExp, string][] = [
+        [/\bevidences\b/gi, 'evidence'],
+        [/\binformations\b/gi, 'information'],
+        [/\bresearches\b/gi, 'research'],
+        [/\bknowledges\b/gi, 'knowledge'],
+      ]
+      phdUncountable.forEach(([pattern, replacement]) => {
+        let u: RegExpExecArray | null
+        while ((u = pattern.exec(text)) !== null) {
+          detectorCounts.uncountable = (detectorCounts.uncountable || 0) + 1
+          issues.push({
+            type: 'uncountable',
+            severity: 'moderate',
+            message: 'Uncountable noun: Use singular form in academic English.',
+            original_text: u[0],
+            suggestion_text: replacement,
+            startIndex: u.index,
+            endIndex: u.index + u[0].length,
+          })
+        }
+      })
+
+      // 8. Research tense consistency: methodology past, established present, flag tense switching
+      const tenseMixPattern = /\b(?:was|were|conducted|collected|analysed|analyzed)\s+.*?(?:show|shows|indicate|indicates|suggest|suggests)\s+(?:that|)\s*[a-z]/gi
+      let tm: RegExpExecArray | null
+      while ((tm = tenseMixPattern.exec(text)) !== null) {
+        if (tm[0].length > 20 && tm[0].length < 120) {
+          detectorCounts.research_grammar = (detectorCounts.research_grammar || 0) + 1
+          issues.push({
+            type: 'tense_consistency',
+            severity: 'moderate',
+            message: 'Tense consistency: Use past for methodology ("was conducted"); keep findings consistent (e.g. "showed" or "shows" throughout). Avoid mixing within the same section.',
+            original_text: tm[0].substring(0, 60) + (tm[0].length > 60 ? '...' : ''),
+            suggestion_text: '',
+            startIndex: tm.index,
+            endIndex: Math.min(tm.index + tm[0].length, tm.index + 80),
+          })
+        }
+      }
+      // Methodology must be past: "we collect" → "we collected"
+      const methodologyPresentPattern = /\b(?:we|the\s+researchers?)\s+(?:collect|analyse|analyze|conduct|perform|measure|interview|survey)\b/gi
+      let mp: RegExpExecArray | null
+      while ((mp = methodologyPresentPattern.exec(text)) !== null) {
+        const orig = mp[0]
+        const past = orig.replace(/\b(collect|analyse|analyze|conduct|perform|measure|interview|survey)\b/gi, (m) => {
+          const v = m.toLowerCase()
+          if (v === 'collect') return 'collected'
+          if (v === 'analyse' || v === 'analyze') return 'analysed'
+          if (v === 'conduct') return 'conducted'
+          if (v === 'perform') return 'performed'
+          if (v === 'measure') return 'measured'
+          if (v === 'interview') return 'interviewed'
+          if (v === 'survey') return 'surveyed'
+          return m
+        })
+        issues.push({
+          type: 'tense_consistency',
+          severity: 'moderate',
+          message: 'Research tense: Methodology should be in past tense (e.g. "we collected", "was conducted").',
+          original_text: orig,
+          suggestion_text: past,
+          startIndex: mp.index,
+          endIndex: mp.index + orig.length,
+        })
+      }
+
+      // ========== END STRICT RESEARCH RULES ==========
+
       // 1. Hedging & Caution Detection - Overconfident claims
       const overconfidentPatterns = [
         { 
@@ -1268,7 +1976,7 @@ export async function POST(req: NextRequest) {
             issues.push({
               type: 'academic_citation',
               severity: 'moderate',
-              message: 'Citation warning: This claim may require a citation to support the statement. Consider adding a reference.',
+              message: 'Citation may be required.',
               original_text: claimMatch[0],
               suggestion_text: '', // No auto-suggestion, just a warning
               startIndex: claimMatch.index,
@@ -1770,9 +2478,138 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================================
-    // ACADEMIC STANDARD SPECIFIC CHECKS (undergraduate/university level)
+    // ACADEMIC STANDARD SPECIFIC CHECKS (undergraduate + PhD: both run these)
     // ========================================================================
-    if (isAcademicStandard) {
+    if (isAcademicStandard || isAcademicResearch) {
+      // ---------- Academic Standard extended rules (A–E): formal grammar, uncountable, phrasing, articles, consistency ----------
+      if (options.grammar !== false) {
+        // A) Formal grammar: plural subject + has → have; singular subject + have → has; modal + -s → base form
+        const agreementPatterns: { pattern: RegExp; suggestion: string; message: string }[] = [
+          { pattern: /\b(researchers?|studies|platforms|participants?|students?|findings|results|data)\s+has\b/gi, suggestion: 'have', message: 'Agreement: Use "have" with plural subjects.' },
+          { pattern: /\b(researchers?|studies|platforms|participants?|students?|findings|results)\s+influences?\b/gi, suggestion: 'influence', message: 'Agreement: Use plural verb form with plural subjects.' },
+          { pattern: /\b(organisation|organization|study|research|evidence|use|analysis)\s+have\b/gi, suggestion: 'has', message: 'Agreement: Use "has" with singular subjects.' },
+          { pattern: /\b(study|research|paper|analysis)\s+highlight\b/gi, suggestion: 'highlights', message: 'Agreement: Use third-person singular verb with singular subject.' },
+          { pattern: /\bcan\s+provides?\b/gi, suggestion: 'provide', message: 'Grammar: After modal "can", use base form of the verb.' },
+          { pattern: /\bmay\s+leads?\b/gi, suggestion: 'lead', message: 'Grammar: After modal "may", use base form of the verb.' },
+        ]
+        agreementPatterns.forEach(({ pattern, suggestion, message }) => {
+          let m: RegExpExecArray | null
+          while ((m = pattern.exec(text)) !== null) {
+            const orig = m[0]
+            const sug = orig.replace(/\b(has|have|influences?|highlight|provides?|leads?)\b/i, suggestion)
+            if (sug !== orig) {
+              detectorCounts.agreement = (detectorCounts.agreement || 0) + 1
+              issues.push({ type: 'agreement', severity: 'moderate', message, original_text: orig, suggestion_text: sug, startIndex: m.index, endIndex: m.index + orig.length })
+            }
+          }
+        })
+        // Modal + -s form: could/would/should/might/must + verb with -s/-es (base form needed)
+        const modalVerbMap: { pattern: RegExp; suggestion: string; message: string }[] = [
+          { pattern: /\b(could|would|should|might|must)\s+leads\b/gi, suggestion: 'lead', message: 'Grammar: After modal, use base form "lead".' },
+          { pattern: /\b(could|would|should|might|must)\s+provides\b/gi, suggestion: 'provide', message: 'Grammar: After modal, use base form "provide".' },
+          { pattern: /\b(could|would|should|might|must)\s+shows\b/gi, suggestion: 'show', message: 'Grammar: After modal, use base form "show".' },
+          { pattern: /\b(could|would|should|might|must)\s+suggests\b/gi, suggestion: 'suggest', message: 'Grammar: After modal, use base form "suggest".' },
+          { pattern: /\b(could|would|should|might|must)\s+indicates\b/gi, suggestion: 'indicate', message: 'Grammar: After modal, use base form "indicate".' },
+        ]
+        modalVerbMap.forEach(({ pattern, suggestion, message }) => {
+          let mv: RegExpExecArray | null
+          while ((mv = pattern.exec(text)) !== null) {
+            const orig = mv[0]
+            const sug = orig.replace(/\b(leads|provides|shows|suggests|indicates)\b/gi, suggestion)
+            if (sug !== orig) {
+              detectorCounts.agreement = (detectorCounts.agreement || 0) + 1
+              issues.push({ type: 'agreement', severity: 'moderate', message, original_text: orig, suggestion_text: sug, startIndex: mv.index, endIndex: mv.index + orig.length })
+            }
+          }
+        })
+
+        // A) Quantifier + singular noun → plural (e.g. "5 student" → "5 students", "many participant" → "many participants")
+        const quantifierPluralRegex = /\b(one|two|three|four|five|six|seven|eight|nine|\d+|many|several|few|multiple)\s+(student|participant|respondent|subject)\b/gi
+        let qm: RegExpExecArray | null
+        while ((qm = quantifierPluralRegex.exec(text)) !== null) {
+          const noun = qm[2]
+          const plural = noun + 's'
+          if (noun.toLowerCase() !== plural.toLowerCase()) {
+            detectorCounts.agreement = (detectorCounts.agreement || 0) + 1
+            issues.push({ type: 'agreement', severity: 'moderate', message: 'Agreement: Use plural noun after numbers or quantifiers.', original_text: qm[0], suggestion_text: qm[1] + ' ' + plural, startIndex: qm.index, endIndex: qm.index + qm[0].length })
+          }
+        }
+
+        // B) Uncountable nouns: plural form → singular
+        const uncountableMap: [RegExp, string][] = [
+          [/\binformations\b/gi, 'information'],
+          [/\bevidences\b/gi, 'evidence'],
+          [/\bresearches\b/gi, 'research'],
+          [/\badvices\b/gi, 'advice'],
+          [/\bequipments\b/gi, 'equipment'],
+        ]
+        uncountableMap.forEach(([pattern, replacement]) => {
+          let um: RegExpExecArray | null
+          while ((um = pattern.exec(text)) !== null) {
+            detectorCounts.uncountable = (detectorCounts.uncountable || 0) + 1
+            issues.push({ type: 'uncountable', severity: 'moderate', message: 'Uncountable noun: Use singular form in academic English.', original_text: um[0], suggestion_text: replacement, startIndex: um.index, endIndex: um.index + um[0].length })
+          }
+        })
+
+        // C) Academic phrasing
+        const phrasingPatterns: { pattern: RegExp; suggestion: string; message: string }[] = [
+          { pattern: /\bthe\s+way\s+how\b/gi, suggestion: 'the way', message: 'Academic style: Prefer "the way" instead of "the way how".' },
+          { pattern: /\bresponsible\s+to\s+manage\b/gi, suggestion: 'responsible for managing', message: 'Academic style: Use "responsible for" + -ing form.' },
+        ]
+        phrasingPatterns.forEach(({ pattern, suggestion, message }) => {
+          let pm: RegExpExecArray | null
+          while ((pm = pattern.exec(text)) !== null) {
+            detectorCounts.academic_style = (detectorCounts.academic_style || 0) + 1
+            issues.push({ type: 'academic_style', severity: 'moderate', message, original_text: pm[0], suggestion_text: suggestion, startIndex: pm.index, endIndex: pm.index + pm[0].length })
+          }
+        })
+        // Adjective after verb → adverb (common cases)
+        const adjToAdv: [RegExp, string][] = [
+          [/\b(work|operate|function|perform)\s+efficient\b/gi, 'efficiently'],
+          [/\b(respond|react|behave)\s+calm\b/gi, 'calmly'],
+          [/\b(communicate|write|speak)\s+clear\b/gi, 'clearly'],
+          [/\b(study|analyze|examine)\s+careful\b/gi, 'carefully'],
+          [/\b(conduct|perform)\s+proper\b/gi, 'properly'],
+        ]
+        adjToAdv.forEach(([pattern, adverb]) => {
+          let am: RegExpExecArray | null
+          while ((am = pattern.exec(text)) !== null) {
+            detectorCounts.academic_style = (detectorCounts.academic_style || 0) + 1
+            issues.push({ type: 'academic_style', severity: 'moderate', message: 'Academic style: Use adverb after verb (e.g. "efficiently" not "efficient").', original_text: am[0], suggestion_text: am[0].replace(/\b(efficient|calm|clear|careful|proper)\b/i, adverb), startIndex: am.index, endIndex: am.index + am[0].length })
+          }
+        })
+
+        // D) Article & formal
+        const articlePatterns: { pattern: RegExp; suggestion: string; message: string }[] = [
+          { pattern: /\bmotivated\s+person\b/gi, suggestion: 'a motivated person', message: 'Article: Use indefinite article before singular countable noun.' },
+          { pattern: /\bone\s+of\s+the\s+best\s+company\b/gi, suggestion: 'one of the best companies', message: 'Agreement: Use plural noun after "one of the best".' },
+          { pattern: /\bin\s+retail\s+sector\b/gi, suggestion: 'in the retail sector', message: 'Article: Use definite article in formal reference to sector.' },
+          { pattern: /\bof\s+retail\s+sector\b/gi, suggestion: 'of the retail sector', message: 'Article: Use definite article in formal reference to sector.' },
+        ]
+        articlePatterns.forEach(({ pattern, suggestion, message }) => {
+          let apm: RegExpExecArray | null
+          while ((apm = pattern.exec(text)) !== null) {
+            detectorCounts.article = (detectorCounts.article || 0) + 1
+            issues.push({ type: 'article', severity: 'low', message, original_text: apm[0], suggestion_text: suggestion, startIndex: apm.index, endIndex: apm.index + apm[0].length })
+          }
+        })
+
+        // E) Subject-verb agreement with abstract singular nouns (research/evidence/use + plural verb → singular)
+        const abstractSVA: { pattern: RegExp; suggestion: string }[] = [
+          { pattern: /\bresearch\s+show\b/gi, suggestion: 'research shows' },
+          { pattern: /\bevidence\s+suggest\b/gi, suggestion: 'evidence suggests' },
+          { pattern: /\buse\s+indicate\b/gi, suggestion: 'use indicates' },
+          { pattern: /\bdata\s+show\b/gi, suggestion: 'data shows' },
+        ]
+        abstractSVA.forEach(({ pattern, suggestion }) => {
+          let sm: RegExpExecArray | null
+          while ((sm = pattern.exec(text)) !== null) {
+            detectorCounts.agreement = (detectorCounts.agreement || 0) + 1
+            issues.push({ type: 'agreement', severity: 'moderate', message: 'Agreement: Use singular verb with singular abstract subject.', original_text: sm[0], suggestion_text: suggestion, startIndex: sm.index, endIndex: sm.index + sm[0].length })
+          }
+        })
+      }
+
       // 1️⃣ Claim Strength & Hedging
       // Detect overly strong or absolute claims
       const strongClaimPatterns = [
@@ -1971,8 +2808,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Ensure all issues have required fields (original_text must never be null). General: no limit on number of issues.
-    const maxIssues = mode === 'general' ? undefined : 50
+    // Ensure all issues have required fields. General & academic_research: no cap (full-document sweep); academic_standard: cap 50.
+    const maxIssues = mode === 'academic_research' ? undefined : (mode === 'general' ? undefined : 50)
     const capped = maxIssues != null ? nonOverlapping.slice(0, maxIssues) : nonOverlapping
     const validatedIssues = capped.map(issue => {
       // Clamp indices to valid range (0-based character offsets)
@@ -2005,6 +2842,24 @@ export async function POST(req: NextRequest) {
       const suggestionText = isRepetition ? '' : (issue.suggestion_text || '')
       const action: IssueAction = isRepetition ? 'delete' : 'replace'
       
+      const ruleTypeMap: Record<string, RuleType> = {
+        grammar: 'grammar',
+        spelling: 'spelling',
+        repetition: 'repetition',
+        word_form: 'wordForm',
+        tense: 'tense',
+        tense_consistency: 'tense',
+        style: 'style',
+        clarity: 'clarity',
+        preposition: 'preposition',
+        agreement: 'agreement',
+        article: 'article',
+        uncountable: 'uncountable',
+        research_grammar: 'research_grammar',
+        punctuation: 'punctuation',
+      }
+      const ruleType: RuleType = (issue as Issue).ruleType ?? ruleTypeMap[issue.type] ?? 'grammar'
+
       return {
         id: crypto.randomUUID(),
         type: toDisplayIssueType(issue.type),
@@ -2017,6 +2872,7 @@ export async function POST(req: NextRequest) {
         startIndex: start,
         endIndex: end,
         action,
+        ruleType,
       }
     }).filter((issue): issue is NonNullable<typeof issue> => issue !== null) // Remove nulls
 

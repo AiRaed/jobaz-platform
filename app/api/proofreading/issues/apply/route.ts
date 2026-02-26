@@ -91,38 +91,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Apply fix to content (replace or delete: empty suggestion = delete range)
+    // Safe apply: replace ONLY the exact range [start_index, end_index]. No global replace, no search.
     let content = document.content || ''
     const start_index = issue.start_index ?? issue.startIndex
     const end_index = issue.end_index ?? issue.endIndex
     const original = issue.original_text ?? issue.original ?? ''
     const suggestion = issue.suggestion_text ?? issue.suggestion ?? ''
 
-    // Validate original text matches
-    const actualText = content.substring(start_index, end_index)
-    if (!actualText.includes(original) && !original.includes(actualText)) {
-      // Try to find text nearby
-      const searchStart = Math.max(0, start_index - 50)
-      const searchEnd = Math.min(content.length, end_index + 50)
-      const foundIndex = content.indexOf(original, searchStart)
-      
-      if (foundIndex !== -1 && foundIndex < searchEnd) {
-        // Use found position
-        const before = content.substring(0, foundIndex)
-        const after = content.substring(foundIndex + original.length)
-        content = before + suggestion + after
-      } else {
-        // Fallback: use original positions anyway (e.g. delete by range)
-        const before = content.substring(0, start_index)
-        const after = content.substring(end_index)
-        content = before + suggestion + after
-      }
-    } else {
-      // Direct replacement or delete (suggestion empty = delete)
-      const before = content.substring(0, start_index)
-      const after = content.substring(end_index)
-      content = before + suggestion + after
+    const startClamp = Math.max(0, Math.min(start_index, content.length))
+    const endClamp = Math.max(startClamp, Math.min(end_index, content.length))
+    const actualText = content.substring(startClamp, endClamp)
+
+    if (actualText !== original) {
+      return NextResponse.json(
+        { ok: false, error: 'Text at this position no longer matches. The document may have changed. Re-run analysis.' },
+        { status: 400 }
+      )
     }
+
+    content = content.substring(0, startClamp) + (suggestion ?? '') + content.substring(endClamp)
 
     // Recalculate counts
     const charCount = content.length

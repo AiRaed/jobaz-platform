@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, LogOut, Compass, FileCheck, Wrench, MessageSquare } from 'lucide-react'
+import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, LogOut, Compass, FileCheck, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import AppShell from '@/components/layout/AppShell'
@@ -1291,16 +1291,16 @@ export default function DashboardPage() {
       {/* Main Dashboard Content */}
       <>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - single row on xl (≥1280px), wrap on smaller screens */}
         <section className="mb-6">
           <h2 className="text-sm font-semibold tracking-wide text-slate-300/80 uppercase mb-3">
             Quick Actions
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
             <Link
               href="/cv-builder-v2"
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50",
+                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
                 "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
                 "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
               )}
@@ -1316,7 +1316,7 @@ export default function DashboardPage() {
             <Link
               href="/cover"
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50",
+                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
                 "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
                 "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
               )}
@@ -1332,7 +1332,7 @@ export default function DashboardPage() {
             <Link
               href="/job-finder"
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50",
+                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
                 "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
                 "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
               )}
@@ -1348,7 +1348,7 @@ export default function DashboardPage() {
             <Link
               href="/interview-coach"
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50",
+                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
                 "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
                 "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
               )}
@@ -1364,7 +1364,7 @@ export default function DashboardPage() {
             <Link
               href="/build-your-path"
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50",
+                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
                 "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
                 "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
               )}
@@ -1380,15 +1380,18 @@ export default function DashboardPage() {
             <Link
               href="/uk-career-assistant"
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50",
+                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
                 "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
                 "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
               )}
             >
+              <span className="absolute top-2 right-2 rounded-full bg-gradient-to-r from-violet-600/90 to-purple-600/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-100/95 shadow-[0_0_12px_rgba(139,92,246,0.25)]">
+                Beta
+              </span>
               <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
               <MessageSquare className="w-4 h-4 text-violet-400 flex-shrink-0" />
               <div className="flex flex-col min-w-0">
-                <div className="text-sm font-semibold text-slate-50">UK Career Assistant (Beta)</div>
+                <div className="text-sm font-semibold text-slate-50">UK Career Assistant</div>
                 <div className="text-xs text-slate-400 leading-snug">Assess your work situation step-by-step</div>
               </div>
             </Link>
@@ -1396,32 +1399,19 @@ export default function DashboardPage() {
             <Link
               href="/proofreading"
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50",
+                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
                 "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
                 "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
               )}
             >
-              {/* Bold diagonal maintenance stripe - corner to corner */}
-              <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-2xl z-0">
-                <div 
-                  className="absolute top-0 right-0 w-[200%] h-6 bg-gradient-to-br from-red-600/30 via-orange-600/35 to-red-500/30 origin-top-right"
-                  style={{
-                    transform: 'rotate(-38deg)',
-                    transformOrigin: 'top right',
-                    boxShadow: '0 0 8px rgba(239, 68, 68, 0.2)',
-                  }}
-                />
-              </div>
-              
+              <span className="absolute top-2 right-2 rounded-full bg-gradient-to-r from-violet-600/90 to-purple-600/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-100/95 shadow-[0_0_12px_rgba(139,92,246,0.25)]">
+                Beta
+              </span>
               <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
               <FileCheck className="w-4 h-4 text-violet-400 flex-shrink-0 relative z-10" />
               <div className="flex flex-col min-w-0 flex-1 relative z-10">
                 <div className="text-sm font-semibold text-slate-50">Writing Review</div>
                 <div className="text-xs text-slate-400 leading-snug">Review and improve any text</div>
-                <div className="flex flex-col items-start gap-0.5 mt-1">
-                  <Wrench className="w-3.5 h-3.5 text-red-400" />
-                  <span className="text-[11px] text-red-400 font-semibold leading-tight">Under development</span>
-                </div>
               </div>
             </Link>
           </div>

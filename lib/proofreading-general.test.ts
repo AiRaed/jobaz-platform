@@ -185,5 +185,57 @@ if (!repeatGrammarOk) {
   console.log('✅ Repeated-sentence text yields grammar issues')
 }
 
-passed = passed && quickPass && (duplicatesRemoved || duplicateCountBefore <= 1) && repeatGrammarOk
+// 4) Safe apply: slice-based patch must never create merged words or break spacing
+function applyFixSliceOnly(
+  text: string,
+  startIndex: number,
+  endIndex: number,
+  originalText: string,
+  replacementText: string
+): string {
+  const startClamp = Math.max(0, Math.min(startIndex, text.length))
+  const endClamp = Math.max(startClamp, Math.min(endIndex, text.length))
+  const slice = text.substring(startClamp, endClamp)
+  if (slice !== originalText) return text
+  return text.substring(0, startClamp) + replacementText + text.substring(endClamp)
+}
+
+const noMergedWordsRegex = /\b(aremany|companyhase|havemany|therearemany|manys)\b/i
+function hasMergedWord(s: string): boolean {
+  return noMergedWordsRegex.test(s)
+}
+
+// Simulate "There is many" -> "There are many" and "company have" -> "company has" in one text (descending order)
+const beforeApply = 'There is many reasons. company have a strong reputation.'
+const idxHave = beforeApply.indexOf('have')
+const issues = [
+  { startIndex: 0, endIndex: 9, originalText: 'There is ', replacementText: 'There are ' },
+  { startIndex: idxHave, endIndex: idxHave + 4, originalText: 'have', replacementText: 'has' },
+]
+let current = beforeApply
+for (const issue of issues.sort((a, b) => b.startIndex - a.startIndex)) {
+  current = applyFixSliceOnly(
+    current,
+    issue.startIndex,
+    issue.endIndex,
+    issue.originalText,
+    issue.replacementText
+  )
+}
+const safeApplyNoMerge = !hasMergedWord(current)
+const safeApplySpacing = /There are many/.test(current) && /company has a/.test(current)
+if (!safeApplyNoMerge) {
+  console.log('❌ Apply must not create merged words (e.g. aremany, companyhase). Got:', current)
+  passed = false
+} else {
+  console.log('✅ Slice-based apply does not create merged words')
+}
+if (!safeApplySpacing) {
+  console.log('❌ Apply must preserve spacing. Got:', JSON.stringify(current))
+  passed = false
+} else {
+  console.log('✅ Spacing preserved after apply')
+}
+
+passed = passed && quickPass && (duplicatesRemoved || duplicateCountBefore <= 1) && repeatGrammarOk && safeApplyNoMerge && safeApplySpacing
 process.exit(passed ? 0 : 1)

@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Plus, FileText, Trash2, Loader2, X, CheckCircle2, AlertCircle, BookOpen, Briefcase, Sparkles, Check, XCircle, RefreshCw, Mail, Copy, Save, Wand2, Upload, Info, Download } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Plus, FileText, Trash2, Loader2, X, CheckCircle2, AlertCircle, BookOpen, Briefcase, Sparkles, Check, XCircle, RefreshCw, Mail, Copy, Save, Wand2, Upload, Info, Download, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import PageHeader from '@/components/PageHeader'
 import { parseEmail } from '@/lib/email-parser'
 import type { EmailPurpose, RecipientType, Tone } from '@/lib/email-templates'
 import { exportProofreadingToDocx } from '@/lib/docx'
@@ -33,7 +33,7 @@ interface ProofreadingDocument {
 interface ProofreadingIssue {
   id: string
   document_id: string
-  type: 'grammar' | 'spelling' | 'style' | 'clarity' | 'word_form' | 'tense' | 'repetition' | 'preposition' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality'
+  type: 'grammar' | 'spelling' | 'style' | 'clarity' | 'word_form' | 'tense' | 'repetition' | 'preposition' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality' | 'agreement' | 'article' | 'uncountable' | 'research_grammar' | 'punctuation'
   severity: 'low' | 'moderate' | 'high'
   message: string
   original_text: string
@@ -48,6 +48,64 @@ interface ProofreadingIssue {
 
 type IssueFilter = 'all' | 'open' | 'applied' | 'rejected'
 type TabType = 'proofreading' | 'email'
+
+/** Feature flag: set NEXT_PUBLIC_ENABLE_LLM_PROOFREAD=true to show AI Proofread (LLM) in Writing Review. */
+const ENABLE_LLM_PROOFREAD = typeof process.env.NEXT_PUBLIC_ENABLE_LLM_PROOFREAD === 'string' && process.env.NEXT_PUBLIC_ENABLE_LLM_PROOFREAD === 'true'
+
+/** Feature flag: set NEXT_PUBLIC_ENABLE_PHD_MODE=true to show Academic Research / PhD in project creation and sidebar. Default false. */
+const ENABLE_PHD_MODE = typeof process.env.NEXT_PUBLIC_ENABLE_PHD_MODE === 'string' && process.env.NEXT_PUBLIC_ENABLE_PHD_MODE === 'true'
+
+/** Collapse 2+ consecutive spaces to one; never remove newlines or paragraph breaks. */
+function collapseDoubleSpaces(text: string): string {
+  return text.replace(/  +/g, ' ')
+}
+
+/**
+ * Remove trailing dots that look like artifacts.
+ * - Removes trailing lines that contain only whitespace and periods (e.g. "\n\n....." or "\n. . .").
+ * - Replaces trailing multiple periods with a single period, including:
+ *   "....." (consecutive) and ". . . . ." (periods with spaces between).
+ */
+function normalizeTrailingDots(text: string): string {
+  if (!text.length) return text
+  let out = text
+  // Remove trailing lines that are only spaces and/or periods
+  while (/[\r\n][\s.]*$/.test(out)) {
+    out = out.replace(/[\r\n][\s.]*$/, '')
+  }
+  // Consecutive dots at end (e.g. "soon. .....")
+  out = out.replace(/[\s.]*\.{2,}\s*$/, '.')
+  // Periods with spaces between at end (e.g. "soon. . . . . .") — 2+ (period + optional space)
+  out = out.replace(/(?:\.\s*){2,}\s*$/, '.')
+  return out
+}
+
+/** Detect likely merged words (e.g. "aremany", "companyhase") after Apply All. */
+function hasMergedTokens(text: string): boolean {
+  if (!text.trim()) return false
+  // Lowercase letter immediately followed by uppercase in the middle of a word (no space)
+  if (/\b[a-z][A-Z]\w*/.test(text)) return true
+  if (/\b\w+[a-z][A-Z]\w*/.test(text)) return true
+  // Common merged patterns that indicate missing space
+  const mergedPatterns = /\b(aremany|companyhase|companyhave|thereare|thereis|manyreasons|havea|hasa)\b/i
+  return mergedPatterns.test(text)
+}
+
+/**
+ * Fix broken spacing from single-char capitalization (e.g. "T here" → "There").
+ * Only merges when single capital + space + lowercase forms a known word (whitelist).
+ */
+function fixBrokenCapitalizationSpacing(text: string): string {
+  const mergeableWords = new Set(['there', 'their', 'this', 'that', 'the', 'these', 'those', 'and', 'are'])
+  const brokenRegex = /\b([A-Z])\s+([a-z]{2,})\b/g
+  return text.replace(brokenRegex, (_, cap, rest) => {
+    const merged = (cap + rest).toLowerCase()
+    if (mergeableWords.has(merged)) {
+      return cap + rest
+    }
+    return cap + ' ' + rest
+  })
+}
 
 interface EmailProject {
   id: string
@@ -116,7 +174,22 @@ export default function ProofreadingPage() {
   const [showImportTooltip, setShowImportTooltip] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  
+  const [applyingIssueId, setApplyingIssueId] = useState<string | null>(null)
+  const [isApplyingAll, setIsApplyingAll] = useState(false)
+  const [isAutoFixRunning, setIsAutoFixRunning] = useState(false)
+  const [autoFixPass, setAutoFixPass] = useState(0)
+  const [autoFixRemaining, setAutoFixRemaining] = useState<number | null>(null)
+  // AI (LLM) proofread: full-text correction + improvement, no partial patching
+  const [aiProofreadResult, setAiProofreadResult] = useState<{
+    corrected_text: string
+    improved_text: string
+    issues: Array<{ type: string; original: string; correction: string; explanation: string }>
+    confidence_score: number
+  } | null>(null)
+  const [aiProofreadOriginal, setAiProofreadOriginal] = useState<string>('')
+  const [aiProofreadLoading, setAiProofreadLoading] = useState(false)
+
+  const router = useRouter()
   const { addToast } = useToast()
   const { setContext } = useJazContext()
   
@@ -143,6 +216,7 @@ export default function ProofreadingPage() {
   const overlayRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const importTooltipTimeoutRef = useRef<NodeJS.Timeout>()
+  const latestEditorContentRef = useRef<string>('')
 
   // Helper function to check if a project is academic type
   const isAcademicProject = useCallback((projectId: string | null): boolean => {
@@ -155,6 +229,40 @@ export default function ProofreadingPage() {
            category === 'academic_standard' || 
            category === 'academic_research_phd'
   }, [projects])
+
+  const isPhdProject = useCallback((category: string): boolean => {
+    return category === 'academic_research_phd' || category === 'Academic Research'
+  }, [])
+
+  const projectsToShow = useMemo(() => {
+    return ENABLE_PHD_MODE ? projects : projects.filter(p => !isPhdProject(p.category))
+  }, [projects, ENABLE_PHD_MODE, isPhdProject])
+
+  // When PhD mode is hidden, switch away from any active PhD project
+  useEffect(() => {
+    if (ENABLE_PHD_MODE || !activeProjectId) return
+    const active = projects.find(p => p.id === activeProjectId)
+    if (active && isPhdProject(active.category)) {
+      const firstVisible = projectsToShow[0]
+      setActiveProjectId(firstVisible?.id ?? null)
+    }
+  }, [ENABLE_PHD_MODE, activeProjectId, projects, projectsToShow, isPhdProject])
+
+  // Writing Review → General mode only (not Academic / Academic Research)
+  const isGeneralMode = useCallback((): boolean => {
+    if (!activeProjectId) return false
+    return !isAcademicProject(activeProjectId)
+  }, [activeProjectId, isAcademicProject])
+
+  /** Current analysis mode for Apply / Apply All: same as Run Analysis. */
+  const getAnalysisMode = useCallback((): 'general' | 'academic' | 'academic_research' => {
+    if (!activeProjectId) return 'general'
+    const project = projects.find(p => p.id === activeProjectId)
+    const slug = project?.category || ''
+    if (slug === 'academic_research_phd' || slug === 'Academic Research') return 'academic_research'
+    if (slug === 'academic_standard' || slug === 'Academic') return 'academic'
+    return 'general'
+  }, [activeProjectId, projects])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -196,6 +304,11 @@ export default function ProofreadingPage() {
     if (pages[activePageIndex]) {
       setContent(pages[activePageIndex].content)
     }
+  }, [pages, activePageIndex])
+
+  // Keep ref in sync so Run Analysis always sees the latest editor text (no stale closure)
+  useEffect(() => {
+    latestEditorContentRef.current = pages[activePageIndex]?.content ?? ''
   }, [pages, activePageIndex])
 
   // Load issues when document changes
@@ -262,7 +375,10 @@ export default function ProofreadingPage() {
       if (data.ok) {
         setProjects(data.projects)
         if (data.projects.length > 0 && !activeProjectId) {
-          setActiveProjectId(data.projects[0].id)
+          const firstVisible = ENABLE_PHD_MODE
+            ? data.projects[0]
+            : data.projects.find((p: ProofreadingProject) => !(p.category === 'academic_research_phd' || p.category === 'Academic Research'))
+          if (firstVisible) setActiveProjectId(firstVisible.id)
         }
       } else {
         setError(data.error || 'Failed to load projects')
@@ -296,7 +412,7 @@ export default function ProofreadingPage() {
           }
           setCurrentDocument(data.document)
           setActiveDocumentId(data.document.id)
-          const documentContent = data.document.content || ''
+          const documentContent = fixBrokenCapitalizationSpacing(normalizeTrailingDots(data.document.content || ''))
           // Initialize pages with document content on first page
           setPages([{ id: '1', content: documentContent }])
           setActivePageIndex(0)
@@ -408,14 +524,16 @@ export default function ProofreadingPage() {
     }, 1200) // 1200ms debounce
   }, [activeProjectId, activeDocumentId, pages, ensureDocumentExists])
 
-  const saveDocument = async (docId?: string) => {
+  const saveDocument = async (docId?: string, contentOverride?: string) => {
     const documentId = docId || activeDocumentId
     if (!documentId || !activeProjectId) return
 
     try {
       setIsSaving(true)
-      // Combine all pages content for saving
-      const combinedContent = pages.map(p => p.content).join('\n\n--- Page Break ---\n\n')
+      const combinedContent =
+        contentOverride !== undefined
+          ? contentOverride
+          : pages.map(p => p.content).join('\n\n--- Page Break ---\n\n')
       
       if (process.env.NODE_ENV === 'development') {
         console.log('[Proofreading] Saving document:', documentId, 'Content length:', combinedContent.length)
@@ -451,6 +569,7 @@ export default function ProofreadingPage() {
   }
 
   const handleContentChange = async (newContent: string) => {
+    latestEditorContentRef.current = newContent
     // Always allow content changes when a project is selected
     if (activeProjectId) {
       // Calculate combined content with updated active page
@@ -644,12 +763,13 @@ export default function ProofreadingPage() {
     if (!newProjectTitle.trim()) return
 
     try {
+      const categoryToUse = (newProjectCategory === 'academic_research_phd' && !ENABLE_PHD_MODE) ? 'general' : newProjectCategory
       const res = await fetch('/api/proofreading/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newProjectTitle.trim(),
-          category: newProjectCategory,
+          category: categoryToUse,
         }),
       })
       
@@ -979,16 +1099,30 @@ export default function ProofreadingPage() {
   }
 
   const runAnalysis = async () => {
-    // Get active page content only
-    const activePageContent = pages[activePageIndex]?.content || ''
+    let textToAnalyze = latestEditorContentRef.current ?? pages[activePageIndex]?.content ?? ''
     const activePageId = pages[activePageIndex]?.id
-    if (!activeProjectId || !activePageContent.trim() || isAnalyzing) return
+    if (!activeProjectId || !textToAnalyze.trim() || isAnalyzing) return
+
+    // Normalize trailing dots and fix broken capitalization spacing before analysis
+    let cleaned = normalizeTrailingDots(textToAnalyze)
+    cleaned = fixBrokenCapitalizationSpacing(cleaned)
+    if (cleaned !== textToAnalyze) {
+      textToAnalyze = cleaned
+      latestEditorContentRef.current = cleaned
+      setPages((prev) => {
+        const updated = [...prev]
+        if (updated[activePageIndex]) {
+          updated[activePageIndex] = { ...updated[activePageIndex], content: cleaned }
+        }
+        return updated
+      })
+      setContent(cleaned)
+    }
 
     try {
       setIsAnalyzing(true)
       setError(null)
 
-      // Ensure document exists before running analysis (use combined content for document creation)
       let docId = activeDocumentId
       if (!docId && activeProjectId) {
         const combinedContent = pages.map(p => p.content).join('\n\n--- Page Break ---\n\n')
@@ -1020,13 +1154,13 @@ export default function ProofreadingPage() {
         mode = 'general'
       }
 
-      // Run analysis only on active page content
+      // Analyze current editor text only (single source of truth)
       const res = await fetch('/api/proofreading/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           documentId: docId,
-          content: activePageContent, // Only analyze active page
+          content: textToAnalyze,
           mode,
           options: {
             spelling: true,
@@ -1087,18 +1221,111 @@ export default function ProofreadingPage() {
     }
   }
 
+  /**
+   * Re-run analysis on given content and replace issues list.
+   * Uses current project mode (general / academic / academic_research) when mode not provided.
+   * Returns the number of issues returned by the analyzer (for safety checks).
+   */
+  const runAnalysisWithContent = useCallback(
+    async (pageContent: string, mode?: 'general' | 'academic' | 'academic_research'): Promise<number> => {
+      const docId = activeDocumentId
+      const activePageId = pages[activePageIndex]?.id
+      if (!docId || !activePageId) return 0
+
+      const analysisMode = mode ?? getAnalysisMode()
+      const options =
+        analysisMode === 'general'
+          ? { spelling: true, grammar: true, style: true, clarity: true }
+          : analysisMode === 'academic_research'
+            ? { grammar: true, style: true, clarity: true, section: undefined as string | undefined }
+            : { grammar: true, style: true, clarity: true }
+
+      try {
+        setIsAnalyzing(true)
+        setError(null)
+        const res = await fetch('/api/proofreading/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentId: docId,
+            content: pageContent,
+            mode: analysisMode,
+            options,
+          }),
+        })
+        const data = await res.json()
+        if (!data.ok) {
+          setError(data.error || data.message || 'Re-analysis failed')
+          return 0
+        }
+        const issueCount = Array.isArray(data.issues) ? data.issues.length : 0
+        const issuesRes = await fetch('/api/proofreading/issues', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ document_id: docId, issues: data.issues }),
+        })
+        const issuesData = await issuesRes.json()
+        if (issuesData.ok) {
+          const nextIssues = issuesData.issues || []
+          setClearedPages(prev => ({ ...prev, [activePageId]: false }))
+          setPageIssues(prev => ({ ...prev, [activePageId]: nextIssues }))
+          setIssues(nextIssues)
+        }
+        return issueCount
+      } catch (err: any) {
+        console.error('Re-analysis after apply failed:', err)
+        setError(err.message || 'Re-analysis failed')
+        return 0
+      } finally {
+        setIsAnalyzing(false)
+      }
+    },
+    [activeDocumentId, activePageIndex, pages, getAnalysisMode]
+  )
+
   const applyIssue = async (issue: ProofreadingIssue) => {
     if (!activeDocumentId || !currentDocument) return
 
-    try {
-      // Apply fix to active page content only (delete = remove range when action is delete or type is repetition)
-      const activePageContent = pages[activePageIndex]?.content || ''
-      const before = activePageContent.substring(0, issue.start_index)
-      const after = activePageContent.substring(issue.end_index)
-      const isDelete = issue.action === 'delete' || issue.type === 'repetition'
-      const newContent = isDelete ? before + after : before + (issue.suggestion_text || '') + after
+    const originalText = issue.original_text ?? ''
+    const suggestion = (issue.suggestion_text ?? '').trim()
+    const isDelete = issue.action === 'delete' || issue.type === 'repetition'
+    // Tip-only (e.g. clarity with no replacement): no-op; Apply is already disabled in UI
+    if (!isDelete && !suggestion) return
 
-      // Update active page content
+    const activePageContent = pages[activePageIndex]?.content ?? ''
+    const activePageId = pages[activePageIndex]?.id
+    const start = issue.start_index ?? (issue as any).startIndex ?? 0
+    const end = issue.end_index ?? (issue as any).endIndex ?? start
+    const mode = getAnalysisMode()
+
+    try {
+      const textLen = activePageContent.length
+      const startClamp = Math.max(0, Math.min(start, textLen))
+      const endClamp = Math.max(startClamp, Math.min(end, textLen))
+      const currentSlice = activePageContent.substring(startClamp, endClamp)
+
+      if (currentSlice !== originalText) {
+        addToast?.({ title: 'Text changed', description: 'Re-analyzing to refresh offsets.', variant: 'default' })
+        await runAnalysisWithContent(activePageContent, mode)
+        return
+      }
+
+      setApplyingIssueId(issue.id)
+      // Same apply engine for General and Academic: slice-only, word-boundary preservation
+      let replacement = isDelete ? '' : (issue.suggestion_text ?? '').trim()
+      if (replacement) {
+        const charBefore = startClamp > 0 ? activePageContent[startClamp - 1] : ' '
+        const charAfter = endClamp < activePageContent.length ? activePageContent[endClamp] : ' '
+        if (/[a-zA-Z]/.test(charBefore) && /[a-zA-Z]/.test(replacement[0])) replacement = ' ' + replacement
+        if (/[a-zA-Z]/.test(replacement[replacement.length - 1]) && /[a-zA-Z]/.test(charAfter)) replacement = replacement + ' '
+      }
+      const before = activePageContent.substring(0, startClamp)
+      const after = activePageContent.substring(endClamp)
+      let newContent = before + replacement + after
+      newContent = collapseDoubleSpaces(newContent)
+      newContent = normalizeTrailingDots(newContent)
+      newContent = fixBrokenCapitalizationSpacing(newContent)
+
       setPages(prev => {
         const updated = [...prev]
         if (updated[activePageIndex]) {
@@ -1107,31 +1334,368 @@ export default function ProofreadingPage() {
         return updated
       })
       setContent(newContent)
-      
-      // Update issue status
+
+      const combinedContent = pages
+        .map((p, i) => (i === activePageIndex ? newContent : p.content))
+        .join('\n\n--- Page Break ---\n\n')
+      await saveDocument(activeDocumentId, combinedContent)
+
       const res = await fetch(`/api/proofreading/issues/${issue.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'applied',
-        }),
+        body: JSON.stringify({ status: 'applied' }),
       })
-
-      if (res.ok) {
-        // Reload issues to ensure consistency with server
-        if (activeDocumentId) {
-          const activePageId = pages[activePageIndex]?.id
-          if (activePageId) {
-            await loadIssues(activeDocumentId, issueFilter, activePageId)
-          }
-        }
-        // Save updated content
-        await saveDocument()
+      if (!res.ok) {
+        addToast?.({ title: 'Apply failed', description: 'Could not mark issue as applied.', variant: 'error' })
+        return
       }
-    } catch (err) {
+
+      setIssues(prev => prev.filter(i => i.id !== issue.id))
+      if (activePageId) {
+        setPageIssues(prev => ({
+          ...prev,
+          [activePageId]: (prev[activePageId] || []).filter(i => i.id !== issue.id),
+        }))
+      }
+      addToast?.({ title: 'Applied', description: 'Re-analyzing…', variant: 'success' })
+      await runAnalysisWithContent(newContent, mode)
+    } catch (err: any) {
       console.error('Failed to apply issue:', err)
+      addToast?.({ title: 'Apply failed', description: err.message || 'Failed to apply.', variant: 'error' })
+    } finally {
+      setApplyingIssueId(null)
     }
   }
+
+  const MAX_APPLY_ALL_PASSES = 5
+
+  /**
+   * Apply All (General and Academic): offset-safe loop.
+   * 1) Analyze CURRENT editor text with current project mode (single source of truth).
+   * 2) Sort issues by startIndex DESC (bottom-to-top).
+   * 3) Apply each fix to the CURRENT text string; verify currentText.slice(start,end) === originalText before apply.
+   *    On mismatch: re-locate originalText in a window around start; if found exactly once, use that position; else skip.
+   * 4) Slice-only: newText = currentText.slice(0,start) + replacement + currentText.slice(end). No global/regex replace.
+   * 5) After each pass, update editor state; after all passes, re-run analysis in same mode. If General and 0 issues but merged tokens, re-analyze.
+   */
+  const applyAllIssues = async () => {
+    if (!activeDocumentId || !currentDocument) return
+    const activePageId = pages[activePageIndex]?.id
+    if (!activePageId) return
+
+    const mode = getAnalysisMode()
+    const options =
+      mode === 'general'
+        ? { spelling: true, grammar: true, style: true, clarity: true }
+        : mode === 'academic_research'
+          ? { grammar: true, style: true, clarity: true, section: undefined as string | undefined }
+          : { grammar: true, style: true, clarity: true }
+
+    let content = pages[activePageIndex]?.content ?? ''
+    if (!content.trim()) {
+      addToast?.({ title: 'No content', description: 'Add text to proofread.', variant: 'default' })
+      return
+    }
+
+    try {
+      setIsApplyingAll(true)
+      setError(null)
+
+      for (let pass = 1; pass <= MAX_APPLY_ALL_PASSES; pass++) {
+        const res = await fetch('/api/proofreading/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentId: activeDocumentId,
+            content,
+            mode,
+            options,
+          }),
+        })
+        const data = await res.json()
+        if (!data.ok) {
+          setError(data.error || data.message || 'Analysis failed')
+          break
+        }
+        const issuesList: Array<{ id?: string; startIndex?: number; endIndex?: number; start_index?: number; end_index?: number; original_text?: string; suggestion_text?: string; type?: string; action?: string }> = data.issues || []
+
+        if (issuesList.length === 0) {
+          addToast?.({ title: 'Apply All complete', description: 'No issues remaining.', variant: 'success' })
+          break
+        }
+
+        const sorted = [...issuesList].sort((a, b) => (b.startIndex ?? b.start_index ?? 0) - (a.startIndex ?? a.start_index ?? 0))
+        let currentText = content
+        let appliedCount = 0
+        const SEARCH_WINDOW = 80
+
+        for (const issue of sorted) {
+          const originalText = issue.original_text ?? ''
+          if (!originalText) continue
+          const isDelete = issue.action === 'delete' || issue.type === 'repetition'
+          const hasReplacement = isDelete || (issue.suggestion_text ?? '').trim()
+          if (!hasReplacement) continue
+          const expectedStart = issue.startIndex ?? issue.start_index ?? 0
+          const expectedEnd = issue.endIndex ?? issue.end_index ?? expectedStart
+          const textLen = currentText.length
+          let start = Math.max(0, Math.min(expectedStart, textLen))
+          let end = Math.max(start, Math.min(expectedEnd, textLen))
+          let slice = currentText.substring(start, end)
+
+          if (slice !== originalText) {
+            const windowStart = Math.max(0, expectedStart - SEARCH_WINDOW)
+            const windowEnd = Math.min(textLen, expectedStart + SEARCH_WINDOW + originalText.length)
+            const candidates: number[] = []
+            let pos = currentText.indexOf(originalText, windowStart)
+            while (pos !== -1 && pos + originalText.length <= windowEnd) {
+              candidates.push(pos)
+              pos = currentText.indexOf(originalText, pos + 1)
+            }
+            if (candidates.length === 0) continue
+            const closest = candidates.reduce((best, idx) =>
+              Math.abs(idx - expectedStart) < Math.abs(best - expectedStart) ? idx : best
+            )
+            const tie = candidates.filter(idx => Math.abs(idx - expectedStart) === Math.abs(closest - expectedStart))
+            if (tie.length > 1) continue
+            start = closest
+            end = closest + originalText.length
+            slice = currentText.substring(start, end)
+            if (slice !== originalText) continue
+          }
+
+          let replacement = isDelete ? '' : (issue.suggestion_text ?? '')
+          if (replacement) {
+            const charBefore = start > 0 ? currentText[start - 1] : ' '
+            const charAfter = end < textLen ? currentText[end] : ' '
+            const needSpaceBefore = /[a-zA-Z]/.test(charBefore) && /[a-zA-Z]/.test(replacement[0])
+            const needSpaceAfter = /[a-zA-Z]/.test(replacement[replacement.length - 1]) && /[a-zA-Z]/.test(charAfter)
+            if (needSpaceBefore) replacement = ' ' + replacement
+            if (needSpaceAfter) replacement = replacement + ' '
+          }
+          currentText = currentText.substring(0, start) + replacement + currentText.substring(end)
+          appliedCount++
+        }
+
+        if (appliedCount === 0) {
+          addToast?.({ title: 'Apply All', description: 'No more fixes could be applied (positions may be stale). Run analysis again if needed.', variant: 'default' })
+          break
+        }
+
+        content = collapseDoubleSpaces(currentText)
+        content = normalizeTrailingDots(content)
+        content = fixBrokenCapitalizationSpacing(content)
+        setPages((prev) => {
+          const updated = [...prev]
+          if (updated[activePageIndex]) {
+            updated[activePageIndex] = { ...updated[activePageIndex], content }
+          }
+          return updated
+        })
+        setContent(content)
+
+        const combinedContent = pages
+          .map((p, i) => (i === activePageIndex ? content : p.content))
+          .join('\n\n--- Page Break ---\n\n')
+        await saveDocument(activeDocumentId, combinedContent)
+      }
+
+      const issueCount = await runAnalysisWithContent(content, mode)
+      if (mode === 'general' && issueCount === 0 && content.trim().length > 0 && hasMergedTokens(content)) {
+        setError('Possible merged words detected (e.g. missing spaces). Run Analysis again to refresh issues.')
+        await runAnalysisWithContent(content, mode)
+      }
+    } catch (err: any) {
+      console.error('Apply All failed:', err)
+      addToast?.({ title: 'Apply All failed', description: err.message || 'Failed to apply all.', variant: 'error' })
+    } finally {
+      setIsApplyingAll(false)
+    }
+  }
+
+  const MAX_AUTO_FIX_PASSES = 5
+
+  /**
+   * Auto-Fix (Iterative): run analysis → apply safe fixes in descending order → re-analyze → repeat
+   * until no issues, max passes, or no fixes applied. Grammarly-like proofreading loop.
+   */
+  const runAutoFixLoop = async () => {
+    if (!isGeneralMode() || !activeDocumentId || !currentDocument) return
+    const activePageId = pages[activePageIndex]?.id
+    if (!activePageId) return
+
+    let content = pages[activePageIndex]?.content ?? ''
+    if (!content.trim()) {
+      addToast?.({ title: 'No content', description: 'Add text to proofread.', variant: 'default' })
+      return
+    }
+
+    setIsAutoFixRunning(true)
+    setError(null)
+
+    try {
+      for (let pass = 1; pass <= MAX_AUTO_FIX_PASSES; pass++) {
+        setAutoFixPass(pass)
+        const res = await fetch('/api/proofreading/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentId: activeDocumentId,
+            content,
+            mode: 'general',
+            options: { spelling: true, grammar: true, style: true, clarity: true },
+          }),
+        })
+        const data = await res.json()
+        if (!data.ok) {
+          setError(data.error || data.message || 'Analysis failed')
+          break
+        }
+        const issuesList: Array<{ startIndex: number; endIndex: number; original_text?: string; suggestion_text?: string; type?: string; action?: string }> = data.issues || []
+        setAutoFixRemaining(issuesList.length)
+
+        if (issuesList.length === 0) {
+          addToast?.({ title: 'Auto-Fix complete', description: 'No issues remaining.', variant: 'success' })
+          break
+        }
+
+        const sorted = [...issuesList].sort((a, b) => (b.startIndex ?? 0) - (a.startIndex ?? 0))
+        let newContent = content
+        let appliedCount = 0
+
+        for (const issue of sorted) {
+          const start = issue.startIndex ?? 0
+          const end = issue.endIndex ?? start
+          const originalText = issue.original_text ?? ''
+          const textLen = newContent.length
+          const startClamp = Math.max(0, Math.min(start, textLen))
+          const endClamp = Math.max(startClamp, Math.min(end, textLen))
+          const slice = newContent.substring(startClamp, endClamp)
+          if (slice !== originalText) continue
+          const isDelete = issue.action === 'delete' || issue.type === 'repetition'
+          let replacement = isDelete ? '' : (issue.suggestion_text ?? '')
+          if (replacement) {
+            const charBefore = startClamp > 0 ? newContent[startClamp - 1] : ' '
+            const charAfter = endClamp < textLen ? newContent[endClamp] : ' '
+            const needSpaceBefore = /[a-zA-Z]/.test(charBefore) && /[a-zA-Z]/.test(replacement[0])
+            const needSpaceAfter = /[a-zA-Z]/.test(replacement[replacement.length - 1]) && /[a-zA-Z]/.test(charAfter)
+            if (needSpaceBefore) replacement = ' ' + replacement
+            if (needSpaceAfter) replacement = replacement + ' '
+          }
+          newContent = newContent.substring(0, startClamp) + replacement + newContent.substring(endClamp)
+          appliedCount++
+        }
+
+        if (appliedCount === 0) break
+
+        content = collapseDoubleSpaces(newContent)
+        content = normalizeTrailingDots(content)
+        content = fixBrokenCapitalizationSpacing(content)
+        setPages((prev) => {
+          const updated = [...prev]
+          if (updated[activePageIndex]) {
+            updated[activePageIndex] = { ...updated[activePageIndex], content }
+          }
+          return updated
+        })
+        setContent(content)
+
+        const combinedContent = pages
+          .map((p, i) => (i === activePageIndex ? content : p.content))
+          .join('\n\n--- Page Break ---\n\n')
+        await saveDocument(activeDocumentId, combinedContent)
+      }
+
+      await runAnalysisWithContent(content)
+    } catch (err: any) {
+      console.error('Auto-Fix loop failed:', err)
+      addToast?.({ title: 'Auto-Fix failed', description: err.message || 'Something went wrong.', variant: 'error' })
+    } finally {
+      setIsAutoFixRunning(false)
+      setAutoFixPass(0)
+      setAutoFixRemaining(null)
+    }
+  }
+
+  /** AI (LLM) proofread: full-text only. No-op when feature flag is off. */
+  const runAiProofread = useCallback(async () => {
+    if (!ENABLE_LLM_PROOFREAD) return
+    const editorText = (latestEditorContentRef.current ?? pages[activePageIndex]?.content ?? '').trim()
+    if (!editorText || !isGeneralMode()) return
+    if (process.env.NODE_ENV === 'development') {
+      console.log('LLM INPUT length:', editorText.length, 'preview:', editorText.slice(0, 150))
+    }
+    setAiProofreadLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/proofreading/ai-proofread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editorText }),
+      })
+      const responseText = await res.text()
+      if (process.env.NODE_ENV === 'development') {
+        console.log('LLM RAW RESPONSE status:', res.status, 'length:', responseText.length, 'preview:', responseText.slice(0, 300))
+      }
+      let data: { ok?: boolean; error?: string; corrected_text?: string; improved_text?: string; issues?: unknown[]; confidence_score?: number; raw_preview?: string }
+      try {
+        data = JSON.parse(responseText) as typeof data
+      } catch (parseErr) {
+        const msg = parseErr instanceof Error ? parseErr.message : 'Invalid JSON'
+        setError(`Response parse error: ${msg}`)
+        addToast?.({ title: 'AI Proofread failed', description: `Could not parse response: ${msg}`, variant: 'error' })
+        return
+      }
+      if (!data.ok) {
+        const errMsg = data.error || 'AI proofread failed'
+        setError(errMsg)
+        if (data.raw_preview) {
+          if (process.env.NODE_ENV === 'development') console.log('LLM RAW RESPONSE (error preview):', data.raw_preview)
+        }
+        addToast?.({ title: 'AI Proofread failed', description: errMsg, variant: 'error' })
+        return
+      }
+      setAiProofreadOriginal(editorText)
+      setAiProofreadResult({
+        corrected_text: data.corrected_text ?? editorText,
+        improved_text: data.improved_text ?? data.corrected_text ?? editorText,
+        issues: Array.isArray(data.issues) ? data.issues : [],
+        confidence_score: typeof data.confidence_score === 'number' ? data.confidence_score : 0,
+      })
+      addToast?.({ title: 'AI Proofread complete', description: `Confidence: ${data.confidence_score ?? 0}%`, variant: 'success' })
+    } catch (err: any) {
+      setError(err.message || 'AI proofread failed')
+      addToast?.({ title: 'AI Proofread failed', description: err.message || 'Try again.', variant: 'error' })
+    } finally {
+      setAiProofreadLoading(false)
+    }
+  }, [activePageIndex, pages, isGeneralMode, addToast])
+
+  /** Replace editor content with AI result (full text only; no partial patches). */
+  const applyAiProofreadVersion = useCallback(
+    (version: 'corrected_text' | 'improved_text') => {
+      if (!aiProofreadResult) return
+      const newContent = aiProofreadResult[version] ?? ''
+      setPages((prev) => {
+        const updated = [...prev]
+        if (updated[activePageIndex]) {
+          updated[activePageIndex] = { ...updated[activePageIndex], content: newContent }
+        }
+        return updated
+      })
+      setContent(newContent)
+      latestEditorContentRef.current = newContent
+      setAiProofreadResult(null)
+      setAiProofreadOriginal('')
+      if (activeDocumentId) {
+        const combined = pages
+          .map((p, i) => (i === activePageIndex ? newContent : p.content))
+          .join('\n\n--- Page Break ---\n\n')
+        saveDocument(activeDocumentId, combined)
+      }
+      addToast?.({ title: 'Text updated', description: version === 'improved_text' ? 'Replaced with improved version.' : 'Replaced with corrected version.', variant: 'success' })
+    },
+    [aiProofreadResult, activePageIndex, pages, activeDocumentId, addToast]
+  )
 
   const rejectIssue = async (issue: ProofreadingIssue) => {
     try {
@@ -1304,8 +1868,10 @@ export default function ProofreadingPage() {
     // This callback is kept for potential future use
   }, [])
   
-  // Get active page content (defined before useEffect that uses it)
+  // Single source of truth for editor text (General mode). Always use this for Run Analysis and Apply.
+  // Never analyze cached/DB content or a different state — only pages[activePageIndex].content.
   const activePageContent = pages[activePageIndex]?.content || ''
+  const editorText = activePageContent
   
   // Ensure textarea and overlay heights match content for proper scrolling
   // CRITICAL: Wrapper is the scroll container. Both layers must match content height.
@@ -1410,65 +1976,85 @@ export default function ProofreadingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50">
-      <PageHeader 
-        title={activeTab === 'proofreading' ? 'Writing Review Workspace' : 'Email Builder'} 
-        horizontalLayout={true}
-        disclaimer={activeTab === 'proofreading' ? "Note: This tool supports writing improvement and review, not final authorship. Always follow your academic or professional guidelines and seek human review when required." : undefined}
-      />
-      
-      {/* BETA Notice - Centered under title (only for Writing Review tab) */}
-      {activeTab === 'proofreading' && (
-        <div className="max-w-[1920px] mx-auto px-4 pt-2 pb-2 flex justify-center">
-          <div className="text-red-400 text-base md:text-lg font-semibold flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-950/20 border border-red-500/30">
-            <span className="text-xl md:text-2xl">🛠️</span>
-            <div className="flex flex-col gap-0.5">
-              <span className="font-semibold">Writing Review is currently in BETA</span>
-              <span className="text-sm font-normal text-red-300/80">This feature is under active development. Some tools may be unstable or incomplete.</span>
+    <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 relative overflow-hidden">
+      {/* Background glows - match CV Builder */}
+      <div className="pointer-events-none absolute -top-40 -left-24 h-72 w-72 rounded-full bg-violet-600/30 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-fuchsia-500/25 blur-3xl" />
+
+      <main className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10">
+        {/* Header: vertical order to match CV Builder (Back → Title → BETA → Note top-right) */}
+        <header className="mb-2 pb-2 border-b border-slate-800/60" data-no-translate>
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard')}
+              className="inline-flex items-center gap-1.5 text-xs md:text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors w-fit"
+            >
+              <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
+              Back to Dashboard
+            </button>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <h1 className="text-2xl md:text-3xl font-semibold text-slate-50 m-0 leading-tight">
+                {activeTab === 'proofreading' ? 'Writing Review Workspace' : 'Email Builder'}
+              </h1>
+              {activeTab === 'proofreading' && (
+                <p className="text-xs text-slate-400/90 leading-tight m-0 sm:text-right max-w-md">
+                  This tool supports writing improvement and review, not final authorship. Follow your guidelines and seek human review when required.
+                </p>
+              )}
             </div>
+            {activeTab === 'proofreading' && (
+              <div className="flex justify-center pt-1">
+                <span className="inline-block text-[11px] md:text-xs text-red-400/80 leading-tight py-1 px-2 rounded border border-red-500/25 bg-red-950/10" title="Writing Review is currently in BETA. This feature is under active development.">
+                  Writing Review is currently in BETA
+                </span>
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* Tab Navigation */}
+        <div className="mt-4">
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setActiveTab('proofreading')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition",
+                activeTab === 'proofreading'
+                  ? "bg-violet-600 text-white"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+              )}
+            >
+              Writing Review
+            </button>
+            <button
+              onClick={() => setActiveTab('email')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition",
+                activeTab === 'email'
+                  ? "bg-violet-600 text-white"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+              )}
+            >
+              Email Builder
+            </button>
           </div>
         </div>
-      )}
-      
-      {/* Tab Navigation */}
-      <div className="max-w-[1920px] mx-auto px-4 pt-4">
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab('proofreading')}
-            className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition",
-              activeTab === 'proofreading'
-                ? "bg-violet-600 text-white"
-                : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-            )}
-          >
-            Writing Review
-          </button>
-          <button
-            onClick={() => setActiveTab('email')}
-            className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition",
-              activeTab === 'email'
-                ? "bg-violet-600 text-white"
-                : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-            )}
-          >
-            Email Builder
-          </button>
-        </div>
-      </div>
-      
-      <div className="max-w-[1920px] mx-auto px-4 pb-6">
+
+        <div className="pb-4">
         {activeTab === 'proofreading' ? (
-          <div className="grid grid-cols-12 gap-4 h-[calc(100vh-8rem)]">
+          <div className="grid grid-cols-12 gap-4 h-[calc(100vh-12rem)] md:h-[calc(100vh-11rem)]">
             {/* LEFT COLUMN: Project List */}
-          <div className="col-span-3 flex flex-col bg-slate-900/80 rounded-xl border border-slate-800/60 overflow-hidden">
+          <div className="col-span-3 flex flex-col rounded-2xl border border-slate-700/60 bg-slate-950/70 overflow-hidden">
             <div className="p-4 border-b border-slate-800/60">
               <h2 className="text-lg font-semibold text-slate-50 mb-3">Projects</h2>
               
               {/* New Project Button - Always Visible */}
               <button
-                onClick={() => setShowNewProjectForm(!showNewProjectForm)}
+                onClick={() => {
+                  if (!showNewProjectForm && !ENABLE_PHD_MODE) setNewProjectCategory('general')
+                  setShowNewProjectForm(!showNewProjectForm)
+                }}
                 data-jaz-action="pr_new_project"
                 className="w-full px-3 py-2 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-600/30 rounded-lg text-violet-300 text-sm font-medium transition flex items-center justify-center gap-2"
               >
@@ -1519,18 +2105,20 @@ export default function ProofreadingPage() {
                       >
                         Academic – Standard
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setNewProjectCategory('academic_research_phd')}
-                        className={cn(
-                          "h-9 px-3 py-2 rounded-xl text-sm font-medium transition-colors duration-150",
-                          newProjectCategory === 'academic_research_phd'
-                            ? "bg-violet-600/60 border border-violet-300/20 text-white"
-                            : "bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10"
-                        )}
-                      >
-                        Academic – Research / PhD
-                      </button>
+                      {ENABLE_PHD_MODE && (
+                        <button
+                          type="button"
+                          onClick={() => setNewProjectCategory('academic_research_phd')}
+                          className={cn(
+                            "h-9 px-3 py-2 rounded-xl text-sm font-medium transition-colors duration-150",
+                            newProjectCategory === 'academic_research_phd'
+                              ? "bg-violet-600/60 border border-violet-300/20 text-white"
+                              : "bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10"
+                          )}
+                        >
+                          Academic – Research / PhD
+                        </button>
+                      )}
                     </div>
                     <p className="text-xs text-slate-400 px-1">
                       Choose a category to set the analysis rules.
@@ -1563,7 +2151,7 @@ export default function ProofreadingPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {projects.map((project) => (
+              {projectsToShow.map((project) => (
                 <button
                   key={project.id}
                   onClick={() => handleProjectChange(project.id)}
@@ -1600,7 +2188,7 @@ export default function ProofreadingPage() {
                 </button>
               ))}
               
-              {projects.length === 0 && (
+              {projectsToShow.length === 0 && (
                 <div className="text-center py-8 text-slate-400 text-sm">
                   No projects yet. Create one to get started.
                 </div>
@@ -1609,7 +2197,7 @@ export default function ProofreadingPage() {
           </div>
 
           {/* CENTER COLUMN: Document Editor */}
-          <div className="col-span-6 flex flex-col bg-slate-900/80 rounded-xl border border-slate-800/60 overflow-hidden min-h-0">
+          <div className="col-span-6 flex flex-col rounded-2xl border border-slate-700/60 bg-slate-950/70 overflow-hidden min-h-0">
             <div className="p-4 border-b border-slate-800/60 flex-shrink-0">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-slate-50">
@@ -1768,10 +2356,75 @@ export default function ProofreadingPage() {
               )}
             </div>
 
-            {/* Editor Area - Always show when project is selected */}
+            {/* Editor Area - or AI Proofread side-by-side when result is present (only if LLM feature enabled) */}
             {activeProjectId ? (
               <div className="flex-1 min-h-0 flex flex-col">
-                {isLoadingDocument ? (
+                {ENABLE_LLM_PROOFREAD && aiProofreadResult ? (
+                  /* AI Proofread: Original | Corrected | Improved — full-text replace only */
+                  <div className="flex-1 flex flex-col min-h-0 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-slate-300">AI Proofread — Compare and replace</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400">Confidence: {aiProofreadResult.confidence_score}%</span>
+                        <button
+                          onClick={() => { setAiProofreadResult(null); setAiProofreadOriginal('') }}
+                          className="px-2 py-1 rounded text-xs bg-slate-700 hover:bg-slate-600 text-slate-300"
+                        >
+                          Back to edit
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 min-h-0">
+                      <div className="flex flex-col rounded-lg border border-slate-700 bg-slate-800/60 overflow-hidden">
+                        <div className="px-3 py-2 border-b border-slate-700 text-xs font-semibold text-slate-400">Original</div>
+                        <div className="flex-1 overflow-y-auto p-4 text-sm text-slate-200 whitespace-pre-wrap break-words">{aiProofreadOriginal}</div>
+                      </div>
+                      <div className="flex flex-col rounded-lg border border-slate-700 bg-slate-800/60 overflow-hidden">
+                        <div className="px-3 py-2 border-b border-slate-700 text-xs font-semibold text-emerald-400">Corrected</div>
+                        <div className="flex-1 overflow-y-auto p-4 text-sm text-slate-200 whitespace-pre-wrap break-words">{aiProofreadResult.corrected_text}</div>
+                        <div className="p-3 border-t border-slate-700">
+                          <button
+                            onClick={() => applyAiProofreadVersion('corrected_text')}
+                            className="w-full px-3 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white"
+                          >
+                            Replace with Corrected
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col rounded-lg border border-slate-700 bg-slate-800/60 overflow-hidden">
+                        <div className="px-3 py-2 border-b border-slate-700 text-xs font-semibold text-violet-400">Improved</div>
+                        <div className="flex-1 overflow-y-auto p-4 text-sm text-slate-200 whitespace-pre-wrap break-words">{aiProofreadResult.improved_text}</div>
+                        <div className="p-3 border-t border-slate-700">
+                          <button
+                            onClick={() => applyAiProofreadVersion('improved_text')}
+                            className="w-full px-3 py-2 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-700 text-white"
+                          >
+                            Replace with Improved
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    {aiProofreadResult.issues.length > 0 && (
+                      <details className="mt-4 rounded-lg border border-slate-700 bg-slate-800/40 overflow-hidden">
+                        <summary className="px-4 py-2 cursor-pointer text-sm font-medium text-slate-300 hover:bg-slate-800/60">
+                          Issues ({aiProofreadResult.issues.length})
+                        </summary>
+                        <div className="max-h-48 overflow-y-auto p-4 space-y-2">
+                          {aiProofreadResult.issues.map((item, idx) => (
+                            <div key={idx} className="text-xs border-b border-slate-700/60 pb-2 last:border-0">
+                              <span className="inline-block px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 capitalize">{item.type}</span>
+                              <span className="text-slate-400 mx-1">—</span>
+                              <span className="text-red-300/90 line-through">{item.original}</span>
+                              <span className="text-slate-400 mx-1">→</span>
+                              <span className="text-emerald-300/90">{item.correction}</span>
+                              {item.explanation && <p className="text-slate-500 mt-1">{item.explanation}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                ) : isLoadingDocument ? (
                   <div className="flex-1 flex items-center justify-center">
                     <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
                   </div>
@@ -1870,7 +2523,7 @@ export default function ProofreadingPage() {
           </div>
 
           {/* RIGHT COLUMN: Analysis Panel */}
-          <div className="col-span-3 flex flex-col bg-slate-900/80 rounded-xl border border-slate-800/60 overflow-hidden">
+          <div className="col-span-3 flex flex-col rounded-2xl border border-slate-700/60 bg-slate-950/70 overflow-hidden">
             <div className="p-4 border-b border-slate-800/60 flex-shrink-0">
               <h3 className="text-lg font-semibold text-slate-50 mb-3">Analysis</h3>
               
@@ -1904,6 +2557,87 @@ export default function ProofreadingPage() {
                   {activePageContent.trim().length === 0 ? 'Type to analyze.' : 'Run analysis to detect issues.'}
                 </p>
               </div>
+
+              {/* Auto-Fix (Iterative) — General only; Apply All — General + Academic (Strict for PhD) */}
+              {(isGeneralMode() || isAcademicProject(activeProjectId)) && (
+                <div className="mb-3 space-y-2">
+                  {isGeneralMode() && (
+                    <button
+                      onClick={runAutoFixLoop}
+                      disabled={isAnalyzing || isApplyingAll || isAutoFixRunning || !(pages[activePageIndex]?.content?.trim())}
+                      className={cn(
+                        "w-full px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2",
+                        !isAnalyzing && !isApplyingAll && !isAutoFixRunning && pages[activePageIndex]?.content?.trim()
+                          ? "bg-emerald-600/90 hover:bg-emerald-600 text-white"
+                          : "bg-slate-700 cursor-not-allowed opacity-50 text-slate-400"
+                      )}
+                    >
+                      {isAutoFixRunning ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Pass {autoFixPass}/{MAX_AUTO_FIX_PASSES}
+                          {autoFixRemaining != null && ` · ${autoFixRemaining} left`}
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          Auto-Fix (Iterative)
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {issueCounts.open > 0 && !isAutoFixRunning && (
+                    <button
+                      onClick={applyAllIssues}
+                      disabled={isAnalyzing || isApplyingAll}
+                      className={cn(
+                        "w-full px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2",
+                        !isAnalyzing && !isApplyingAll
+                          ? "bg-green-600/90 hover:bg-green-600 text-white"
+                          : "bg-slate-700 cursor-not-allowed opacity-50 text-slate-400"
+                      )}
+                      title={getAnalysisMode() === 'academic_research' ? 'Apply all safe corrections, then re-run full validation' : undefined}
+                    >
+                      {isApplyingAll ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Applying all…
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          {getAnalysisMode() === 'academic_research' ? `Apply All (Strict) (${issueCounts.open})` : `Apply All (${issueCounts.open})`}
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {ENABLE_LLM_PROOFREAD && isGeneralMode() && (
+                    <button
+                      onClick={runAiProofread}
+                      disabled={aiProofreadLoading || !(pages[activePageIndex]?.content?.trim())}
+                      className={cn(
+                        "w-full px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2",
+                        !aiProofreadLoading && pages[activePageIndex]?.content?.trim()
+                          ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                          : "bg-slate-700 cursor-not-allowed opacity-50 text-slate-400"
+                      )}
+                      title="AI-powered proofreading: correct + improve full text (no partial patches)"
+                    >
+                      {aiProofreadLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          AI Proofreading…
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-4 h-4" />
+                          AI Proofread (LLM)
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
               
               {/* Issue Filter Tabs */}
               <div className="flex gap-1" data-jaz-action="pr_issues_panel">
@@ -1951,13 +2685,27 @@ export default function ProofreadingPage() {
                               "inline-block w-2 h-2 rounded-full flex-shrink-0",
                               issue.type === 'spelling' && "bg-red-400",
                               issue.type === 'grammar' && "bg-blue-400",
+                              issue.type === 'research_grammar' && "bg-blue-400",
                               issue.type === 'style' && "bg-amber-400",
                               issue.type === 'clarity' && "bg-emerald-400",
                               issue.type === 'word_form' && "bg-cyan-400",
                               issue.type === 'tense' && "bg-orange-400",
+                              issue.type === 'tense_consistency' && "bg-violet-400",
                               issue.type === 'repetition' && "bg-rose-400",
+                              issue.type === 'structure' && "bg-pink-400",
+                              issue.type === 'methodology' && "bg-pink-400",
                               issue.type === 'preposition' && "bg-teal-400",
-                              !['spelling','grammar','style','clarity','word_form','tense','repetition','preposition'].includes(issue.type) && "bg-violet-400"
+                              issue.type === 'agreement' && "bg-emerald-500",
+                              issue.type === 'article' && "bg-amber-400",
+                              issue.type === 'uncountable' && "bg-cyan-400",
+                              issue.type === 'academic_hedging' && "bg-orange-400",
+                              issue.type === 'academic_citation' && "bg-yellow-400",
+                              issue.type === 'academic_tone' && "bg-violet-400",
+                              issue.type === 'academic_objectivity' && "bg-violet-400",
+                              issue.type === 'academic_style' && "bg-amber-400",
+                              issue.type === 'academic_logic' && "bg-pink-400",
+                              issue.type === 'punctuation' && "bg-teal-400",
+                              !['spelling','grammar','research_grammar','style','clarity','word_form','tense','tense_consistency','repetition','structure','methodology','preposition','agreement','article','uncountable','academic_hedging','academic_citation','academic_tone','academic_objectivity','academic_style','academic_logic','punctuation'].includes(issue.type) && "bg-violet-400"
                             )}
                             title={issue.type}
                           />
@@ -1995,16 +2743,30 @@ export default function ProofreadingPage() {
                       <div className="flex gap-2 mt-2">
                         <button
                           onClick={() => applyIssue(issue)}
-                          disabled={!(issue.suggestion_text?.trim() || issue.type === 'repetition' || issue.action === 'delete')}
+                          disabled={
+                            isApplyingAll ||
+                            isAutoFixRunning ||
+                            applyingIssueId !== null ||
+                            !(issue.suggestion_text?.trim() || issue.type === 'repetition' || issue.action === 'delete')
+                          }
                           className={cn(
                             "flex-1 px-2 py-1 rounded text-xs font-medium transition flex items-center justify-center gap-1",
-                            (issue.suggestion_text?.trim() || issue.type === 'repetition' || issue.action === 'delete')
+                            (issue.suggestion_text?.trim() || issue.type === 'repetition' || issue.action === 'delete') && !applyingIssueId && !isApplyingAll && !isAutoFixRunning
                               ? "bg-green-600 hover:bg-green-700"
                               : "bg-slate-600 cursor-not-allowed opacity-60"
                           )}
                         >
-                          <Check className="w-3 h-3" />
-                          Apply
+                          {applyingIssueId === issue.id ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Applying…
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-3 h-3" />
+                              Apply
+                            </>
+                          )}
                         </button>
                         <button
                           onClick={() => rejectIssue(issue)}
@@ -2072,10 +2834,10 @@ export default function ProofreadingPage() {
             copyEmailToClipboard={copyEmailToClipboard}
           />
         )}
-      </div>
+        </div>
 
-      {/* Delete Project Confirmation Dialog */}
-      <ConfirmModal
+        {/* Delete Project Confirmation Dialog */}
+        <ConfirmModal
         isOpen={isDeleteDialogOpen}
         title="Delete project?"
         message="This will permanently delete this project and all its documents. This action cannot be undone."
@@ -2091,6 +2853,7 @@ export default function ProofreadingPage() {
         variant="danger"
         confirmText="Delete"
       />
+      </main>
     </div>
   )
 }
@@ -2189,7 +2952,7 @@ function EmailBuilderContent({
   return (
     <div className="grid grid-cols-12 gap-4 h-[calc(100vh-8rem)]">
       {/* LEFT COLUMN: Email Projects */}
-      <div className="col-span-3 flex flex-col bg-slate-900/80 rounded-xl border border-slate-800/60 overflow-hidden">
+      <div className="col-span-3 flex flex-col rounded-2xl border border-slate-700/60 bg-slate-950/70 overflow-hidden">
         <div className="p-4 border-b border-slate-800/60">
           <h2 className="text-lg font-semibold text-slate-50 mb-3">Email Projects</h2>
           
@@ -2275,7 +3038,7 @@ function EmailBuilderContent({
       </div>
 
       {/* MIDDLE COLUMN: Email Editor */}
-      <div className="col-span-6 flex flex-col bg-slate-900/80 rounded-xl border border-slate-800/60 overflow-hidden">
+      <div className="col-span-6 flex flex-col rounded-2xl border border-slate-700/60 bg-slate-950/70 overflow-hidden">
         <div className="p-4 border-b border-slate-800/60">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-slate-50">
@@ -2526,7 +3289,7 @@ function EmailBuilderContent({
       </div>
 
       {/* RIGHT COLUMN: Actions & Analysis */}
-      <div className="col-span-3 flex flex-col bg-slate-900/80 rounded-xl border border-slate-800/60 overflow-hidden">
+      <div className="col-span-3 flex flex-col rounded-2xl border border-slate-700/60 bg-slate-950/70 overflow-hidden">
         <div className="p-4 border-b border-slate-800/60">
           <h3 className="text-lg font-semibold text-slate-50 mb-3">Actions</h3>
           

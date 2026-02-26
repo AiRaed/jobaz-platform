@@ -17,9 +17,10 @@ type Props = {
   horizontalLayout?: boolean // if true, uses 2-column layout with disclaimer on right
   disclaimer?: string // disclaimer text to show on right side of header
   notice?: string // notice text to show on right side of header (smaller, for beta/under development)
+  compact?: boolean // if true, reduces padding and title size (e.g. Writing Review page)
 }
 
-export default function PageHeader({ title, subtitle, showBackToDashboard = true, showBackToJobFinder = false, showBackToAllPaths = false, showBackToCareerAssistant = false, caSessionId, jobId, mode, from, horizontalLayout = false, disclaimer, notice }: Props) {
+export default function PageHeader({ title, subtitle, showBackToDashboard = true, showBackToJobFinder = false, showBackToAllPaths = false, showBackToCareerAssistant = false, caSessionId, jobId, mode, from, horizontalLayout = false, disclaimer, notice, compact = false }: Props) {
   const router = useRouter()
 
   const handleBackToJobDetails = () => {
@@ -35,19 +36,19 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
   }
 
   const backButtonClass = horizontalLayout 
-    ? "inline-flex items-center gap-1.5 text-sm md:text-base font-medium text-slate-300 hover:text-slate-100 transition-colors mb-2" 
+    ? (compact ? "inline-flex items-center gap-1.5 text-xs md:text-sm font-medium text-slate-300 hover:text-slate-100 transition-colors mb-0.5" : "inline-flex items-center gap-1.5 text-sm md:text-base font-medium text-slate-300 hover:text-slate-100 transition-colors mb-2")
     : "hover:text-slate-100 transition"
 
   return (
-    <header className="mb-2 pb-2 border-b border-slate-800/60" data-no-translate>
+    <header className={compact ? 'mb-1 pb-1 border-b border-slate-800/60' : 'mb-2 pb-2 border-b border-slate-800/60'} data-no-translate>
       {horizontalLayout ? (
         // 2-column layout: LEFT (title block), RIGHT (disclaimer)
         <div className="max-w-[1920px] mx-auto px-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
+          <div className={compact ? 'flex flex-col md:flex-row md:items-center md:justify-between gap-1 md:gap-2' : 'flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4'}>
             {/* LEFT: Title block with back button */}
             <div className="flex-1 min-w-0">
               {(showBackToDashboard !== false || showBackToJobFinder || showBackToAllPaths || showBackToCareerAssistant || jobId) && (
-                <div className="mb-1">
+                <div className={compact ? 'mb-0.5' : 'mb-1'}>
                   {showBackToCareerAssistant && (
                     <button
                       type="button"
@@ -100,11 +101,11 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
                   )}
                 </div>
               )}
-              <h1 className="text-2xl md:text-3xl font-semibold text-slate-50 m-0">
+              <h1 className={compact ? 'text-xl md:text-2xl font-semibold text-slate-50 m-0 leading-tight' : 'text-2xl md:text-3xl font-semibold text-slate-50 m-0'}>
                 {title}
               </h1>
               {subtitle && (
-                <p className="mt-1 text-xs md:text-sm text-slate-400 m-0">
+                <p className={compact ? 'mt-0.5 text-xs text-slate-400 m-0 leading-tight' : 'mt-1 text-xs md:text-sm text-slate-400 m-0'}>
                   {subtitle}
                 </p>
               )}
@@ -112,7 +113,7 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
             
             {/* RIGHT: Disclaimer and/or Notice */}
             {(disclaimer || notice) && (
-              <div className="md:flex-shrink-0 md:max-w-md md:min-w-0 md:pl-4 flex flex-col gap-1.5">
+              <div className={compact ? 'md:flex-shrink-0 md:max-w-md md:min-w-0 md:pl-4 flex flex-col gap-0.5' : 'md:flex-shrink-0 md:max-w-md md:min-w-0 md:pl-4 flex flex-col gap-1.5'}>
                 {notice && (
                   <p className="text-[11px] md:text-xs text-slate-400 leading-tight m-0 px-2 md:px-0">
                     {notice}
@@ -129,9 +130,9 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
         </div>
       ) : (
         // Vertical layout: back button above title (original layout)
-        <div className="flex flex-col gap-1">
+        <div className={compact ? 'flex flex-col gap-0.5' : 'flex flex-col gap-1'}>
           {(showBackToDashboard !== false || showBackToJobFinder || showBackToAllPaths || showBackToCareerAssistant || jobId) && (
-            <div className="flex items-center gap-4 text-xs md:text-sm text-slate-400 mb-3">
+            <div className={compact ? 'flex items-center gap-4 text-xs text-slate-400 mb-1' : 'flex items-center gap-4 text-xs md:text-sm text-slate-400 mb-3'}>
               {showBackToCareerAssistant && (
                 <button
                   type="button"
@@ -179,16 +180,16 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
               )}
             </div>
           )}
-          <h1 className="text-2xl md:text-3xl font-semibold text-slate-50 m-0">
+          <h1 className={compact ? 'text-xl md:text-2xl font-semibold text-slate-50 m-0 leading-tight' : 'text-2xl md:text-3xl font-semibold text-slate-50 m-0'}>
             {title}
           </h1>
           {disclaimer && (
-            <p className="mt-1.5 text-xs text-slate-500 m-0">
+            <p className={compact ? 'mt-0.5 text-xs text-slate-500 m-0 leading-tight' : 'mt-1.5 text-xs text-slate-500 m-0'}>
               {disclaimer}
             </p>
           )}
           {subtitle && (
-            <p className="mt-1 text-xs md:text-sm text-slate-400 m-0">
+            <p className={compact ? 'mt-0.5 text-xs text-slate-400 m-0 leading-tight' : 'mt-1 text-xs md:text-sm text-slate-400 m-0'}>
               {subtitle}
             </p>
           )}

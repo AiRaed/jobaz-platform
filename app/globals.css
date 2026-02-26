@@ -2306,3 +2306,54 @@ h1, h2, h3, h4, h5, h6 {
   background-color: rgba(20, 184, 166, 0.25); /* light teal */
   text-decoration: none;
 }
+
+/* Academic Research / PhD Strict – category colors */
+.pf-mark.pf-mark--agreement {
+  background-color: rgba(34, 197, 94, 0.3); /* green */
+  text-decoration: none;
+}
+.pf-mark.pf-mark--academic_hedging {
+  background-color: rgba(251, 146, 60, 0.3); /* orange */
+  text-decoration: none;
+}
+.pf-mark.pf-mark--tense_consistency {
+  background-color: rgba(168, 85, 247, 0.3); /* purple */
+  text-decoration: none;
+}
+.pf-mark.pf-mark--structure,
+.pf-mark.pf-mark--methodology {
+  background-color: rgba(236, 72, 153, 0.25); /* pink */
+  text-decoration: none;
+}
+.pf-mark.pf-mark--academic_citation {
+  background-color: rgba(234, 179, 8, 0.35); /* yellow */
+  text-decoration: none;
+}
+.pf-mark.pf-mark--research_grammar {
+  background-color: rgba(59, 130, 246, 0.25); /* blue – same as grammar */
+  text-decoration: none;
+}
+.pf-mark.pf-mark--academic_objectivity {
+  background-color: rgba(168, 85, 247, 0.25);
+  text-decoration: none;
+}
+.pf-mark.pf-mark--uncountable {
+  background-color: rgba(6, 182, 212, 0.25);
+  text-decoration: none;
+}
+.pf-mark.pf-mark--article {
+  background-color: rgba(234, 179, 8, 0.25);
+  text-decoration: none;
+}
+.pf-mark.pf-mark--punctuation {
+  background-color: rgba(20, 184, 166, 0.25);
+  text-decoration: none;
+}
+.pf-mark.pf-mark--academic_logic {
+  background-color: rgba(236, 72, 153, 0.2);
+  text-decoration: none;
+}
+.pf-mark.pf-mark--academic_style {
+  background-color: rgba(234, 179, 8, 0.2);
+  text-decoration: none;
+}

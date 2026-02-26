@@ -12,36 +12,27 @@ declare global {
 const MAX_GTAG_WAIT_MS = 5000
 const GTAG_POLL_MS = 100
 
+/** Sends page_view events only; does not load or reinitialize GA. */
 export default function GA4PageView({ measurementId }: { measurementId: string }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
   useEffect(() => {
     const qs = searchParams?.toString()
-    const pagePath = qs ? `${pathname}?${qs}` : pathname
+    const url = qs ? `${pathname}?${qs}` : pathname
 
-    const sendPageView = (): boolean => {
+    const send = (): boolean => {
       if (typeof window === 'undefined' || !window.gtag) return false
-      window.gtag('event', 'page_view', {
-        page_path: pagePath,
-        page_location: window.location.href,
-        page_title: document.title,
-        send_to: measurementId,
-      })
+      window.gtag('event', 'page_view', { page_path: url })
       return true
     }
 
-    if (sendPageView()) return
-
+    if (send()) return
     const deadline = Date.now() + MAX_GTAG_WAIT_MS
     const pollId = setInterval(() => {
-      if (Date.now() > deadline) {
-        clearInterval(pollId)
-        return
-      }
-      if (sendPageView()) clearInterval(pollId)
+      if (Date.now() > deadline) clearInterval(pollId)
+      else if (send()) clearInterval(pollId)
     }, GTAG_POLL_MS)
-
     return () => clearInterval(pollId)
   }, [pathname, searchParams, measurementId])
 

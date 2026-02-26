@@ -22,7 +22,7 @@ export default function GA4PageView({ measurementId }: { measurementId: string }
     const url = qs ? `${pathname}?${qs}` : pathname
 
     const send = (): boolean => {
-      if (typeof window === 'undefined' || !window.gtag) return false
+      if (typeof window === 'undefined' || typeof window.gtag !== 'function') return false
       window.gtag('event', 'page_view', { page_path: url })
       return true
     }

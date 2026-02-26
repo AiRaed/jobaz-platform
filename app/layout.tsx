@@ -1,16 +1,11 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import Script from 'next/script'
 import './globals.css'
 import ClientProviders from './client-providers'
-import GA4PageView from './components/GA4PageView'
 
 const inter = Inter({ subsets: ['latin'] })
 
 const appUrl = 'https://jobaz.io'
-const GA_MEASUREMENT_ID = 'G-XYH878PXVQ'
-/** Single GA4 script URL – must be absolute so the browser never requests /js?id=... from our domain */
-const GA_GTAG_SCRIPT_URL = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -97,42 +92,43 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#7C3AED" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
 
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-XYH878PXVQ"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        window.gtag = gtag;
+        gtag('js', new Date());
+        gtag('config', 'G-XYH878PXVQ');
+      `,
+          }}
+        />
+
         {/* Structured Data – Build Your Path */}
-        <Script id="jobaz-structured-data" type="application/ld+json" strategy="afterInteractive">
-          {JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'WebSite',
-            name: 'JobAZ',
-            url: appUrl,
-            description:
-              'AI-powered platform to build CVs, explore career paths with Build Your Path, find jobs, and prepare for interviews.',
-            potentialAction: {
-              '@type': 'SearchAction',
-              target: `${appUrl}/build-your-path`,
-              'query-input': 'required name=search_term_string',
-            },
-          })}
-        </Script>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebSite',
+              name: 'JobAZ',
+              url: appUrl,
+              description:
+                'AI-powered platform to build CVs, explore career paths with Build Your Path, find jobs, and prepare for interviews.',
+              potentialAction: {
+                '@type': 'SearchAction',
+                target: `${appUrl}/build-your-path`,
+                'query-input': 'required name=search_term_string',
+              },
+            }),
+          }}
+        />
       </head>
 
       <body
         className={`${inter.className} transition-colors duration-300 bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 min-h-screen`}
       >
-        {/* GA4 – single code-based implementation; only source of gtag.js */}
-        <Script src={GA_GTAG_SCRIPT_URL} strategy="afterInteractive" />
-        <Script id="ga4-init" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            window.gtag = gtag;
-            gtag('js', new Date());
-            gtag('config', '${GA_MEASUREMENT_ID}');
-          `}
-        </Script>
-
-        {/* Page-view only; does not load any script */}
-        <GA4PageView measurementId={GA_MEASUREMENT_ID} />
-
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>

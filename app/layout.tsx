@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import ClientProviders from './client-providers'
@@ -99,23 +100,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#7C3AED" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
 
-        {/* GA4 */}
-        <script
-          async
-          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-        ></script>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              window.gtag = gtag;
-              gtag('js', new Date());
-              gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: true });
-            `,
-          }}
-        />
-
         {/* Structured Data – WebSite */}
         <script
           type="application/ld+json"
@@ -140,6 +124,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${inter.className} transition-colors duration-300 bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 min-h-screen`}
       >
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-PDGHSSX1XK"
+          strategy="afterInteractive"
+        />
+        <Script id="ga4-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            window.gtag = gtag;
+            gtag('js', new Date());
+            gtag('config', 'G-PDGHSSX1XK', { send_page_view: false });
+            function sendPV(){ gtag('event','page_view',{page_location: location.href, page_path: location.pathname + location.search, page_title: document.title}); }
+            sendPV();
+            var _push = history.pushState;
+            history.pushState = function(){ _push.apply(this, arguments); sendPV(); };
+            var _rep = history.replaceState;
+            history.replaceState = function(){ _rep.apply(this, arguments); sendPV(); };
+            window.addEventListener('popstate', sendPV);
+          `}
+        </Script>
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>

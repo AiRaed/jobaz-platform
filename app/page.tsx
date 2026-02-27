@@ -182,11 +182,11 @@ export default function LandingPage() {
               }}
             />
             <span className="bg-gradient-to-r from-[#D9C8FF] to-[#BCA8FF] bg-clip-text text-transparent relative z-10">
-              CVs, jobs, cover letters, and interviews — all in one place.
+              JobAZ — Your AI Career Assistant
             </span>
           </h1>
           <p className="text-xl md:text-2xl text-gray-300/80 mb-8 leading-relaxed max-w-3xl mx-auto">
-            Build your CV with AI, find matching jobs, tailor each application, and prepare for interviews — guided by JAZ. Not ready to apply yet? Use Build Your Path to explore career routes and become job-ready. Simple, accessible, and multilingual.
+            Build your CV with AI, find matching jobs, tailor applications automatically, practice interviews, explore career paths, improve your writing, and get multilingual support — all guided by JAZ, your intelligent career assistant.
           </p>
           
           {/* AI Dashboard Strip */}
@@ -351,14 +351,46 @@ export default function LandingPage() {
       </section>
 
 
-      {/* AI Assistant Section (JAZ) */}
+      {/* What is JobAZ? */}
       <section className="max-w-5xl mx-auto px-4 py-20">
         <h2 className="text-4xl md:text-5xl font-heading font-bold text-center mb-6 text-white">
-          Meet JAZ — your AI job search assistant
+          What is JobAZ?
         </h2>
-        <p className="text-center text-xl text-gray-300/80 max-w-3xl mx-auto">
-          JAZ is your AI assistant, helping you improve your CV, prepare for interviews, and use the platform in your preferred language.
+        <p className="text-center text-xl text-gray-300/80 max-w-3xl mx-auto mb-10">
+          JobAZ is a complete AI career assistant designed to support you at every step of your job journey.
         </p>
+        <div className="max-w-3xl mx-auto">
+          <ul className="space-y-4 text-lg">
+            <li className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
+              <span className="text-gray-300/80">Create and optimize your CV</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
+              <span className="text-gray-300/80">Tailor your CV to job descriptions</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
+              <span className="text-gray-300/80">Find relevant job opportunities</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
+              <span className="text-gray-300/80">Practice interviews with AI (text + voice)</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
+              <span className="text-gray-300/80">Improve your writing with AI Writing Review</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
+              <span className="text-gray-300/80">Translate and refine content in multiple languages</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
+              <span className="text-gray-300/80">Explore realistic career paths and skill routes</span>
+            </li>
+          </ul>
+        </div>
       </section>
 
       {/* Who is JobAZ for Section */}
@@ -371,19 +403,19 @@ export default function LandingPage() {
           <ul className="space-y-4 text-lg">
             <li className="flex items-start gap-3">
               <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
-              <span className="text-gray-300/80">People looking for their first job in the UK</span>
+              <span className="text-gray-300/80">People looking for their first job</span>
             </li>
             <li className="flex items-start gap-3">
               <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
-              <span className="text-gray-300/80">Career changers who don't know how to present their experience</span>
+              <span className="text-gray-300/80">Career changers who want to present their experience effectively</span>
             </li>
             <li className="flex items-start gap-3">
               <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
-              <span className="text-gray-300/80">Busy people who don't want to waste hours on CV and cover letters</span>
+              <span className="text-gray-300/80">Busy people who want faster applications</span>
             </li>
             <li className="flex items-start gap-3">
               <div className="w-2 h-2 rounded-full bg-[#CBB6FF] flex-shrink-0 mt-2"></div>
-              <span className="text-gray-300/80">Anyone who wants AI guidance from CV to interview</span>
+              <span className="text-gray-300/80">Anyone who wants writing help and multilingual support</span>
             </li>
           </ul>
         </div>
@@ -405,7 +437,7 @@ export default function LandingPage() {
               <h4 className="font-semibold mb-3 text-white">Company</h4>
               <ul className="space-y-2 text-gray-400">
                 <li>
-                  <Link href="#" className="hover:text-violet-300 transition-colors">About</Link>
+                  <Link href="/about" className="hover:text-violet-300 transition-colors">About JobAZ</Link>
                 </li>
                 <li>
                   <span className="hover:text-violet-300 transition-colors">Created by Raed Mahfoud — Independent AI product creator.</span>

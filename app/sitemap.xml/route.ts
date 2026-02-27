@@ -18,6 +18,10 @@ export async function GET() {
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://jobaz.io/about</loc>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://jobaz.io/auth</loc>
     <priority>0.6</priority>
   </url>

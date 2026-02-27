@@ -9,10 +9,17 @@ const appUrl = 'https://jobaz.io'
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
-  title: 'JobAZ – CV, Jobs & Interview Training',
+  title: 'JobAZ — Your AI Career Assistant',
   description:
-    'JobAZ helps you build professional CVs, discover career paths with Build Your Path, find jobs, and prepare for interviews using AI.',
+    'Build your CV with AI, find matching jobs, tailor applications, practice interviews, improve your writing, and get multilingual support — guided by JAZ.',
   keywords: [
+    'AI career assistant',
+    'CV builder',
+    'job finder',
+    'interview practice',
+    'writing review',
+    'proofreading',
+    'multilingual',
     'CV generator',
     'resume builder',
     'AI resume',
@@ -20,7 +27,6 @@ export const metadata: Metadata = {
     'cover letter',
     'professional CV',
     'job search',
-    'interview training',
     'career path',
     'build your path',
     'career guidance',
@@ -44,23 +50,23 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: appUrl,
     siteName: 'JobAZ',
-    title: 'JobAZ – CV, Jobs & Interview Training',
+    title: 'JobAZ — Your AI Career Assistant',
     description:
-      'Build your CV, explore career routes with Build Your Path, find jobs, and get interview-ready with AI.',
+      'Build your CV with AI, find matching jobs, tailor applications, practice interviews, improve your writing, and get multilingual support — guided by JAZ.',
     images: [
       {
         url: `${appUrl}/og-image`,
         width: 1200,
         height: 630,
-        alt: 'JobAZ – Build Your Path & AI Career Tools',
+        alt: 'JobAZ — Your AI Career Assistant',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'JobAZ – CV, Jobs & Interview Training',
+    title: 'JobAZ — Your AI Career Assistant',
     description:
-      'Build CVs, explore career paths, find jobs, and prepare for interviews with AI.',
+      'Build your CV with AI, find jobs, tailor applications, practice interviews, writing review, and multilingual support — guided by JAZ.',
     images: [`${appUrl}/og-image`],
     creator: '@jobaz',
     site: '@jobaz',
@@ -115,7 +121,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               name: 'JobAZ',
               url: appUrl,
               description:
-                'AI-powered platform to build CVs, explore career paths with Build Your Path, find jobs, and prepare for interviews.',
+                'AI career assistant: build CVs, find jobs, tailor applications, practice interviews, writing review, and multilingual support.',
               potentialAction: {
                 '@type': 'SearchAction',
                 target: `${appUrl}/build-your-path`,

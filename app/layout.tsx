@@ -6,6 +6,7 @@ import ClientProviders from './client-providers'
 const inter = Inter({ subsets: ['latin'] })
 
 const appUrl = 'https://jobaz.io'
+const GA_MEASUREMENT_ID = 'G-PDGHSSX1XK'
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -98,20 +99,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#7C3AED" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
 
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-XYH878PXVQ"></script>
+        {/* GA4 */}
+        <script
+          async
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+        ></script>
         <script
           dangerouslySetInnerHTML={{
             __html: `
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        window.gtag = gtag;
-        gtag('js', new Date());
-        gtag('config', 'G-B6F0REFBQR');
-      `,
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              window.gtag = gtag;
+              gtag('js', new Date());
+              gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: true });
+            `,
           }}
         />
 
-        {/* Structured Data – Build Your Path */}
+        {/* Structured Data – WebSite */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { getAiApiErrorMessage } from '@/lib/ai-client-errors'
 import { createPortal } from 'react-dom'
 import { X, Sparkles, Loader2 } from 'lucide-react'
 
@@ -78,7 +79,11 @@ export default function SkillsAIModal({
       const data = await response.json()
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || 'AI request failed')
+        const err = new Error(getAiApiErrorMessage(data, 'AI request failed')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
 
       // Apply the result and close modal

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Sparkles, Loader2, Undo2, X, CheckCircle2, AlertCircle, AlertTriangle, Zap, Check, Copy } from 'lucide-react'
 import { CvData } from '@/app/cv-builder-v2/page'
 import { hasSummaryGrammarOrSpellingIssues } from '@/lib/cv-summary-grammar-detect'
+import { getAiApiErrorMessage, handleAiClientError } from '@/lib/ai-client-errors'
 
 interface SummaryTabProps {
   summary: string
@@ -28,6 +29,7 @@ export default function SummaryTab({ summary, personalInfo, skills, experience, 
   const [qualityCheckLoading, setQualityCheckLoading] = useState(false)
   const [grammarFixLoading, setGrammarFixLoading] = useState(false)
   const [grammarSuccessMessage, setGrammarSuccessMessage] = useState<string>('')
+  const [aiServiceError, setAiServiceError] = useState<string>('')
   
   // Suggestion Card State
   const [suggestedSummary, setSuggestedSummary] = useState<string>('')
@@ -214,11 +216,17 @@ export default function SummaryTab({ summary, personalInfo, skills, experience, 
           setShowKeywordModal(false)
         }
       } else {
-        throw new Error(data.error || 'Failed to generate summary')
+        const err = new Error(getAiApiErrorMessage(data, 'Failed to generate summary')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('AI summary error:', error)
-      alert(error.message || 'Failed to generate summary. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to generate summary. Please try again.')
+      )
     } finally {
       setIsSuggesting(false)
       setAiLoading(null)
@@ -316,11 +324,17 @@ Important: If there are NO grammar or spelling issues, return the EXACT same tex
           setSimilarityWarning(false)
         }
       } else {
-        throw new Error(data.error || 'Failed to check grammar')
+        const err = new Error(getAiApiErrorMessage(data, 'Failed to check grammar')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Grammar check error:', error)
-      alert(error.message || 'Failed to check grammar. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to check grammar. Please try again.')
+      )
     } finally {
       setGrammarFixLoading(false)
       setIsSuggesting(false)
@@ -352,11 +366,17 @@ Important: If there are NO grammar or spelling issues, return the EXACT same tex
         setQualityStatus(data.status || 'good')
         setGrammarIssues(data.hasGrammarIssues || false)
       } else {
-        throw new Error(data.error || 'Failed to check quality')
+        const err = new Error(getAiApiErrorMessage(data, 'Failed to check quality')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Quality check error:', error)
-      alert(error.message || 'Failed to check quality. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to check quality. Please try again.')
+      )
     } finally {
       setQualityCheckLoading(false)
     }
@@ -467,6 +487,13 @@ Important: If there are NO grammar or spelling issues, return the EXACT same tex
           <div className="mt-2 p-2.5 bg-green-950/20 border border-green-500/30 rounded-lg flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
             <span className="text-xs text-green-300">{grammarSuccessMessage}</span>
+          </div>
+        )}
+
+        {aiServiceError && (
+          <div className="mt-2 p-2.5 bg-red-950/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <span className="text-xs text-red-300">{aiServiceError}</span>
           </div>
         )}
 

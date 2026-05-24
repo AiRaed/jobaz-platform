@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Sparkles, Loader2, Target, FileText } from 'lucide-react'
+import { Sparkles, Loader2, Target, FileText, AlertCircle } from 'lucide-react'
 import { CvData } from '@/app/cv-builder-v2/page'
+import { getAiApiErrorMessage, handleAiClientError } from '@/lib/ai-client-errors'
 
 interface JobDescriptionPanelProps {
   cvData: CvData
@@ -28,6 +29,7 @@ export default function JobDescriptionPanel({
     keywords: string[]
     jobLevel: string
   } | null>(null)
+  const [aiServiceError, setAiServiceError] = useState<string>('')
 
   const handleAnalyzeJD = async () => {
     if (!jobDescription.trim()) {
@@ -56,11 +58,17 @@ export default function JobDescriptionPanel({
       if (data.ok && data.analysis) {
         setJdAnalysis(data.analysis)
       } else {
-        throw new Error(data.error || 'Failed to analyze job description')
+        const err = new Error(
+          getAiApiErrorMessage(data, 'Failed to analyze job description')
+        ) as Error & { code?: string }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('JD analysis error:', error)
-      alert(error.message || 'Failed to analyze job description. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to analyze job description. Please try again.')
+      )
     } finally {
       setLoading(null)
       onLoadingChange(false)
@@ -101,11 +109,17 @@ export default function JobDescriptionPanel({
       if (data.ok && data.tailoredSummary) {
         onCvDataUpdate({ summary: data.tailoredSummary })
       } else {
-        throw new Error(data.error || 'Failed to tailor summary')
+        const err = new Error(getAiApiErrorMessage(data, 'Failed to tailor summary')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Tailor summary error:', error)
-      alert(error.message || 'Failed to tailor summary. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to tailor summary. Please try again.')
+      )
     } finally {
       setLoading(null)
       onLoadingChange(false)
@@ -149,11 +163,17 @@ export default function JobDescriptionPanel({
           throw new Error('Invalid experience data received from server')
         }
       } else {
-        throw new Error(data.error || 'Failed to tailor experience')
+        const err = new Error(getAiApiErrorMessage(data, 'Failed to tailor experience')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Tailor experience error:', error)
-      alert(error.message || 'Failed to tailor experience. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to tailor experience. Please try again.')
+      )
     } finally {
       setLoading(null)
       onLoadingChange(false)
@@ -198,11 +218,17 @@ export default function JobDescriptionPanel({
           alert('No new skills suggested. Your current skills may already cover the job requirements.')
         }
       } else {
-        throw new Error(data.error || 'Failed to suggest skills')
+        const err = new Error(getAiApiErrorMessage(data, 'Failed to suggest skills')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Suggest skills error:', error)
-      alert(error.message || 'Failed to suggest skills. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to suggest skills. Please try again.')
+      )
     } finally {
       setLoading(null)
       onLoadingChange(false)
@@ -217,6 +243,12 @@ export default function JobDescriptionPanel({
       </div>
 
       <div className="space-y-4">
+        {aiServiceError && (
+          <div className="p-2.5 bg-red-950/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <span className="text-xs text-red-300">{aiServiceError}</span>
+          </div>
+        )}
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1.5">Job Description</label>
           <textarea

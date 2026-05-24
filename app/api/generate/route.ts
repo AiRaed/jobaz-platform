@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 import { normalizeSummaryParagraph, stripPlaceholders } from '@/lib/normalize'
 
 export const dynamic = 'force-dynamic'
@@ -68,7 +69,7 @@ OUTPUT FORMAT:
 A single polished paragraph. Return only the paragraph text, nothing else. Write in ${lang}.`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -93,11 +94,8 @@ A single polished paragraph. Return only the paragraph text, nothing else. Write
     console.log('[Generate] result:', response)
 
     return NextResponse.json(response)
-  } catch (error: any) {
-    console.error('Error generating CV:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to generate CV. Please try again.' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to generate CV. Please try again.')
+    return NextResponse.json(body, { status })
   }
 }

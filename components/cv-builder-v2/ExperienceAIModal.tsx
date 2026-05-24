@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, Sparkles, Loader2 } from 'lucide-react'
+import { getAiApiErrorMessage } from '@/lib/ai-client-errors'
 
 export type ExperienceAIMode = 'responsibilities' | 'achievements' | 'both'
 
@@ -54,7 +55,11 @@ export default function ExperienceAIModal({
       const data = await response.json()
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || 'AI request failed')
+        const err = new Error(getAiApiErrorMessage(data, 'AI request failed')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
 
       // Apply the result and close modal

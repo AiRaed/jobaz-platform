@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -176,7 +177,7 @@ Return as three blocks separated by:
 Role/keywords: ${roleKeywords}`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -251,12 +252,9 @@ Each should be maximum 180 words total. Return clean, continuous body text only.
     ]
 
     return NextResponse.json({ ok: true, variants })
-  } catch (error: any) {
-    console.error('Error comparing cover letters:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to compare cover letters. Please try again.' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to compare cover letters. Please try again.')
+    return NextResponse.json(body, { status })
   }
 }
 

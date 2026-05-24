@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: OPENAI_MODEL,
       messages: [
         { role: 'system', content: 'You are a professional translator.' },
         { role: 'user', content: `Translate the following text into natural, professional English. Preserve the meaning and tone:\n\n${text}` }
@@ -30,11 +31,8 @@ export async function POST(req: NextRequest) {
     const content = completion.choices[0]?.message?.content || ''
     
     return NextResponse.json({ content })
-  } catch (error: any) {
-    console.error('AI API error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to translate text' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to translate text')
+    return NextResponse.json(body, { status })
   }
 }

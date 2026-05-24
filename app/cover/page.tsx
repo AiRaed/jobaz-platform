@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils'
 import { useJazContext } from '@/contexts/JazContextContext'
 import type { CoverLetterContext } from '@/components/JazAssistant'
 import { getUserScopedKeySync, getCurrentUserIdSync, initUserStorageCache } from '@/lib/user-storage'
+import { AI_MODEL_UNAVAILABLE_MESSAGE } from '@/lib/openai-model'
+import { isAiModelUnavailableResponse } from '@/lib/ai-client-errors'
 
 type Tab = 'recipient' | 'letter' | 'layout'
 
@@ -475,6 +477,10 @@ export default function CoverPage() {
       try { data = await res.json(); } catch {}
 
       if (!res.ok || !data?.ok) {
+        if (isAiModelUnavailableResponse(data)) {
+          showToast('error', AI_MODEL_UNAVAILABLE_MESSAGE)
+          return
+        }
         showToast('error', 'AI temporarily unavailable. Using a safe draft.')
         // fallback to mock if server ever returns non-ok - use local preview state
         const cleanedText = cleanCoverLetterText(
@@ -537,7 +543,11 @@ export default function CoverPage() {
 
       if (!response.ok || !data.ok) {
         console.error('[AI] request failed')
-        showToast('error', '⚠️ AI request failed')
+        if (isAiModelUnavailableResponse(data)) {
+          showToast('error', AI_MODEL_UNAVAILABLE_MESSAGE)
+        } else {
+          showToast('error', '⚠️ AI request failed')
+        }
         return
       }
 
@@ -598,7 +608,11 @@ export default function CoverPage() {
 
       if (!response.ok || !data.ok) {
         console.error('[AI] request failed')
-        showToast('error', '⚠️ AI request failed')
+        if (isAiModelUnavailableResponse(data)) {
+          showToast('error', AI_MODEL_UNAVAILABLE_MESSAGE)
+        } else {
+          showToast('error', '⚠️ AI request failed')
+        }
         return
       }
 
@@ -666,7 +680,11 @@ export default function CoverPage() {
 
       if (!response.ok || !data.ok) {
         console.error('[AI] request failed')
-        showToast('error', '⚠️ AI request failed')
+        if (isAiModelUnavailableResponse(data)) {
+          showToast('error', AI_MODEL_UNAVAILABLE_MESSAGE)
+        } else {
+          showToast('error', '⚠️ AI request failed')
+        }
         return
       }
 

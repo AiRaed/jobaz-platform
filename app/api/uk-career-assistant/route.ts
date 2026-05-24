@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import {
+  isOpenAIModelNotFoundError,
+  OPENAI_MODEL,
+} from '@/lib/openai-model'
 import { SYSTEM_PROMPT, PATH_MODULES } from '@/lib/uk-career-assistant/prompts'
 import { buildReasons } from '@/lib/uk-career-assistant/reasons'
 import { scoreAllDirections } from '@/lib/uk-career-assistant/scoring'
@@ -3691,7 +3695,7 @@ IMPORTANT: Check state.answers before extracting. If a field is already in state
 
   try {
     const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -3987,10 +3991,8 @@ export async function POST(req: NextRequest) {
     ]
 
     // Call OpenAI with JSON mode (force enabled for reliability)
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini'
-    
     const completion = await openai.chat.completions.create({
-      model,
+      model: OPENAI_MODEL,
       messages,
       temperature: 0.2, // Lower temperature for more consistent JSON
       max_tokens: 2000,
@@ -4205,7 +4207,7 @@ export async function POST(req: NextRequest) {
           ]
           
           const repairCompletion = await openai.chat.completions.create({
-            model,
+            model: OPENAI_MODEL,
             messages: repairMessages,
           temperature: 0.1,
             max_tokens: 2000,
@@ -4901,11 +4903,12 @@ export async function POST(req: NextRequest) {
 
     // Success - return validated response
     return NextResponse.json(parsed)
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Always return fallback on error - never break the chat
-    if (process.env.NODE_ENV === 'development') {
+    if (isOpenAIModelNotFoundError(error)) {
+      console.error('[UK Career Assistant] OpenAI model error:', error)
+    } else if (process.env.NODE_ENV === 'development') {
       console.error('[UK Career Assistant] API error:', error)
-      console.error('[UK Career Assistant] Error details:', error.message || 'Unknown error')
     }
     return NextResponse.json(getFallbackResponse())
   }

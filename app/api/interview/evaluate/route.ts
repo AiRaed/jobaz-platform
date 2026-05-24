@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
     const questionContext = question ? `Interview Question: ${question}` : ''
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -152,12 +153,9 @@ IMPORTANT:
       improvedSampleAnswer: evaluation.improvedSample || evaluation.improvedSampleAnswer || evaluation.improved_answer || '',
       shortTip: Array.isArray(evaluation.tips) && evaluation.tips.length > 0 ? evaluation.tips[0] : (evaluation.shortTip || 'Focus on clarity and providing specific examples.'),
     })
-  } catch (error: any) {
-    console.error('AI Evaluation error:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to evaluate answer' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to evaluate answer')
+    return NextResponse.json(body, { status })
   }
 }
 

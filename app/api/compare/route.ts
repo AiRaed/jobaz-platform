@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
       : `Generate three distinct, high-quality CV sections based on these keywords suitable for UI/UX or front-end developer roles. Write as clean paragraph text only - no headings, no bullets, no labels, no prefixes. Write in English only:\n\n${keywords}`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -82,11 +83,8 @@ Output format: Three clearly separated blocks labeled "A:", "B:", and "C:" follo
     console.log('[Compare] response:', response)
 
     return NextResponse.json(response)
-  } catch (error: any) {
-    console.error('Error comparing content:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to compare content. Please try again.' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to compare content. Please try again.')
+    return NextResponse.json(body, { status })
   }
 }

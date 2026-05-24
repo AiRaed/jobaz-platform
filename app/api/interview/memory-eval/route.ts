@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     let evaluationCompletion
     try {
       evaluationCompletion = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: OPENAI_MODEL,
         messages: [
           {
             role: 'system',
@@ -112,12 +113,12 @@ Evaluate how well they remembered and articulated key ideas across all answers. 
         max_tokens: 2000,
         response_format: { type: 'json_object' },
       })
-    } catch (openaiError: any) {
-      console.error('MEMORY_EVAL_OPENAI_ERROR', openaiError)
-      return NextResponse.json(
-        { error: 'OPENAI_ERROR', message: 'Memory evaluation failed.' },
-        { status: 500 }
+    } catch (openaiError: unknown) {
+      const { body, status } = openAIErrorResponse(
+        openaiError,
+        'Memory evaluation failed.'
       )
+      return NextResponse.json(body, { status })
     }
 
     const evaluationContent = evaluationCompletion.choices[0]?.message?.content

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Trash2, Sparkles, CheckCircle2, Zap, Loader2, X, AlertTriangle, AlertCircle, ThumbsUp } from 'lucide-react'
 import { CvData } from '@/app/cv-builder-v2/page'
 import ExperienceAIModal from './ExperienceAIModal'
+import { getAiApiErrorMessage, handleAiClientError } from '@/lib/ai-client-errors'
 
 interface ExperienceTabProps {
   experience: CvData['experience']
@@ -24,6 +25,7 @@ interface BulletSuggestion {
 
 export default function ExperienceTab({ experience, onUpdate }: ExperienceTabProps) {
   const [openModalIndex, setOpenModalIndex] = useState<number | null>(null)
+  const [aiServiceError, setAiServiceError] = useState<string>('')
   
   // Quality check states per bullet: [expIndex][bulletIndex]
   const [bulletQuality, setBulletQuality] = useState<Record<string, BulletQualityState>>({})
@@ -120,11 +122,17 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
           },
         })
       } else {
-        throw new Error(data.error || 'Failed to check quality')
+        const err = new Error(getAiApiErrorMessage(data, 'Failed to check quality')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Bullet quality check error:', error)
-      alert(error.message || 'Failed to check quality. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to check quality. Please try again.')
+      )
     } finally {
       setCheckingBullet(null)
     }
@@ -164,11 +172,17 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
           },
         })
       } else {
-        throw new Error(data.error || 'Failed to fix grammar')
+        const err = new Error(getAiApiErrorMessage(data, 'Failed to fix grammar')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Bullet grammar fix error:', error)
-      alert(error.message || 'Failed to fix grammar. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to fix grammar. Please try again.')
+      )
     } finally {
       setFixingBullet(null)
     }
@@ -209,11 +223,17 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
           },
         })
       } else {
-        throw new Error(data.error || 'Failed to generate improvement')
+        const err = new Error(
+          getAiApiErrorMessage(data, 'Failed to generate improvement')
+        ) as Error & { code?: string }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Bullet improvement error:', error)
-      alert(error.message || 'Failed to suggest improvement. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to suggest improvement. Please try again.')
+      )
     } finally {
       setImprovingBullet(null)
     }
@@ -306,6 +326,12 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
 
   return (
     <div className="space-y-6">
+      {aiServiceError && (
+        <div className="p-2.5 bg-red-950/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span className="text-xs text-red-300">{aiServiceError}</span>
+        </div>
+      )}
       {experience.map((exp, expIndex) => (
         <div key={exp.id} className="p-4 bg-slate-900/30 rounded-lg border border-slate-700/50">
           <div className="flex justify-between items-start mb-4">

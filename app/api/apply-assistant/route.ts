@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -99,7 +100,7 @@ ${body.job.requirements ? `Requirements: ${body.job.requirements}` : ''}
 Return ONLY valid JSON, no additional text.`
 
     const jobAnalysisResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [{ role: 'user', content: jobAnalysisPrompt }],
       temperature: 0.3,
       response_format: { type: 'json_object' },
@@ -125,7 +126,7 @@ ${cvText}
 Return ONLY valid JSON, no additional text.`
 
     const comparisonResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [{ role: 'user', content: comparisonPrompt }],
       temperature: 0.3,
       response_format: { type: 'json_object' },
@@ -156,7 +157,7 @@ Risks: ${comparison.risks?.join(', ') || 'None'}
 Return ONLY valid JSON, no additional text.`
 
     const fitScoreResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [{ role: 'user', content: fitScorePrompt }],
       temperature: 0.3,
       response_format: { type: 'json_object' },
@@ -188,7 +189,7 @@ User's Skills: ${body.cv.skills.join(', ')}
 Return ONLY the improved summary text, no labels or explanations.`
 
     const improvedSummaryResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [{ role: 'user', content: improvedSummaryPrompt }],
       temperature: 0.7,
       max_tokens: 200,
@@ -214,7 +215,7 @@ Candidate's Skills: ${body.cv.skills.slice(0, 5).join(', ')}
 Write a complete cover letter with greeting and closing. Keep it professional and concise (3-4 paragraphs, approximately 200-250 words).`
 
     const coverLetterResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [{ role: 'user', content: coverLetterPrompt }],
       temperature: 0.7,
       max_tokens: 400,
@@ -236,7 +237,7 @@ Areas to Improve: ${fitScore.weaknesses?.slice(0, 3).join(', ') || 'None'}
 Format as numbered bullets (1. 2. 3. etc.). Be concise and actionable. Maximum 6 bullets total.`
 
     const actionPlanResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [{ role: 'user', content: actionPlanPrompt }],
       temperature: 0.7,
       max_tokens: 300,
@@ -254,15 +255,12 @@ Format as numbered bullets (1. 2. 3. etc.). Be concise and actionable. Maximum 6
     }
 
     return NextResponse.json(response, { status: 200 })
-  } catch (error: any) {
-    console.error('Apply Assistant API Error:', error)
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      },
-      { status: 500 }
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(
+      error,
+      'Failed to process apply assistant request'
     )
+    return NextResponse.json(body, { status })
   }
 }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -52,7 +53,7 @@ Return ONLY the improved bullet point text.
 Do NOT include explanations, headings, or extra formatting.`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -84,12 +85,9 @@ Do NOT include explanations, headings, or extra formatting.`
       improved: cleanedImproved,
     })
 
-  } catch (error: any) {
-    console.error('Bullet improvement error:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to improve bullet point' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to improve bullet point')
+    return NextResponse.json(body, { status })
   }
 }
 

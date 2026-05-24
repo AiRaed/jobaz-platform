@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -143,7 +144,7 @@ ${jobSnippet}${jobKeywords ? `\n${jobKeywords}` : ''}`
       : `Rewrite this cover letter body text. Return ONLY the main paragraph content (no greeting, no closing, no signature).\n\n${FORMATTING_INSTRUCTION}\n\nBody text to rewrite:\n${bodyText}`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -161,12 +162,9 @@ ${jobSnippet}${jobKeywords ? `\n${jobKeywords}` : ''}`
     const content = completion.choices[0]?.message?.content || ''
 
     return NextResponse.json({ ok: true, body: content, letter: content })
-  } catch (error: any) {
-    console.error('Error rewriting cover letter:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to rewrite cover letter. Please try again.' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to rewrite cover letter. Please try again.')
+    return NextResponse.json(body, { status })
   }
 }
 

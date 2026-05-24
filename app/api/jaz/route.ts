@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import {
+  AI_MODEL_UNAVAILABLE_CODE,
+  OPENAI_MODEL,
+  openAIErrorResponse,
+} from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -219,7 +224,7 @@ export async function POST(request: NextRequest) {
 
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages,
       max_tokens: 800,
       temperature: 0.7,
@@ -236,18 +241,33 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(response, { status: 200 })
-  } catch (error: any) {
-    console.error('JAZ API Error:', error)
-    
-    // Return user-friendly error message
-    const errorMessage = error.message || 'Failed to process your request'
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(
+      error,
+      'Failed to process your request'
+    )
+    const payload = body as {
+      error: string
+      code?: string
+    }
     return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        assistantMessage: 'Sorry, I encountered an error processing your request. Please try again in a moment.',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      {
+        error:
+          payload.code === AI_MODEL_UNAVAILABLE_CODE
+            ? payload.error
+            : 'Internal server error',
+        code: payload.code,
+        assistantMessage:
+          payload.code === AI_MODEL_UNAVAILABLE_CODE
+            ? payload.error
+            : 'Sorry, I encountered an error processing your request. Please try again in a moment.',
+        details:
+          process.env.NODE_ENV === 'development' &&
+          payload.code !== AI_MODEL_UNAVAILABLE_CODE
+            ? payload.error
+            : undefined,
       },
-      { status: 500 }
+      { status }
     )
   }
 }

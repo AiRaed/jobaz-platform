@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -71,7 +72,7 @@ Examples of feedback:
 Return ONLY valid JSON, no other text.`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -125,12 +126,9 @@ Return ONLY valid JSON, no other text.`
       feedback: analysis.feedback?.slice(0, 3) || [],
     })
 
-  } catch (error: any) {
-    console.error('Bullet quality check error:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to check bullet quality' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to check bullet quality')
+    return NextResponse.json(body, { status })
   }
 }
 

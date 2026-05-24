@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -91,7 +92,7 @@ My relevant experience (bullets or sentences):
 ${candidateHighlights}`
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: OPENAI_MODEL,
         messages: [
           {
             role: 'system',
@@ -140,7 +141,7 @@ ${company ? `\nCompany context: ${company}` : ''}
 ${role ? `\nPosition: ${role}` : ''}`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -178,11 +179,8 @@ ${role ? `\nPosition: ${role}` : ''}`
     console.log('[Cover Generate] response length:', cleanedBody.length)
 
     return NextResponse.json(response)
-  } catch (error: any) {
-    console.error('Error generating cover letter:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to generate cover letter. Please try again.' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to generate cover letter. Please try again.')
+    return NextResponse.json(body, { status })
   }
 }

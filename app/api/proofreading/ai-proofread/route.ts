@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [
         { role: 'system', content: PROOFREAD_SYSTEM },
         { role: 'user', content: `Proofread and improve the following text. Identify ALL grammar, spelling, agreement, tense, article, collocation, and repetition errors. List every change in the issues array. Return only the JSON object.\n\n${content}` },
@@ -165,11 +166,7 @@ export async function POST(req: NextRequest) {
       confidence_score,
     })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'AI proofread failed'
-    console.error('[Proofreading AI]', err)
-    return NextResponse.json(
-      { ok: false, error: message },
-      { status: 500 }
-    )
+    const { body, status } = openAIErrorResponse(err, 'AI proofread failed')
+    return NextResponse.json(body, { status })
   }
 }

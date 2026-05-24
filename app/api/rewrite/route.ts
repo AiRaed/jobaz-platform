@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
     const instruction = modeInstructions[mode as keyof typeof modeInstructions] || modeInstructions.enhance
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -83,11 +84,8 @@ export async function POST(req: Request) {
     console.log('[Rewrite] response:', response)
 
     return NextResponse.json(response)
-  } catch (error: any) {
-    console.error('Error rewriting content:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to rewrite content. Please try again.' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to rewrite content. Please try again.')
+    return NextResponse.json(body, { status })
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     // Evaluate the spoken answer compared to the written target answer using GPT
     const evaluationCompletion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -119,12 +120,9 @@ Respond only with valid JSON, no additional text.`,
     }
 
     return NextResponse.json({ ok: true, ...result })
-  } catch (error: any) {
-    console.error('Hard mode evaluation error:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to process hard mode evaluation' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to process hard mode evaluation')
+    return NextResponse.json(body, { status })
   }
 }
 

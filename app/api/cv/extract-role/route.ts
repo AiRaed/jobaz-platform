@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -65,7 +66,7 @@ ${context}
 Return ONLY the job title, nothing else.`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -93,12 +94,9 @@ Return ONLY the job title, nothing else.`
       ok: true,
       role: cleanRole,
     })
-  } catch (error: any) {
-    console.error('Error extracting role:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to extract role. Please try again.' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to extract role. Please try again.')
+    return NextResponse.json(body, { status })
   }
 }
 

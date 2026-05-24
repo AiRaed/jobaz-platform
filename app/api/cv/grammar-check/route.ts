@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -432,7 +433,7 @@ Return ONLY a valid JSON array of issues in this exact format:
 If no errors are found, return an empty array []. Return ONLY the JSON array, no other text.`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -507,12 +508,9 @@ If no errors are found, return an empty array []. Return ONLY the JSON array, no
         safeCount
       }
     })
-  } catch (error: any) {
-    console.error('Grammar check error:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to check grammar' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to check grammar')
+    return NextResponse.json(body, { status })
   }
 }
 

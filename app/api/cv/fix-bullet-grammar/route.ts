@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { OPENAI_MODEL, openAIErrorResponse } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -45,7 +46,7 @@ CRITICAL RULES:
 Return ONLY the improved bullet point text, nothing else. No quotes, no explanations, just the improved text.`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: OPENAI_MODEL,
       messages: [
         {
           role: 'system',
@@ -82,12 +83,9 @@ Return ONLY the improved bullet point text, nothing else. No quotes, no explanat
       improved: cleanedImproved,
     })
 
-  } catch (error: any) {
-    console.error('Bullet grammar fix error:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Failed to fix bullet grammar' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const { body, status } = openAIErrorResponse(error, 'Failed to fix bullet grammar')
+    return NextResponse.json(body, { status })
   }
 }
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, Sparkles, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Zap, Copy, Undo2, X } from 'lucide-react'
 import { CvData } from '@/app/cv-builder-v2/page'
+import { getAiApiErrorMessage, handleAiClientError } from '@/lib/ai-client-errors'
 
 interface MoreTabProps {
   projects: CvData['projects']
@@ -24,6 +25,7 @@ export default function MoreTab({ projects, languages, certifications, publicati
   const [newProject, setNewProject] = useState({ name: '', description: '', url: '' })
   const [newLanguage, setNewLanguage] = useState('')
   const [newCertification, setNewCertification] = useState('')
+  const [aiServiceError, setAiServiceError] = useState<string>('')
   
   // Publications state
   const [newPublication, setNewPublication] = useState<Partial<Publication>>({
@@ -167,11 +169,17 @@ export default function MoreTab({ projects, languages, certifications, publicati
           })
         }
       } else {
-        throw new Error(data.error || 'Failed to process publication')
+        const err = new Error(getAiApiErrorMessage(data, 'Failed to process publication')) as Error & {
+          code?: string
+        }
+        err.code = data.code
+        throw err
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Publication AI error:', error)
-      alert(error.message || 'Failed to process publication. Please try again.')
+      handleAiClientError(error, setAiServiceError, (msg) =>
+        alert(msg || 'Failed to process publication. Please try again.')
+      )
     } finally {
       setPublicationLoading({ ...publicationLoading, [index]: null })
     }
@@ -344,6 +352,12 @@ export default function MoreTab({ projects, languages, certifications, publicati
 
       {/* Publications */}
       <div>
+        {aiServiceError && (
+          <div className="mb-3 p-2.5 bg-red-950/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <span className="text-xs text-red-300">{aiServiceError}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-slate-300">Publications</h3>
           <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">

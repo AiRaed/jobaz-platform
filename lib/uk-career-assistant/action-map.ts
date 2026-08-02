@@ -1,6 +1,6 @@
 /**
  * Action mapping for UK Career Assistant results.
- * Maps catalog_id to job finder and build-your-path URLs.
+ * Maps catalog_id to job finder and Career Hub URLs.
  */
 
 export interface ActionMapEntry {
@@ -8,47 +8,52 @@ export interface ActionMapEntry {
   buildPathUrl: string
 }
 
+const hubRoute = (pathId: string, category?: string) =>
+  category
+    ? `/career-hub?route=${pathId}&category=${category}`
+    : `/career-hub?route=${pathId}`
+
 export const ACTION_MAP: Record<string, ActionMapEntry> = {
   warehouse_logistics: {
-    jobFinderUrl: "/job-finder?query=warehouse%20operative",
-    buildPathUrl: "/build-your-path/warehouse-logistics"
+    jobFinderUrl: '/job-finder?query=warehouse%20operative',
+    buildPathUrl: hubRoute('warehouse-logistics', 'warehouse'),
   },
   security_facilities: {
-    jobFinderUrl: "/job-finder?query=security%20sia",
-    buildPathUrl: "/build-your-path/security-facilities"
+    jobFinderUrl: '/job-finder?query=security%20sia',
+    buildPathUrl: hubRoute('security-facilities', 'security'),
   },
   cleaning: {
-    jobFinderUrl: "/job-finder?query=cleaner",
-    buildPathUrl: "/build-your-path/cleaning"
+    jobFinderUrl: '/job-finder?query=cleaner',
+    buildPathUrl: hubRoute('cleaner', 'cleaner'),
   },
   hospitality_front: {
-    jobFinderUrl: "/job-finder?query=hospitality%20front%20of%20house",
-    buildPathUrl: "/build-your-path/hospitality-front"
+    jobFinderUrl: '/job-finder?query=hospitality%20front%20of%20house',
+    buildPathUrl: hubRoute('hospitality-front', 'hospitality'),
   },
   care_support: {
-    jobFinderUrl: "/job-finder?query=care%20support",
-    buildPathUrl: "/build-your-path/care-support"
+    jobFinderUrl: '/job-finder?query=care%20support',
+    buildPathUrl: hubRoute('care-support', 'care'),
   },
   driving_transport: {
-    jobFinderUrl: "/job-finder?query=driver%20delivery",
-    buildPathUrl: "/build-your-path/driving-transport"
+    jobFinderUrl: '/job-finder?query=driver%20delivery',
+    buildPathUrl: hubRoute('driving-transport', 'driving'),
   },
   maintenance_facilities: {
-    jobFinderUrl: "/job-finder?query=maintenance%20facilities",
-    buildPathUrl: "/build-your-path/maintenance-facilities"
+    jobFinderUrl: '/job-finder?query=maintenance%20facilities',
+    buildPathUrl: hubRoute('maintenance-facilities', 'maintenance'),
   },
   office_admin_support: {
-    jobFinderUrl: "/job-finder?query=admin%20assistant",
-    buildPathUrl: "/build-your-path/office-admin"
+    jobFinderUrl: '/job-finder?query=admin%20assistant',
+    buildPathUrl: hubRoute('office-admin', 'office'),
   },
   digital_ai_adjacent: {
-    jobFinderUrl: "/job-finder?query=junior%20digital%20support",
-    buildPathUrl: "/build-your-path/digital-ai-adjacent"
+    jobFinderUrl: '/job-finder?query=junior%20digital%20support',
+    buildPathUrl: hubRoute('digital-ai-beginner', 'digital'),
   },
   construction_trades: {
-    jobFinderUrl: "/job-finder?query=construction%20labour",
-    buildPathUrl: "/build-your-path/construction-trades"
-  }
+    jobFinderUrl: '/job-finder?query=construction%20labour',
+    buildPathUrl: hubRoute('construction-trades', 'construction'),
+  },
 }
 
 /**
@@ -56,27 +61,23 @@ export const ACTION_MAP: Record<string, ActionMapEntry> = {
  * Handles both kebab-case (direction_id format) and snake_case (ACTION_MAP keys).
  */
 export function getActionUrls(catalogId: string, directionTitle?: string): ActionMapEntry {
-  // Try exact match first
   let mapped = ACTION_MAP[catalogId]
   if (mapped) {
     return mapped
   }
-  
-  // Try converting kebab-case to snake_case (e.g., "warehouse-logistics" -> "warehouse_logistics")
+
   const snakeCaseId = catalogId.replace(/-/g, '_')
   mapped = ACTION_MAP[snakeCaseId]
   if (mapped) {
     return mapped
   }
-  
-  // Safe fallback: generate URLs from catalog_id or direction_title
-  const fallbackQuery = directionTitle 
+
+  const fallbackQuery = directionTitle
     ? encodeURIComponent(directionTitle)
     : encodeURIComponent(catalogId.replace(/-/g, ' '))
-  
+
   return {
     jobFinderUrl: `/job-finder?query=${fallbackQuery}`,
-    buildPathUrl: `/build-your-path?tag=${encodeURIComponent(catalogId)}`
+    buildPathUrl: `/career-hub?tag=${encodeURIComponent(catalogId)}`,
   }
 }
-

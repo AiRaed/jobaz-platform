@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils'
-import { User } from 'lucide-react'
 
 interface UserBubbleProps {
   content: string
@@ -9,20 +8,24 @@ interface UserBubbleProps {
 
 export default function UserBubble({ content, timestamp, showTimestamp = false }: UserBubbleProps) {
   return (
-    <div className="flex justify-end items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex-1 max-w-[80%] flex justify-end">
-        <div className="rounded-xl px-5 py-3 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/30 shadow-lg backdrop-blur-sm">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">{content}</p>
+    <div className="uk-ca-user-row flex justify-end items-start gap-3 animate-in fade-in slide-in-from-bottom-3 duration-500">
+      <div className="flex-1 max-w-[85%] flex justify-end">
+        <div className="uk-ca-bubble uk-ca-bubble--user rounded-2xl px-4 py-2.5 bg-gradient-to-r from-cyan-600/25 to-blue-600/20 border border-cyan-400/35 shadow-[0_0_20px_rgba(6,182,212,0.15)] backdrop-blur-sm">
+          <p className="uk-ca-body whitespace-pre-wrap text-sm leading-relaxed text-slate-50">{content}</p>
           {showTimestamp && timestamp && (
-            <p className="text-xs text-cyan-400/50 mt-1.5 text-right">{timestamp}</p>
+            <p className="uk-ca-meta text-xs text-cyan-400/50 mt-1.5 text-right">{timestamp}</p>
           )}
         </div>
       </div>
-      {/* User Avatar */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-cyan-500/30 border border-cyan-400/30 flex items-center justify-center shadow-lg">
-        <User className="w-4 h-4 text-cyan-300" />
+      <div
+        className={cn(
+          'uk-ca-user-avatar flex-shrink-0 w-8 h-8 rounded-full',
+          'bg-gradient-to-br from-cyan-500/30 to-blue-600/20 border border-cyan-400/40',
+          'flex items-center justify-center text-[10px] font-bold text-cyan-200 shadow-lg'
+        )}
+      >
+        You
       </div>
     </div>
   )
 }
-

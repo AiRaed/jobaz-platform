@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       return NextResponse.json({
         ok: true,
@@ -45,8 +41,7 @@ export async function POST(req: NextRequest) {
     // Combine all answers for evaluation
     const allAnswersText = validAnswers.join('\n\n---\n\n')
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -73,12 +68,13 @@ ${allAnswersText}
 Provide a comprehensive evaluation of the candidate's interview performance. Consider consistency across answers, overall communication quality, and professional presentation.`,
         },
       ],
+      modelTier: 'quality',
       temperature: 0.7,
-      max_tokens: 1000,
-      response_format: { type: 'json_object' },
+      maxTokens: 1000,
+      feature: 'interview/evaluate-interview',
     })
 
-    const content = completion.choices[0]?.message?.content || '{}'
+    const content = completion.text || '{}'
     
     let evaluation
     try {

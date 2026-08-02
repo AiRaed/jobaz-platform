@@ -11,9 +11,9 @@ const GA_MEASUREMENT_ID = 'G-PDGHSSX1XK'
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
-  title: 'JobAZ — Your AI Career Assistant',
+  title: 'JobAZ — Find Work & Build Your Career in the UK',
   description:
-    'Build your CV with AI, find matching jobs, tailor applications, practice interviews, improve your writing, and get multilingual support — guided by JAZ.',
+    'Find UK jobs, improve your CV, prepare for interviews, and follow a guided career path — a free UK career platform with smart support.',
   keywords: [
     'AI career assistant',
     'CV builder',
@@ -52,23 +52,23 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: appUrl,
     siteName: 'JobAZ',
-    title: 'JobAZ — Your AI Career Assistant',
+    title: 'JobAZ — Find Work & Build Your Career in the UK',
     description:
-      'Build your CV with AI, find matching jobs, tailor applications, practice interviews, improve your writing, and get multilingual support — guided by JAZ.',
+      'Find UK jobs, improve your CV, prepare for interviews, and follow a guided career path.',
     images: [
       {
         url: `${appUrl}/og-image`,
         width: 1200,
         height: 630,
-        alt: 'JobAZ — Your AI Career Assistant',
+        alt: 'JobAZ — UK Career Platform',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'JobAZ — Your AI Career Assistant',
+    title: 'JobAZ — UK Career Platform',
     description:
-      'Build your CV with AI, find jobs, tailor applications, practice interviews, writing review, and multilingual support — guided by JAZ.',
+      'Find UK jobs, improve your CV, and follow a guided career path.',
     images: [`${appUrl}/og-image`],
     creator: '@jobaz',
     site: '@jobaz',
@@ -95,10 +95,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-jobaz-theme="dark" className="dark">
       <head>
         <meta name="theme-color" content="#7C3AED" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('jobaz-theme-v1')||'dark';if(t!=='day'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-jobaz-theme',t);document.documentElement.classList.toggle('dark',t==='dark');document.documentElement.style.colorScheme=t==='day'?'light':'dark';var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='day'?'#08122f':'#7C3AED');}catch(e){}})();`,
+          }}
+        />
 
         {/* Structured Data – WebSite */}
         <script
@@ -122,7 +127,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
 
       <body
-        className={`${inter.className} transition-colors duration-300 bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 min-h-screen`}
+        className={`${inter.className} transition-colors duration-300 jobaz-page-bg min-h-screen`}
       >
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-PDGHSSX1XK"

@@ -1,11 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { runAcademicEnhancementDetectors } from '@/lib/proofreading/academicEnhancements'
+import { buildWritingReviewReport } from '@/lib/proofreading/reviewReport'
+import type { AnalyzedIssue, ProofreadingAnalyzeMode } from '@/lib/proofreading/types'
 
 export const dynamic = 'force-dynamic'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+function notConfiguredResponse() {
+  return NextResponse.json(
+    {
+      ok: false,
+      issues: [],
+      summary: 'No analysis available',
+      error: 'Writing Review AI is not configured yet.',
+      message: 'Writing Review AI is not configured yet.',
+      code: 'NOT_CONFIGURED',
+    },
+    { status: 503 }
+  )
+}
+
+function analyzeErrorResponse(message: string, status: number, code?: string) {
+  return NextResponse.json(
+    {
+      ok: false,
+      issues: [],
+      summary: 'No analysis available',
+      error: message,
+      message,
+      code: code ?? 'ANALYZE_ERROR',
+    },
+    { status }
+  )
+}
 
 type WritingMode = 'general' | 'academic' | 'academic_research'
 type IssueType = 'grammar' | 'spelling' | 'style' | 'clarity' | 'word_form' | 'tense' | 'tense_consistency' | 'repetition' | 'preposition' | 'academic_tone' | 'academic_objectivity' | 'academic_hedging' | 'academic_citation' | 'academic_logic' | 'structure' | 'academic_style' | 'methodology' | 'evidence' | 'research_quality' | 'agreement' | 'article' | 'uncountable' | 'research_grammar' | 'punctuation'
@@ -47,6 +78,13 @@ interface Issue {
  */
 export async function POST(req: NextRequest) {
   try {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Proofreading Analyze] Missing Supabase environment variables')
+      }
+      return notConfiguredResponse()
+    }
+
     // Get authenticated user
     const cookieStore = cookies()
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -1200,6 +1238,77 @@ export async function POST(req: NextRequest) {
             endIndex: idx + 3,
           })
         }
+      }
+
+      // Plural subject + third-person singular verb (e.g. "people believes" → "believe")
+      const pluralBelievesRegex = /\b(people|students|children|they|we|many)\s+believes\b/gi
+      let pbMatch: RegExpExecArray | null
+      while ((pbMatch = pluralBelievesRegex.exec(text)) !== null) {
+        const idx = text.indexOf('believes', pbMatch.index)
+        if (idx >= 0) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'high',
+            message: 'Subject-verb agreement: plural subject requires "believe", not "believes".',
+            original_text: 'believes',
+            suggestion_text: 'believe',
+            startIndex: idx,
+            endIndex: idx + 8,
+          })
+        }
+      }
+
+      // "it improve" → "it improves"
+      const itImproveRegex = /\bit\s+improve\b/gi
+      let iiMatch: RegExpExecArray | null
+      while ((iiMatch = itImproveRegex.exec(text)) !== null) {
+        const idx = text.indexOf('improve', iiMatch.index)
+        if (idx >= 0) {
+          detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+          issues.push({
+            type: 'grammar',
+            severity: 'high',
+            message: 'Subject-verb agreement: "It" (singular) requires "improves" (third person singular).',
+            original_text: 'improve',
+            suggestion_text: 'improves',
+            startIndex: idx,
+            endIndex: idx + 7,
+          })
+        }
+      }
+
+      // "There is also concerns" / "There is concerns" → "There are"
+      const thereIsPluralNounRegex =
+        /\bthere\s+is\s+(?:also\s+|some\s+)?(?:concerns|issues|problems|reasons|arguments|points|benefits|drawbacks|advantages|disadvantages|factors|effects|impacts)\b/gi
+      let tipnMatch: RegExpExecArray | null
+      while ((tipnMatch = thereIsPluralNounRegex.exec(text)) !== null) {
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'high',
+          message: 'Subject-verb agreement: use "There are" with plural nouns (e.g. "There are concerns").',
+          original_text: 'There is',
+          suggestion_text: 'There are',
+          startIndex: tipnMatch.index,
+          endIndex: tipnMatch.index + 9,
+        })
+      }
+
+      // "both side" → "both sides"
+      const bothSideRegex = /\bboth\s+side\b/gi
+      let bsMatch: RegExpExecArray | null
+      while ((bsMatch = bothSideRegex.exec(text)) !== null) {
+        detectorCounts.grammar = (detectorCounts.grammar || 0) + 1
+        issues.push({
+          type: 'grammar',
+          severity: 'moderate',
+          message: 'Use the plural noun after "both" (e.g. "both sides").',
+          original_text: 'both side',
+          suggestion_text: 'both sides',
+          startIndex: bsMatch.index,
+          endIndex: bsMatch.index + 9,
+        })
       }
 
       // — Grammar (General): adjective after verb → adverb (work efficient → work efficiently, act calm → act calmly)
@@ -2780,6 +2889,11 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    if (isAcademicStandard || isAcademicResearch) {
+      const extra = runAcademicEnhancementDetectors(text, { isAcademicStandard, isAcademicResearch })
+      issues.push(...(extra as Issue[]))
+    }
+
     // Deduplicate: same type + original + suggestion = one issue (stable key)
     const issueKey = (i: Issue) =>
       `${i.type}-${(i.original_text || '').trim().toLowerCase()}-${(i.suggestion_text || '').trim().toLowerCase()}`
@@ -2893,9 +3007,17 @@ export async function POST(req: NextRequest) {
       console.log('[analyze][dev] Issues with no suggestion (Tip-only):', validatedIssues.filter(i => !(i.suggestion_text && i.suggestion_text.trim())).length)
     }
 
+    const review = buildWritingReviewReport(
+      content,
+      validatedIssues as AnalyzedIssue[],
+      mode as ProofreadingAnalyzeMode,
+      typeof body.projectCategory === 'string' ? body.projectCategory : undefined
+    )
+
     return NextResponse.json({
       ok: true,
       issues: validatedIssues,
+      review,
       metadata: {
         writing_mode: mode,
         academic_level: isAcademicResearch ? 'phd' : (isAcademicStandard ? 'standard' : 'general'),
@@ -2904,14 +3026,13 @@ export async function POST(req: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("ANALYZE ERROR:", error)
-    return NextResponse.json(
-      { 
-        ok: false, 
-        stage: "analyze", 
-        message: error?.message ?? String(error) 
-      },
-      { status: 500 }
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Proofreading Analyze] Unexpected error:', error)
+    }
+    return analyzeErrorResponse(
+      error?.message ?? 'Analysis failed',
+      500,
+      'ANALYZE_EXCEPTION'
     )
   }
 }

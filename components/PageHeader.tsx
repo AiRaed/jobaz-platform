@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
 type Props = {
@@ -20,100 +20,130 @@ type Props = {
   compact?: boolean // if true, reduces padding and title size (e.g. Writing Review page)
 }
 
-export default function PageHeader({ title, subtitle, showBackToDashboard = true, showBackToJobFinder = false, showBackToAllPaths = false, showBackToCareerAssistant = false, caSessionId, jobId, mode, from, horizontalLayout = false, disclaimer, notice, compact = false }: Props) {
-  const router = useRouter()
+function jobDetailsHref(jobId: string, mode?: string | null, from?: string) {
+  const modeParam = mode || 'tailorCv'
+  return `/job-details/${jobId}?mode=${modeParam}${from ? `&from=${from}` : ''}`
+}
 
-  const handleBackToJobDetails = () => {
-    if (!jobId) return
-    const modeParam = mode || 'tailorCv'
-    const url = `/job-details/${jobId}?mode=${modeParam}${from ? `&from=${from}` : ''}`
-    router.push(url)
-  }
+function careerAssistantResumeHref(caSessionId: string) {
+  return `/uk-career-assistant?resume=1&ca_session=${encodeURIComponent(caSessionId)}`
+}
 
-  const handleBackToCareerAssistant = () => {
-    if (!caSessionId) return
-    router.push(`/uk-career-assistant?resume=1&ca_session=${encodeURIComponent(caSessionId)}`)
-  }
+export default function PageHeader({
+  title,
+  subtitle,
+  showBackToDashboard = true,
+  showBackToJobFinder = false,
+  showBackToAllPaths = false,
+  showBackToCareerAssistant = false,
+  caSessionId,
+  jobId,
+  mode,
+  from,
+  horizontalLayout = false,
+  disclaimer,
+  notice,
+  compact = false,
+}: Props) {
+  const backButtonClass = horizontalLayout
+    ? compact
+      ? 'inline-flex items-center gap-1.5 text-xs md:text-sm font-medium text-slate-300 hover:text-slate-100 transition-colors mb-0.5'
+      : 'inline-flex items-center gap-1.5 text-sm md:text-base font-medium text-slate-300 hover:text-slate-100 transition-colors mb-2'
+    : 'hover:text-slate-100 transition inline-flex items-center gap-1'
 
-  const backButtonClass = horizontalLayout 
-    ? (compact ? "inline-flex items-center gap-1.5 text-xs md:text-sm font-medium text-slate-300 hover:text-slate-100 transition-colors mb-0.5" : "inline-flex items-center gap-1.5 text-sm md:text-base font-medium text-slate-300 hover:text-slate-100 transition-colors mb-2")
-    : "hover:text-slate-100 transition"
+  const backLinkClass = `${backButtonClass}`
 
   return (
-    <header className={compact ? 'mb-1 pb-1 border-b border-slate-800/60' : 'mb-2 pb-2 border-b border-slate-800/60'} data-no-translate>
+    <header
+      className={
+        compact
+          ? 'mb-1 pb-1 border-b border-[var(--border-subtle)] dark:border-slate-800/60'
+          : 'mb-2 pb-2 border-b border-[var(--border-subtle)] dark:border-slate-800/60'
+      }
+      data-no-translate
+    >
       {horizontalLayout ? (
-        // 2-column layout: LEFT (title block), RIGHT (disclaimer)
         <div className="max-w-[1920px] mx-auto px-4">
-          <div className={compact ? 'flex flex-col md:flex-row md:items-center md:justify-between gap-1 md:gap-2' : 'flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4'}>
-            {/* LEFT: Title block with back button */}
+          <div
+            className={
+              compact
+                ? 'flex flex-col md:flex-row md:items-center md:justify-between gap-1 md:gap-2'
+                : 'flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4'
+            }
+          >
             <div className="flex-1 min-w-0">
-              {(showBackToDashboard !== false || showBackToJobFinder || showBackToAllPaths || showBackToCareerAssistant || jobId) && (
+              {(showBackToDashboard !== false ||
+                showBackToJobFinder ||
+                showBackToAllPaths ||
+                showBackToCareerAssistant ||
+                jobId) && (
                 <div className={compact ? 'mb-0.5' : 'mb-1'}>
-                  {showBackToCareerAssistant && (
-                    <button
-                      type="button"
-                      onClick={handleBackToCareerAssistant}
-                      className={backButtonClass}
+                  {showBackToCareerAssistant && caSessionId && (
+                    <Link
+                      href={careerAssistantResumeHref(caSessionId)}
+                      prefetch
+                      className={backLinkClass}
                     >
                       <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
                       Back to Career Assistant results
-                    </button>
+                    </Link>
                   )}
                   {showBackToDashboard !== false && (
-                    <button
-                      type="button"
-                      onClick={() => router.push('/dashboard')}
-                      className={backButtonClass}
-                    >
+                    <Link href="/dashboard" prefetch className={backLinkClass}>
                       <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
                       Back to Dashboard
-                    </button>
+                    </Link>
                   )}
                   {showBackToJobFinder && (
-                    <button
-                      type="button"
-                      onClick={() => router.push('/job-finder')}
-                      className={backButtonClass}
-                    >
+                    <Link href="/job-finder" prefetch className={backLinkClass}>
                       <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
                       Back to Job Finder
-                    </button>
+                    </Link>
                   )}
                   {showBackToAllPaths && (
-                    <button
-                      type="button"
-                      onClick={() => router.push('/build-your-path')}
-                      className={backButtonClass}
-                    >
+                    <Link href="/career-hub" prefetch className={backLinkClass}>
                       <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
-                      Back to All Paths
-                    </button>
+                      Back to Courses & Licences
+                    </Link>
                   )}
                   {jobId && (
-                    <button
-                      type="button"
-                      onClick={handleBackToJobDetails}
-                      className={backButtonClass}
-                    >
+                    <Link href={jobDetailsHref(jobId, mode, from)} prefetch className={backLinkClass}>
                       <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
                       Back to Job Details
-                    </button>
+                    </Link>
                   )}
                 </div>
               )}
-              <h1 className={compact ? 'text-xl md:text-2xl font-semibold text-slate-50 m-0 leading-tight' : 'text-2xl md:text-3xl font-semibold text-slate-50 m-0'}>
+              <h1
+                className={
+                  compact
+                    ? 'text-xl md:text-2xl font-semibold text-slate-50 m-0 leading-tight'
+                    : 'text-2xl md:text-3xl font-semibold text-slate-50 m-0'
+                }
+              >
                 {title}
               </h1>
               {subtitle && (
-                <p className={compact ? 'mt-0.5 text-xs text-slate-400 m-0 leading-tight' : 'mt-1 text-xs md:text-sm text-slate-400 m-0'}>
+                <p
+                  className={
+                    compact
+                      ? 'mt-0.5 text-xs text-slate-400 m-0 leading-tight'
+                      : 'mt-1 text-xs md:text-sm text-slate-400 m-0'
+                  }
+                >
                   {subtitle}
                 </p>
               )}
             </div>
-            
-            {/* RIGHT: Disclaimer and/or Notice */}
+
             {(disclaimer || notice) && (
-              <div className={compact ? 'md:flex-shrink-0 md:max-w-md md:min-w-0 md:pl-4 flex flex-col gap-0.5' : 'md:flex-shrink-0 md:max-w-md md:min-w-0 md:pl-4 flex flex-col gap-1.5'}>
+              <div
+                className={
+                  compact
+                    ? 'md:flex-shrink-0 md:max-w-md md:min-w-0 md:pl-4 flex flex-col gap-0.5'
+                    : 'md:flex-shrink-0 md:max-w-md md:min-w-0 md:pl-4 flex flex-col gap-1.5'
+                }
+              >
                 {notice && (
                   <p className="text-[11px] md:text-xs text-slate-400 leading-tight m-0 px-2 md:px-0">
                     {notice}
@@ -129,67 +159,74 @@ export default function PageHeader({ title, subtitle, showBackToDashboard = true
           </div>
         </div>
       ) : (
-        // Vertical layout: back button above title (original layout)
         <div className={compact ? 'flex flex-col gap-0.5' : 'flex flex-col gap-1'}>
-          {(showBackToDashboard !== false || showBackToJobFinder || showBackToAllPaths || showBackToCareerAssistant || jobId) && (
-            <div className={compact ? 'flex items-center gap-4 text-xs text-slate-400 mb-1' : 'flex items-center gap-4 text-xs md:text-sm text-slate-400 mb-3'}>
-              {showBackToCareerAssistant && (
-                <button
-                  type="button"
-                  onClick={handleBackToCareerAssistant}
-                  className={backButtonClass}
-                >
+          {(showBackToDashboard !== false ||
+            showBackToJobFinder ||
+            showBackToAllPaths ||
+            showBackToCareerAssistant ||
+            jobId) && (
+            <div
+              className={
+                compact
+                  ? 'flex items-center gap-4 text-xs text-slate-400 mb-1'
+                  : 'flex items-center gap-4 text-xs md:text-sm text-slate-400 mb-3'
+              }
+            >
+              {showBackToCareerAssistant && caSessionId && (
+                <Link href={careerAssistantResumeHref(caSessionId)} prefetch className={backLinkClass}>
                   ← Back to Career Assistant results
-                </button>
+                </Link>
               )}
               {showBackToDashboard !== false && (
-                <button
-                  type="button"
-                  onClick={() => router.push('/dashboard')}
-                  className={backButtonClass}
-                >
+                <Link href="/dashboard" prefetch className={backLinkClass}>
                   ← Back to Dashboard
-                </button>
+                </Link>
               )}
               {showBackToJobFinder && (
-                <button
-                  type="button"
-                  onClick={() => router.push('/job-finder')}
-                  className={backButtonClass}
-                >
+                <Link href="/job-finder" prefetch className={backLinkClass}>
                   ← Back to Job Finder
-                </button>
+                </Link>
               )}
               {showBackToAllPaths && (
-                <button
-                  type="button"
-                  onClick={() => router.push('/build-your-path')}
-                  className={backButtonClass}
-                >
-                  ← Back to All Paths
-                </button>
+                <Link href="/career-hub" prefetch className={backLinkClass}>
+                  ← Back to Courses & Licences
+                </Link>
               )}
               {jobId && (
-                <button
-                  type="button"
-                  onClick={handleBackToJobDetails}
-                  className={backButtonClass}
-                >
+                <Link href={jobDetailsHref(jobId, mode, from)} prefetch className={backLinkClass}>
                   ← Back to Job Details
-                </button>
+                </Link>
               )}
             </div>
           )}
-          <h1 className={compact ? 'text-xl md:text-2xl font-semibold text-slate-50 m-0 leading-tight' : 'text-2xl md:text-3xl font-semibold text-slate-50 m-0'}>
+          <h1
+            className={
+              compact
+                ? 'text-xl md:text-2xl font-semibold text-slate-50 m-0 leading-tight'
+                : 'text-2xl md:text-3xl font-semibold text-slate-50 m-0'
+            }
+          >
             {title}
           </h1>
           {disclaimer && (
-            <p className={compact ? 'mt-0.5 text-xs text-slate-500 m-0 leading-tight' : 'mt-1.5 text-xs text-slate-500 m-0'}>
+            <p
+              className={
+                compact
+                  ? 'mt-0.5 text-xs text-slate-500 m-0 leading-tight'
+                  : 'mt-1.5 text-xs text-slate-500 m-0'
+              }
+            >
               {disclaimer}
             </p>
           )}
           {subtitle && (
-            <p className={compact ? 'mt-0.5 text-xs text-slate-400 m-0 leading-tight' : 'mt-1 text-xs md:text-sm text-slate-400 m-0'}>
+            <p
+              className={
+                compact
+                  ? 'mt-0.5 text-xs text-slate-400 m-0 leading-tight'
+                  : 'mt-1 text-xs md:text-sm text-slate-400 m-0'
+              }
+            >
               {subtitle}
             </p>
           )}

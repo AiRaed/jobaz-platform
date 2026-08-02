@@ -11,6 +11,8 @@ import TranslatableText from '@/components/TranslatableText'
 import PageHeader from '@/components/PageHeader'
 import { useJazStore } from '@/lib/jaz-store'
 import ApplyAssistantPanel from '@/components/apply/ApplyAssistantPanel'
+import ApplicationWorkflowPanel from '@/components/apply/ApplicationWorkflowPanel'
+import { useApplicationAnalysis } from '@/hooks/useApplicationAnalysis'
 import { getCurrentUserIdSync, getUserScopedKeySync, initUserStorageCache } from '@/lib/user-storage'
 import { useNextStepLoadingStore, generateRequestId } from '@/lib/next-step-loading-store'
 // CV storage helper removed - now using Supabase API
@@ -296,6 +298,26 @@ export default function JobDetailsPage() {
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const jobsViewedRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!job?.id || jobsViewedRef.current === job.id) return
+    jobsViewedRef.current = job.id
+    void import('@/lib/jobaz-ai/emitSignal').then(({ emitAiSignal }) =>
+      emitAiSignal({
+        type: 'job_detail_viewed',
+        source: 'job-finder',
+        impact: { engagement: 2, jobSearchActivity: 5 },
+        metadata: {
+          dedupeId: job.id,
+          job_id: job.id,
+          job_title: job.title,
+          company: job.company,
+          location: job.location,
+        },
+      })
+    )
+  }, [job])
   
   // CV state from Supabase
   const [baseCv, setBaseCv] = useState<any | null>(null)
@@ -436,7 +458,21 @@ export default function JobDetailsPage() {
       }
 
       console.log('[AppliedJobs] Successfully saved applied job to Supabase:', result.appliedJob?.id)
-      
+
+      const { emitAiSignal } = await import('@/lib/jobaz-ai/emitSignal')
+      void emitAiSignal({
+        type: 'jobs_applied',
+        source: 'job-finder',
+        impact: { readiness: 12, engagement: 10, jobSearchActivity: 12 },
+        metadata: {
+          dedupeId: jobId,
+          job_id: jobId,
+          job_title: job.title,
+          company: job.company,
+          location: job.location,
+        },
+      })
+
       // Dispatch event to notify Dashboard and other components
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('jobaz-applied-jobs-changed'))
@@ -526,6 +562,22 @@ export default function JobDetailsPage() {
     const textToCheck = isGeneratingCover ? coverLetterText : debouncedCoverLetterText
     return textToCheck.trim().length > 0
   }, [coverLetterText, debouncedCoverLetterText, isGeneratingCover])
+
+  const { analysis: applicationAnalysis } = useApplicationAnalysis({
+    job: {
+      title: job?.title ?? '',
+      company: job?.company,
+      description: job?.description,
+    },
+    cvSummary: cvSummary ?? '',
+    coverLetterText: coverLetterText ?? '',
+    statuses: {
+      cvStatus: cvHasContent ? 'ready' : cvStatus,
+      coverStatus: coverHasContent ? 'ready' : coverStatus,
+      applicationStatus,
+      trainingStatus,
+    },
+  })
 
   // Determine recommended next step - made reactive with useMemo
   // Now checks actual text content directly, not just status flags
@@ -1609,7 +1661,7 @@ export default function JobDetailsPage() {
     <AppShell className="max-w-7xl">
         <PageHeader
           title={job.title}
-          subtitle="Job Details"
+          subtitle="Job application mission"
           showBackToJobFinder={true}
         />
         
@@ -1617,8 +1669,8 @@ export default function JobDetailsPage() {
         {isReadyToApply && (
           <div className="mb-4 p-3 rounded-xl bg-violet-900/20 border border-violet-700/50">
             <p className="text-sm text-violet-200">
-              <span className="font-semibold text-violet-300">JAZ Insight:</span>{' '}
-              Your CV and cover letter look ready. You can apply now or make final improvements below.
+              <span className="font-semibold text-violet-300">Application strength {applicationAnalysis.applicationStrength}%</span>
+              {' '}— your materials are competitive. Apply now or keep improving your match score.
             </p>
           </div>
         )}
@@ -1645,81 +1697,13 @@ export default function JobDetailsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(360px,400px)_minmax(0,1fr)] gap-6 mt-6">
           {/* Column 1: Preparation Status + Apply Assistant Panel */}
           <div className="space-y-4">
-            {/* Preparation Status - Status Only, Smaller, Muted */}
-            <section className="rounded-xl border border-slate-700/40 bg-slate-950/40 shadow-sm p-3 space-y-2">
-              <h2 className="text-sm font-heading font-medium text-slate-400">Preparation Status</h2>
-              <div className="space-y-1.5">
-                {/* CV Status */}
-                <div className="flex items-center gap-2 py-1.5 bg-[#0D0D0D]/50 rounded-lg border border-gray-800/50 px-2.5">
-                  <div className={`flex-shrink-0 ${cvStatus === 'ready' ? 'text-green-500/70' : 'text-gray-500/60'}`}>
-                    {cvStatus === 'ready' ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : (
-                      <XCircle className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-300 text-xs">CV</p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {cvStatus === 'ready' ? 'Ready' : 'Not Ready'}
-                    </p>
-                  </div>
-                </div>
+            <ApplicationWorkflowPanel
+              steps={applicationAnalysis.workflowSteps}
+              applicationStrength={applicationAnalysis.applicationStrength}
+              dimensions={applicationAnalysis.dimensions}
+            />
 
-                {/* Cover Letter Status */}
-                <div className="flex items-center gap-2 py-1.5 bg-[#0D0D0D]/50 rounded-lg border border-gray-800/50 px-2.5">
-                  <div className={`flex-shrink-0 ${coverStatus === 'ready' ? 'text-green-500/70' : 'text-gray-500/60'}`}>
-                    {coverStatus === 'ready' ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : (
-                      <XCircle className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-300 text-xs">Cover Letter</p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {coverStatus === 'ready' ? 'Ready' : 'Not Ready'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Application Status */}
-                <div className="flex items-center gap-2 py-1.5 bg-[#0D0D0D]/50 rounded-lg border border-gray-800/50 px-2.5">
-                  <div className={`flex-shrink-0 ${applicationStatus === 'submitted' ? 'text-green-500/70' : 'text-gray-500/60'}`}>
-                    {applicationStatus === 'submitted' ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : (
-                      <XCircle className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-300 text-xs">Application</p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {applicationStatus === 'submitted' ? 'Submitted' : 'Not Submitted'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Interview Training Status */}
-                <div className="flex items-center gap-2 py-1.5 bg-[#0D0D0D]/50 rounded-lg border border-gray-800/50 px-2.5">
-                  <div className={`flex-shrink-0 ${trainingStatus === 'available' ? 'text-green-500/70' : 'text-gray-500/60'}`}>
-                    {trainingStatus === 'available' ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : (
-                      <XCircle className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-300 text-xs">Interview Training</p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {trainingStatus === 'available' ? 'Completed' : 'Not Started'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Apply Assistant Panel (moved here from Column 3) */}
+            {/* Apply Assistant Panel */}
             <ApplyAssistantPanel
               jobId={jobId}
               job={{
@@ -1803,7 +1787,7 @@ export default function JobDetailsPage() {
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        AI Tailor Summary
+                        AI Tailor Summary — Improve Match
                       </>
                     )}
                   </button>
@@ -1878,7 +1862,7 @@ export default function JobDetailsPage() {
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        AI Generate Cover Letter
+                        Increase Application Strength
                       </>
                     )}
                   </button>

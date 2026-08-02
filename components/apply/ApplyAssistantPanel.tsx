@@ -8,6 +8,8 @@ import { useJazStore } from '@/lib/jaz-store'
 import { NextStepLoadingCard } from '@/components/NextStepLoadingCard'
 import { useNextStepLoadingStore, generateRequestId } from '@/lib/next-step-loading-store'
 import { getBaseCvAnyScope } from '@/lib/cv-storage'
+import { useApplicationAnalysis } from '@/hooks/useApplicationAnalysis'
+import ApplicationIntelligenceSections from '@/components/apply/ApplicationIntelligenceSections'
 
 interface ApplyAssistantPanelProps {
   jobId: string
@@ -105,7 +107,11 @@ export default function ApplyAssistantPanel({
   const finalLanguage = language || globalLanguage || 'EN'
   const [isMobile, setIsMobile] = useState(false)
   // Desktop: open by default; Mobile: closed by default
-  const [isOpen, setIsOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : false)
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    setIsOpen(window.innerWidth >= 1024)
+  }, [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ApplyAssistantResult | null>(null)
@@ -526,6 +532,45 @@ export default function ApplyAssistantPanel({
     return result?.actionPlan ? parseActionPlan(result.actionPlan) : []
   }, [result?.actionPlan])
 
+  const { analysis, deltas } = useApplicationAnalysis({
+    job,
+    cvSummary: propCvSummary ?? '',
+    coverLetterText: propCoverLetterText ?? '',
+    statuses: {
+      cvStatus,
+      coverStatus,
+      applicationStatus,
+      trainingStatus,
+    },
+    aiFitScore: result?.fitScore?.score,
+    aiStrengths: result?.comparison?.strengths,
+    aiWeaknesses: result?.fitScore?.weaknesses,
+    aiMissingSkills: result?.comparison?.missingSkills,
+  })
+
+  const handleSmartPrimaryAction = useCallback(() => {
+    const type = analysis.smartNextStep.ctaType
+    if (type === 'optimize-cv' || type === 'improve-match') {
+      if (onOptimizeCV) onOptimizeCV()
+      else handleOpenCVBuilder()
+      return
+    }
+    if (type === 'cover') {
+      if (onOptimizeCV) onOptimizeCV()
+      else if (onGenerateCoverLetter) onGenerateCoverLetter()
+      else handleOpenCoverBuilder()
+      return
+    }
+    if (type === 'apply') {
+      if (onApply) onApply()
+      return
+    }
+    if (type === 'interview') {
+      if (onTrainInterview) onTrainInterview()
+      else handleTrainInterview()
+    }
+  }, [analysis.smartNextStep.ctaType, onOptimizeCV, onGenerateCoverLetter, onApply, onTrainInterview])
+
   const fitScoreInfo = result ? getFitScoreLabel(result.fitScore.score) : { label: '', color: '' }
 
   // Determine next step based on status
@@ -799,299 +844,24 @@ export default function ApplyAssistantPanel({
       )
     }
 
-    // Always show result if available, even during loading
-    // Only show placeholder if no result exists AND we're loading for the first time
-    const showPlaceholder = !result && loading && !error && analysisStatus !== 'ready'
-    
-    if (showPlaceholder) {
+    // Intelligence-driven panel (local scoring updates instantly; AI enriches in background)
+    if (error !== 'cv-missing' && !error) {
       return (
-        <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition p-6 space-y-5">
-          {/* Analyzing card - same style as re-analysis */}
-          <div className="mb-3 p-3 rounded-lg bg-violet-500/10 border border-violet-500/30 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-200 hover:border-violet-500/50 transition-colors group">
-            <div className="flex-shrink-0">
-              <img 
-                src="/jaz/jaz-eye.png" 
-                alt="JAZ" 
-                className="w-4 h-4 object-cover rounded-full animate-pulse" 
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-violet-300 mb-0.5">
-                JAZ is analyzing…
-              </div>
-              <div className="text-xs text-slate-400">Updating match score & next steps</div>
-            </div>
-          </div>
-          
-          {/* Skeleton placeholders */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="h-4 bg-slate-800/50 rounded w-3/4 animate-pulse"></div>
-              <div className="h-3 bg-slate-800/30 rounded w-1/2 animate-pulse"></div>
-            </div>
-            <div className="h-20 bg-slate-800/30 rounded-lg animate-pulse"></div>
-            <div className="h-10 bg-slate-800/30 rounded-lg animate-pulse"></div>
-          </div>
+        <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 transition p-5">
+          <ApplicationIntelligenceSections
+            analysis={analysis}
+            deltas={deltas}
+            analyzing={loading || analysisStatus === 'analyzing'}
+            onPrimaryAction={handleSmartPrimaryAction}
+            onSecondaryAction={handleOpenJAZ}
+          />
         </div>
       )
     }
 
-    // If no result and not loading, show next step only (no placeholder)
-    if (!result) {
-      return (
-        <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition p-6 space-y-5">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-violet-400" />
-              <h3 className="text-sm font-semibold text-violet-400 uppercase tracking-wide">Recommended next step</h3>
-            </div>
-            <p className="text-xs text-slate-400">Based on your CV and current application progress</p>
-            {nextStep ? (
-              <>
-                <h2 className="text-xl font-heading font-semibold text-white">{nextStep.name}</h2>
-                <p className="text-sm text-slate-300 leading-relaxed">{nextStep.description}</p>
-              </>
-            ) : (
-              <>
-                <h2 className="text-xl font-heading font-semibold text-white">Analyzing Job...</h2>
-                <p className="text-sm text-slate-300 leading-relaxed">Preparing your next steps</p>
-              </>
-            )}
-          </div>
-
-          {nextStep && (
-            <button
-              onClick={nextStep.primaryAction.onClick}
-              className="w-full px-4 py-3 bg-violet-600 hover:bg-violet-500 text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-violet-900/30"
-            >
-              {nextStep.primaryAction.icon}
-              {nextStep.primaryAction.label}
-            </button>
-          )}
-
-          <div className="pt-3 border-t border-slate-700/50">
-            <button
-              onClick={handleOpenJAZ}
-              className="w-full px-4 py-2.5 bg-slate-900/60 hover:bg-slate-800/60 text-slate-300 text-sm font-medium rounded-lg transition flex items-center justify-center gap-2 border border-slate-700/50 hover:border-violet-400/50 hover:text-violet-300"
-            >
-              <Bot className="w-4 h-4" />
-              Open AI Apply Assistant
-            </button>
-          </div>
-        </div>
-      )
-    }
-
-    // Show analyzing state: hide all results, show only analyzing card
-    if (analysisStatus === 'analyzing') {
-      return (
-        <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition p-6 space-y-5">
-          {/* Analyzing card - same style as initial analysis */}
-          <div className="mb-3 p-3 rounded-lg bg-violet-500/10 border border-violet-500/30 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-200 hover:border-violet-500/50 transition-colors group">
-            <div className="flex-shrink-0">
-              <img 
-                src="/jaz/jaz-eye.png" 
-                alt="JAZ" 
-                className="w-4 h-4 object-cover rounded-full animate-pulse" 
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-violet-300 mb-0.5">
-                JAZ is analyzing…
-              </div>
-              <div className="text-xs text-slate-400">Updating match score & next steps</div>
-            </div>
-          </div>
-          
-          {/* Skeleton placeholders */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="h-4 bg-slate-800/50 rounded w-3/4 animate-pulse"></div>
-              <div className="h-3 bg-slate-800/30 rounded w-1/2 animate-pulse"></div>
-            </div>
-            <div className="h-20 bg-slate-800/30 rounded-lg animate-pulse"></div>
-            <div className="h-10 bg-slate-800/30 rounded-lg animate-pulse"></div>
-          </div>
-        </div>
-      )
-    }
-
-    // New streamlined card layout - only show when analysisStatus === 'ready'
-    return (
-      <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition p-6 space-y-5">
-        {/* 1. Title: "Next Step" + step name */}
-        {nextStep ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-violet-400" />
-              <h3 className="text-sm font-semibold text-violet-400 uppercase tracking-wide">Recommended next step</h3>
-            </div>
-            <p className="text-xs text-slate-400">Based on your CV and current application progress</p>
-            <h2 className="text-xl font-heading font-semibold text-white">{nextStep.name}</h2>
-            <p className="text-sm text-slate-300 leading-relaxed">{nextStep.description}</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-violet-400 uppercase tracking-wide">Apply Assistant</h3>
-            <p className="text-sm text-slate-300">Loading next steps...</p>
-          </div>
-        )}
-
-        {/* 2. JAZ Insight (only if ready) */}
-        {isInsightReady && result && (
-          <div className="rounded-xl bg-gradient-to-br from-violet-900/30 to-slate-800/50 border border-violet-700/50 p-4 space-y-3 hover:border-violet-600/60 transition-colors group">
-            <div className="flex items-center gap-2">
-              <img 
-                src="/jaz/jaz-eye.png" 
-                alt="JAZ" 
-                className="w-4 h-4 object-cover rounded-full group-hover:drop-shadow-[0_0_4px_rgba(139,92,246,0.6)] group-hover:drop-shadow-[0_0_8px_rgba(139,92,246,0.3)] transition-all duration-200" 
-              />
-              <h4 className="text-sm font-semibold text-violet-300">JAZ Insight</h4>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-white">{result.fitScore.score}</span>
-                <span className={`text-sm font-medium ${fitScoreInfo.color}`}>
-                  {fitScoreInfo.label} Match
-                </span>
-              </div>
-              <div className="w-full bg-slate-800/50 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all ${
-                    result.fitScore.score >= 80 ? 'bg-green-500' :
-                    result.fitScore.score >= 60 ? 'bg-yellow-500' :
-                    result.fitScore.score >= 40 ? 'bg-orange-500' : 'bg-red-500'
-                  }`}
-                  style={{ width: `${result.fitScore.score}%` }}
-                />
-              </div>
-              {result.comparison.strengths && result.comparison.strengths.length > 0 && (
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  {result.comparison.strengths[0]}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 3. Match score is low / Top fixes card (deterministic visibility) */}
-        {(shouldShowLowScoreCard || shouldShowSkeleton) && (
-          shouldShowLowScoreCard && result && result.fitScore && result.fitScore.weaknesses && result.fitScore.weaknesses.length > 0 ? (
-            // Show actual content when data is available
-            <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-4">
-              <div className="flex items-start gap-2 mb-2">
-                <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <h4 className="text-xs font-semibold text-amber-400 mb-1.5">Match score is low</h4>
-                  <p className="text-xs text-slate-300 mb-2">Top fixes:</p>
-                  <ul className="space-y-1 text-xs text-slate-300">
-                    {result.fitScore.weaknesses.slice(0, 3).map((weakness, i) => (
-                      <li key={i} className="flex items-start gap-1.5">
-                        <span className="text-amber-400">•</span>
-                        <span>{weakness}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Show skeleton placeholder during loading (same size as actual card)
-            <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-4 animate-pulse">
-              <div className="flex items-start gap-2 mb-2">
-                <div className="w-4 h-4 bg-amber-400/20 rounded-full flex-shrink-0 mt-0.5"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 bg-amber-400/20 rounded w-32"></div>
-                  <div className="h-3 bg-slate-300/10 rounded w-24"></div>
-                  <div className="space-y-1.5">
-                    <div className="h-3 bg-slate-300/10 rounded w-full"></div>
-                    <div className="h-3 bg-slate-300/10 rounded w-5/6"></div>
-                    <div className="h-3 bg-slate-300/10 rounded w-4/6"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        )}
-
-        {/* 4. Primary action button (context-based) */}
-        {nextStep && (
-          <button
-            onClick={nextStep.primaryAction.onClick}
-            className="w-full px-4 py-3 bg-violet-600 hover:bg-violet-500 text-white font-medium rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-violet-900/30"
-          >
-            {nextStep.primaryAction.icon}
-            {nextStep.primaryAction.label}
-          </button>
-        )}
-
-        {/* 5. Optional supporting actions */}
-        <div className="space-y-2">
-          {/* Show Optimize CV if not the primary action and CV not ready */}
-          {cvStatus === 'not-tailored' && nextStep?.name !== 'Optimize CV' && (
-            <button
-              onClick={() => {
-                if (onOptimizeCV) {
-                  onOptimizeCV()
-                } else {
-                  handleOpenCVBuilder()
-                }
-              }}
-              className="w-full px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 text-sm font-medium rounded-lg transition flex items-center justify-center gap-2 border border-slate-700/50 hover:border-violet-400/50"
-            >
-              <FileText className="w-4 h-4" />
-              Optimize CV
-            </button>
-          )}
-
-          {/* Show Generate Cover Letter if not the primary action and cover not ready */}
-          {coverStatus === 'not-created' && nextStep?.name !== 'Generate Cover Letter' && cvStatus === 'ready' && (
-            <button
-              onClick={() => {
-                if (onGenerateCoverLetter) {
-                  onGenerateCoverLetter()
-                } else {
-                  handleOpenCoverBuilder()
-                }
-              }}
-              className="w-full px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 text-sm font-medium rounded-lg transition flex items-center justify-center gap-2 border border-slate-700/50 hover:border-violet-400/50"
-            >
-              <Mail className="w-4 h-4" />
-              Generate Cover Letter
-            </button>
-          )}
-
-          {/* Show Train Interview if not the primary action and available */}
-          {trainingStatus === 'available' && nextStep?.name !== 'Train for Interview' && (
-            <button
-              onClick={() => {
-                if (onTrainInterview) {
-                  onTrainInterview()
-                } else {
-                  handleTrainInterview()
-                }
-              }}
-              className="w-full px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 text-sm font-medium rounded-lg transition flex items-center justify-center gap-2 border border-slate-700/50 hover:border-violet-400/50"
-            >
-              <GraduationCap className="w-4 h-4" />
-              Train Interview
-            </button>
-          )}
-        </div>
-
-        {/* 5. Secondary link/button: "Open AI Apply Assistant" (always visible) */}
-        <div className="pt-3 border-t border-slate-700/50">
-          <button
-            onClick={handleOpenJAZ}
-            className="w-full px-4 py-2.5 bg-slate-900/60 hover:bg-slate-800/60 text-slate-300 text-sm font-medium rounded-lg transition flex items-center justify-center gap-2 border border-slate-700/50 hover:border-violet-400/50 hover:text-violet-300"
-          >
-            <Bot className="w-4 h-4" />
-            Open AI Apply Assistant
-          </button>
-        </div>
-      </div>
-    )
+    return null
   }
+
 
   return (
     <>

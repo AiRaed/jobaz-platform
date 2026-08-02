@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 // Formatting instruction for AI Preview output
 const FORMATTING_INSTRUCTION = `CRITICAL FORMATTING REQUIREMENTS FOR OUTPUT:
@@ -54,7 +50,7 @@ export async function POST(req: Request) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       const mockContent = `[MOCK ${mode}] Rewritten content:\n\n${content}`
       return NextResponse.json({ ok: true, content: mockContent })
@@ -62,8 +58,7 @@ export async function POST(req: Request) {
 
     const instruction = modeInstructions[mode as keyof typeof modeInstructions] || modeInstructions.enhance
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -74,11 +69,13 @@ export async function POST(req: Request) {
           content: `${instruction.prompt}\n\n${FORMATTING_INSTRUCTION}\n\nOriginal content:\n${content}`,
         },
       ],
+      modelTier: 'quality',
       temperature: 0.7,
-      max_tokens: 1000,
+      maxTokens: 1000,
+      feature: 'rewrite',
     })
 
-    const rewrittenContent = completion.choices[0]?.message?.content || ''
+    const rewrittenContent = completion.text || ''
     const response = { ok: true, content: rewrittenContent }
     console.log('[Rewrite] response:', response)
 

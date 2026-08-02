@@ -1,43 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import {
+  createProofreadingServerClient,
+  isSupabaseConfigured,
+  proofreadingProjectsJsonError,
+  proofreadingProjectsJsonSuccess,
+} from '@/lib/proofreading/supabaseServer'
 
 export const dynamic = 'force-dynamic'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 /**
  * GET /api/proofreading/projects
  * Fetches all proofreading projects for the authenticated user.
  */
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // Ignore in route handler
-          }
-        },
-      },
-    })
+    if (!isSupabaseConfigured()) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Proofreading Projects] Supabase env vars are missing')
+      }
+      return proofreadingProjectsJsonSuccess([])
+    }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
+    const supabase = createProofreadingServerClient()
+    if (!supabase) {
+      return proofreadingProjectsJsonSuccess([])
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError) {
+      console.error('[Proofreading Projects] Auth error:', authError)
+    }
+
     if (authError || !user) {
-      return NextResponse.json(
-        { ok: false, error: 'Authentication required' },
-        { status: 401 }
-      )
+      // Not signed in — return empty list so the UI can show "No projects yet"
+      return proofreadingProjectsJsonSuccess([])
     }
 
     const { data: projects, error } = await supabase
@@ -47,19 +47,18 @@ export async function GET(req: NextRequest) {
       .order('updated_at', { ascending: false })
 
     if (error) {
-      console.error('[Proofreading Projects] Error:', error)
-      return NextResponse.json(
-        { ok: false, error: 'Failed to fetch projects' },
-        { status: 500 }
-      )
+      console.error('[Proofreading Projects] Fetch error:', error)
+      return proofreadingProjectsJsonError('Failed to load projects', 500, {
+        code: error.code ?? 'DB_ERROR',
+      })
     }
 
-    return NextResponse.json({ ok: true, projects: projects || [] })
-  } catch (error: any) {
-    console.error('[Proofreading Projects] Unexpected error:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Internal server error' },
-      { status: 500 }
+    return proofreadingProjectsJsonSuccess(projects || [])
+  } catch (error: unknown) {
+    console.error('[Proofreading Projects] Unexpected GET error:', error)
+    return proofreadingProjectsJsonError(
+      error instanceof Error ? error.message : 'Failed to load projects',
+      500
     )
   }
 }
@@ -72,41 +71,41 @@ function normalizeCategoryToSlug(category: string): string {
   if (!category || typeof category !== 'string') {
     return 'general'
   }
-  
+
   const trimmed = category.trim()
-  
-  // If already a valid slug, return it
+
   const validSlugs = ['general', 'academic_standard', 'academic_research_phd']
   if (validSlugs.includes(trimmed.toLowerCase())) {
     return trimmed.toLowerCase()
   }
-  
-  // Map old labels to slugs (backward compatibility)
+
   const lowerTrimmed = trimmed.toLowerCase()
-  
+
   if (lowerTrimmed === 'general' || trimmed === 'General') {
     return 'general'
   }
-  
-  // Academic – Standard or Academic - Standard (with em dash or hyphen)
-  if (lowerTrimmed === 'academic' || 
-      lowerTrimmed.includes('academic') && lowerTrimmed.includes('standard') ||
-      trimmed === 'Academic' ||
-      trimmed.includes('Academic – Standard') || 
-      trimmed.includes('Academic - Standard')) {
+
+  if (
+    lowerTrimmed === 'academic' ||
+    (lowerTrimmed.includes('academic') && lowerTrimmed.includes('standard')) ||
+    trimmed === 'Academic' ||
+    trimmed.includes('Academic – Standard') ||
+    trimmed.includes('Academic - Standard')
+  ) {
     return 'academic_standard'
   }
-  
-  // Academic – Research / PhD or Academic - Research / PhD
-  if (lowerTrimmed.includes('academic') && (lowerTrimmed.includes('research') || lowerTrimmed.includes('phd')) ||
-      trimmed === 'Academic Research' ||
-      trimmed.includes('Academic – Research') || 
-      trimmed.includes('Academic - Research') || 
-      trimmed.includes('PhD')) {
+
+  if (
+    (lowerTrimmed.includes('academic') &&
+      (lowerTrimmed.includes('research') || lowerTrimmed.includes('phd'))) ||
+    trimmed === 'Academic Research' ||
+    trimmed.includes('Academic – Research') ||
+    trimmed.includes('Academic - Research') ||
+    trimmed.includes('PhD')
+  ) {
     return 'academic_research_phd'
   }
-  
-  // Default fallback
+
   return 'general'
 }
 
@@ -116,71 +115,63 @@ function normalizeCategoryToSlug(category: string): string {
  */
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // Ignore in route handler
-          }
-        },
-      },
-    })
+    if (!isSupabaseConfigured()) {
+      console.error('[Proofreading Projects] Supabase env vars are missing')
+      return proofreadingProjectsJsonError(
+        'Writing Review is not configured yet. Please try again later.',
+        503,
+        { code: 'NOT_CONFIGURED' }
+      )
+    }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
+    const supabase = createProofreadingServerClient()
+    if (!supabase) {
+      return proofreadingProjectsJsonError(
+        'Writing Review is not configured yet. Please try again later.',
+        503,
+        { code: 'NOT_CONFIGURED' }
+      )
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
     if (authError || !user) {
-      return NextResponse.json(
-        { ok: false, error: 'Authentication required' },
-        { status: 401 }
-      )
+      return proofreadingProjectsJsonError('Authentication required', 401, {
+        code: 'AUTH_REQUIRED',
+      })
     }
 
-    let body
+    let body: Record<string, unknown>
     try {
-      body = await req.json()
-    } catch (parseError: any) {
+      body = (await req.json()) as Record<string, unknown>
+    } catch (parseError: unknown) {
       console.error('[Proofreading Projects] JSON parse error:', parseError)
-      return NextResponse.json(
-        { 
-          ok: false, 
-          error: 'Invalid JSON in request body',
-          message: parseError?.message || 'Failed to parse request body'
-        },
-        { status: 400 }
+      return proofreadingProjectsJsonError('Invalid JSON in request body', 400, {
+        code: 'INVALID_JSON',
+      })
+    }
+
+    const title = typeof body.title === 'string' ? body.title : ''
+    const category = typeof body.category === 'string' ? body.category : 'general'
+
+    if (!title.trim()) {
+      return proofreadingProjectsJsonError(
+        'Title is required and must be a non-empty string',
+        400,
+        { code: 'VALIDATION_ERROR' }
       )
     }
 
-    const { title, category = 'general' } = body
-
-    if (!title || typeof title !== 'string' || !title.trim()) {
-      return NextResponse.json(
-        { ok: false, error: 'Title is required and must be a non-empty string' },
-        { status: 400 }
-      )
-    }
-
-    // Map category label to slug (backward compatible)
     const categorySlug = normalizeCategoryToSlug(category)
-    
+
     const payload = {
       user_id: user.id,
       title: title.trim(),
       category: categorySlug,
     }
-
-    console.log('[Proofreading Projects] Creating project with payload:', {
-      ...payload,
-      originalCategory: category,
-      normalizedCategory: categorySlug,
-    })
 
     const { data: project, error } = await supabase
       .from('proofreading_projects')
@@ -195,39 +186,26 @@ export async function POST(req: NextRequest) {
         details: error.details,
         hint: error.hint,
         category: categorySlug,
-        originalCategory: category,
         payload,
-        fullError: error,
       })
       return NextResponse.json(
-        { 
-          ok: false, 
+        {
+          ok: false,
+          projects: [],
           error: 'Failed to create project',
-          code: error.code || 'UNKNOWN_ERROR',
-          message: error.message || 'Unknown error occurred',
-          details: error.details || null,
-          hint: error.hint || null,
+          message: error.message || 'Failed to create project',
+          code: error.code || 'DB_ERROR',
         },
         { status: 500 }
       )
     }
 
-    return NextResponse.json({ ok: true, project })
-  } catch (error: any) {
-    console.error('[Proofreading Projects] Unexpected error:', {
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
-      fullError: error,
-    })
-    return NextResponse.json(
-      { 
-        ok: false, 
-        error: error?.message || 'Internal server error',
-        message: error?.message || 'An unexpected error occurred while creating the project'
-      },
-      { status: 500 }
+    return NextResponse.json({ ok: true, project, projects: project ? [project] : [] })
+  } catch (error: unknown) {
+    console.error('[Proofreading Projects] Unexpected POST error:', error)
+    return proofreadingProjectsJsonError(
+      error instanceof Error ? error.message : 'Failed to create project',
+      500
     )
   }
 }
-

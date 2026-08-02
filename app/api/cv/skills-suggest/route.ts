@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 type SkillsAIMode = 'hard' | 'soft' | 'both'
 type CareerDomain = 'tech' | 'hospitality' | 'production' | 'customer_service' | 'supervisor' | 'general'
@@ -102,7 +98,7 @@ export async function POST(req: Request) {
     const domain = detectDomain(contextText)
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       // Return mock data based on mode and domain
       const mockSkills = getMockSkillsForDomain(domain, mode)
@@ -175,8 +171,7 @@ Detected career domain: ${domain}
 
 Please suggest ${mode === 'hard' ? 'hard/technical' : mode === 'soft' ? 'soft/interpersonal' : 'a balanced mix of hard and soft'} skills that would be appropriate for this role and background.${domainRestriction}`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -187,11 +182,13 @@ Please suggest ${mode === 'hard' ? 'hard/technical' : mode === 'soft' ? 'soft/in
           content: userPrompt,
         },
       ],
+      modelTier: 'default',
       temperature: 0.7,
-      max_tokens: 500,
+      maxTokens: 500,
+      feature: 'cv/skills-suggest',
     })
 
-    const result = completion.choices[0]?.message?.content || ''
+    const result = completion.text || ''
 
     // Parse the response - split by newlines and clean up
     const skills = result

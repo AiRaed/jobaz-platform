@@ -1,128 +1,103 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchAdzunaJobs } from '@/lib/jobs/adzuna'
 import { fetchReedJobs } from '@/lib/jobs/reed'
+import { searchJobazJobs } from '@/lib/jobs/jobaz'
 import { normalizeAdzunaJob, normalizeReedJob, removeDuplicates } from '@/lib/jobs/normalize'
+import { mergeJobSearchResults } from '@/lib/jobs/merge-results'
+import { rankAndFilterJobResults } from '@/lib/jobs/rankResults'
 import type { UnifiedJob } from '@/lib/jobs/types'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * Format salary from min/max to readable string
- */
-function formatSalary(min?: number, max?: number): string | undefined {
+function formatSalary(min?: number, max?: number, display?: string): string | undefined {
+  if (display) return display
   if (!min && !max) return undefined
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
+  const formatAmount = (amount: number) =>
+    new Intl.NumberFormat('en-GB', {
       style: 'currency',
       currency: 'GBP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount)
-  }
 
-  if (min && max) {
-    return `${formatAmount(min)} - ${formatAmount(max)}`
-  } else if (min) {
-    return `From ${formatAmount(min)}`
-  } else if (max) {
-    return `Up to ${formatAmount(max)}`
-  }
-
+  if (min && max) return `${formatAmount(min)} - ${formatAmount(max)}`
+  if (min) return `From ${formatAmount(min)}`
+  if (max) return `Up to ${formatAmount(max)}`
   return undefined
 }
 
 /**
  * GET /api/jobs/search
- * 
- * Query parameters:
- * - keyword: Search keyword (required)
- * - location: Location filter (default: 'UK')
- * - page: Page number (default: 1)
- * 
- * Returns unified job results from both Adzuna and Reed UK APIs
+ * Unified results: JobAZ managed + Adzuna + Reed
  */
 export async function GET(req: NextRequest) {
   try {
-    // Get query parameters
     const searchParams = req.nextUrl.searchParams
     const keyword = searchParams.get('keyword') || ''
     const location = searchParams.get('location') || 'UK'
     const page = parseInt(searchParams.get('page') || '1', 10)
+    const routeTags = searchParams.get('routeTags')?.split(',').filter(Boolean)
 
-    // Validate keyword
     if (!keyword.trim()) {
-      return NextResponse.json(
-        { error: 'Keyword parameter is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Keyword parameter is required' }, { status: 400 })
     }
 
     const searchParamsObj = {
       keyword: keyword.trim(),
       location: location.trim() || 'UK',
       page,
+      routeTags,
     }
 
-    // Fetch jobs from both providers in parallel
-    const [adzunaJobsRaw, reedJobsRaw] = await Promise.allSettled([
+    const [adzunaJobsRaw, reedJobsRaw, jobazJobsRaw] = await Promise.allSettled([
       fetchAdzunaJobs(searchParamsObj),
       fetchReedJobs(searchParamsObj),
+      searchJobazJobs(searchParamsObj),
     ])
 
-    // Normalize jobs from both providers
-    const allJobs: UnifiedJob[] = []
+    const externalJobs: UnifiedJob[] = []
 
-    // Process Adzuna jobs
     if (adzunaJobsRaw.status === 'fulfilled') {
-      const normalized = adzunaJobsRaw.value.map(normalizeAdzunaJob)
-      allJobs.push(...normalized)
+      externalJobs.push(...adzunaJobsRaw.value.map(normalizeAdzunaJob))
     } else {
       console.error('Adzuna API error:', adzunaJobsRaw.reason)
     }
 
-    // Process Reed jobs
     if (reedJobsRaw.status === 'fulfilled') {
-      const normalized = reedJobsRaw.value.map(normalizeReedJob)
-      allJobs.push(...normalized)
+      externalJobs.push(...reedJobsRaw.value.map(normalizeReedJob))
     } else {
       console.error('Reed API error:', reedJobsRaw.reason)
     }
 
-    // Remove duplicates (based on title + company + location)
-    const uniqueJobs = removeDuplicates(allJobs)
+    const uniqueExternal = removeDuplicates(externalJobs)
 
-    // Map to the format expected by the frontend
-    const mappedResults = uniqueJobs.map((job) => ({
-      id: job.id,
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      description: job.description,
-      type: 'Full-time', // Default type for compatibility
-      link: job.url,
-      salary: formatSalary(job.salaryMin, job.salaryMax),
-      source: job.source,
-    }))
+    const jobazJobs = jobazJobsRaw.status === 'fulfilled' ? jobazJobsRaw.value : []
+    if (jobazJobsRaw.status === 'rejected') {
+      console.error('JobAZ jobs error:', jobazJobsRaw.reason)
+    }
 
-    return NextResponse.json({ results: mappedResults }, { status: 200 })
+    const withSalaries = mergeJobSearchResults(jobazJobs, uniqueExternal).map((result) => {
+      const unified =
+        jobazJobs.find((j) => j.id === result.id) ??
+        uniqueExternal.find((j) => j.id === result.id)
+      return {
+        ...result,
+        salary: unified?.salary ?? formatSalary(unified?.salaryMin, unified?.salaryMax),
+      }
+    })
+
+    const ranked = rankAndFilterJobResults(withSalaries, keyword.trim())
+
+    return NextResponse.json({ results: ranked }, { status: 200 })
   } catch (error) {
     console.error('Error in jobs/search route:', error)
-    
-    // Provide user-friendly error messages
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    
+
     if (errorMessage.includes('Missing') && errorMessage.includes('API credentials')) {
       return NextResponse.json(
         { error: 'Server configuration error: Missing API credentials' },
         { status: 500 }
-      )
-    }
-
-    if (errorMessage.includes('Keyword is required')) {
-      return NextResponse.json(
-        { error: 'Keyword parameter is required' },
-        { status: 400 }
       )
     }
 
@@ -132,4 +107,3 @@ export async function GET(req: NextRequest) {
     )
   }
 }
-

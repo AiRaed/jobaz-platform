@@ -1,14 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, AlertTriangle, ExternalLink, FileText, MessageSquare, Mail, Search, Info } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
 import PageHeader from '@/components/PageHeader'
-import { getCareerPathById, CAREER_PATHS } from '@/lib/career-paths'
-import { cn } from '@/lib/utils'
+import { getCareerPathById } from '@/lib/career-paths'
 import { LocationSearchModal } from '@/components/LocationSearchModal'
+import CareerAuthWallModal from '@/components/home/CareerAuthWallModal'
+import { useBuildYourPathProfile } from '@/hooks/useBuildYourPathProfile'
+import {
+  answerGuideQuestion,
+  computePathMatch,
+  getPathIntelligence,
+  getTrackedPathIds,
+  trackPathLocally,
+} from '@/lib/build-your-path/pathIntelligence'
+import YourMatchSection from '@/components/build-your-path/YourMatchSection'
+import CareerTimelineSection from '@/components/build-your-path/CareerTimelineSection'
+import SalaryProgressionCard from '@/components/build-your-path/SalaryProgressionCard'
+import RealityCheckMetrics from '@/components/build-your-path/RealityCheckMetrics'
+import PeopleLikeYouSection from '@/components/build-your-path/PeopleLikeYouSection'
+import RelatedPathsCarousel from '@/components/build-your-path/RelatedPathsCarousel'
+import PathFeedOpportunities from '@/components/build-your-path/PathFeedOpportunities'
+import PathCollapsibleSection from '@/components/build-your-path/PathCollapsibleSection'
+import PathCourseCard from '@/components/build-your-path/PathCourseCard'
+import PathPrepareSidebar from '@/components/build-your-path/PathPrepareSidebar'
+import CareerGuideAssistant from '@/components/build-your-path/CareerGuideAssistant'
+import CareerHubCourseCard from '@/components/career-hub/CareerHubCourseCard'
+import { listPathCourses } from '@/lib/career-hub/courseCatalog'
+import { upsertCareerPlanItem } from '@/lib/career-hub/myPlan'
 
 export default function CareerPathPage() {
   const router = useRouter()
@@ -16,56 +38,89 @@ export default function CareerPathPage() {
   const searchParams = useSearchParams()
   const pathId = params.pathId as string
   const path = getCareerPathById(pathId)
-  const [caSessionId, setCaSessionId] = useState<string | null>(null)
+  const profile = useBuildYourPathProfile()
 
-  // Check for Career Assistant query params and localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const from = searchParams.get('from')
-    const sessionParam = searchParams.get('ca_session')
-    
-    // Show back button if from=career_assistant OR ca_session exists
-    if ((from === 'career_assistant' || sessionParam) && sessionParam) {
-      // Verify snapshot exists before setting session
-      try {
-        const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
-        if (snapshot) {
-          const parsed = JSON.parse(snapshot)
-          if (parsed.sessionId === sessionParam) {
-            setCaSessionId(sessionParam)
-          }
-        }
-      } catch (err) {
-        console.error('Failed to verify CA session:', err)
-      }
-    } else {
-      // Check localStorage for stored session (for refresh durability)
-      try {
-        const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
-        if (snapshot) {
-          const parsed = JSON.parse(snapshot)
-          if (parsed.sessionId) {
-            setCaSessionId(parsed.sessionId)
-          }
-        }
-      } catch (err) {
-        console.error('Failed to restore CA session from localStorage:', err)
-      }
-    }
-  }, [searchParams])
+  const [caSessionId, setCaSessionId] = useState<string | null>(null)
   const [locationModalOpen, setLocationModalOpen] = useState(false)
-  const [selectedCourse, setSelectedCourse] = useState<{ 
+  const [authOpen, setAuthOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'track' | 'jobs'>('track')
+  const [trackedIds, setTrackedIds] = useState<string[]>([])
+  const pathStartedRef = useRef<string | null>(null)
+
+  const [selectedCourse, setSelectedCourse] = useState<{
     name: string
     externalLink?: string
     sourceType: 'GOV.UK' | 'National Careers Service' | 'Professional Body' | 'College' | 'Other'
   } | null>(null)
 
-  if (!path) {
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setTrackedIds(getTrackedPathIds())
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const from = searchParams.get('from')
+    const sessionParam = searchParams.get('ca_session')
+    const loadSession = (id: string) => {
+      try {
+        const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
+        if (snapshot) {
+          const parsed = JSON.parse(snapshot)
+          if (parsed.sessionId === id) setCaSessionId(id)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if ((from === 'career_assistant' || sessionParam) && sessionParam) {
+      loadSession(sessionParam)
+    } else {
+      try {
+        const snapshot = localStorage.getItem('jobaz_ca_last_result_v1')
+        if (snapshot) {
+          const parsed = JSON.parse(snapshot)
+          if (parsed.sessionId) setCaSessionId(parsed.sessionId)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!path || pathStartedRef.current === pathId) return
+    pathStartedRef.current = pathId
+    void import('@/lib/jobaz-ai/skillPathSignals').then(({ emitSkillPathStarted }) =>
+      emitSkillPathStarted({ pathId, pathName: path.title })
+    )
+  }, [path, pathId])
+
+  const intelligence = useMemo(
+    () => (path ? getPathIntelligence(path, profile) : null),
+    [path, profile]
+  )
+  const match = useMemo(
+    () => (path ? computePathMatch(path, profile) : null),
+    [path, profile]
+  )
+
+  const isTracked = trackedIds.includes(pathId)
+
+  const askGuide = useCallback(
+    (question: string) => {
+      if (!path || !intelligence) return 'Ask a question about this path to get guidance.'
+      return answerGuideQuestion(path, question, intelligence)
+    },
+    [path, intelligence]
+  )
+
+  if (!path || !intelligence || !match) {
     return (
       <AppShell>
         <div className="text-center py-12">
           <h1 className="text-2xl font-bold text-slate-200 mb-4">Path Not Found</h1>
-          <p className="text-slate-400 mb-6">The career path you're looking for doesn't exist.</p>
+          <p className="text-slate-400 mb-6">The career path you&apos;re looking for doesn&apos;t exist.</p>
           <Link
             href="/build-your-path"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-500 transition-colors"
@@ -79,42 +134,42 @@ export default function CareerPathPage() {
   }
 
   const handleCreateCV = () => {
-    // Store the path info for CV builder to use
+    void import('@/lib/jobaz-ai/skillPathSignals').then(({ emitSkillGoalSelected }) =>
+      emitSkillGoalSelected({ pathId: path.id, pathName: path.title, goalType: 'cv' })
+    )
     if (typeof window !== 'undefined') {
-      localStorage.setItem('jobaz_career_path', JSON.stringify({
-        pathId: path.id,
-        pathTitle: path.title,
-        skills: path.requirements.certificates.concat(path.requirements.shortCourses)
-      }))
+      localStorage.setItem(
+        'jobaz_career_path',
+        JSON.stringify({
+          pathId: path.id,
+          pathTitle: path.title,
+          skills: path.requirements.certificates.concat(path.requirements.shortCourses),
+        })
+      )
     }
     router.push('/cv-builder-v2')
   }
 
   const handlePracticeInterview = () => {
-    // Store the path info for interview coach
     if (typeof window !== 'undefined') {
-      localStorage.setItem('jobaz_career_path', JSON.stringify({
-        pathId: path.id,
-        pathTitle: path.title,
-        jobTitle: path.title
-      }))
+      localStorage.setItem(
+        'jobaz_career_path',
+        JSON.stringify({ pathId: path.id, pathTitle: path.title, jobTitle: path.title })
+      )
     }
     router.push('/interview-coach')
   }
 
-  const handleWriteCoverLetter = () => {
-    router.push('/cover')
-  }
+  const handleWriteCoverLetter = () => router.push('/cover')
 
-  // Mapping from path IDs to job search keywords
-  const getJobSearchKeyword = (pathId: string): string => {
+  const getJobSearchKeyword = (id: string): string => {
     const keywordMap: Record<string, string> = {
       'translator-interpreter': 'Interpreter',
-      'electrician': 'Electrician',
+      electrician: 'Electrician',
       'plumbing-handyman': 'Plumber',
       'driving-transport': 'Delivery Driver',
       'security-facilities': 'Security Officer',
-      'cleaner': 'Cleaner',
+      cleaner: 'Cleaner',
       'warehouse-logistics': 'Warehouse Operative',
       'office-admin': 'Admin Assistant',
       'care-support': 'Support Worker',
@@ -125,73 +180,102 @@ export default function CareerPathPage() {
       'maintenance-facilities': 'Maintenance Worker',
       'self-employed-freelance': 'Freelance',
     }
-    return keywordMap[pathId] || path.title
+    return keywordMap[id] || path.title
   }
 
-  const handleFindJobs = () => {
-    // Store the path info for job finder
+  const navigateToJobs = () => {
+    void import('@/lib/jobaz-ai/skillPathSignals').then(({ emitSkillGoalSelected }) =>
+      emitSkillGoalSelected({ pathId: path.id, pathName: path.title, goalType: 'jobs' })
+    )
     if (typeof window !== 'undefined') {
-      localStorage.setItem('jobaz_career_path', JSON.stringify({
-        pathId: path.id,
-        pathTitle: path.title
-      }))
+      localStorage.setItem('jobaz_career_path', JSON.stringify({ pathId: path.id, pathTitle: path.title }))
     }
-    
-    // Get the job search keyword for this path
     const keyword = getJobSearchKeyword(path.id)
-    
-    // Navigate to job finder with query parameter
-    const params = new URLSearchParams()
-    params.set('query', keyword)
-    params.set('location', 'UK (Anywhere)')
-    
-    router.push(`/job-finder?${params.toString()}`)
+    const jobParams = new URLSearchParams()
+    jobParams.set('query', keyword)
+    jobParams.set('location', 'UK (Anywhere)')
+    router.push(`/job-finder?${jobParams.toString()}`)
   }
 
-  // Helper function to determine source type from course
-  const getCourseSourceType = (course: { externalLink?: string; type: string; sourceType?: 'GOV.UK' | 'National Careers Service' | 'Professional Body' | 'College' | 'Other' }): 'GOV.UK' | 'National Careers Service' | 'Professional Body' | 'College' | 'Other' => {
-    if (course.sourceType) {
-      return course.sourceType
+  const handleUnlockJobs = () => {
+    if (profile.isLoggedIn) {
+      navigateToJobs()
+      return
     }
+    setAuthMode('jobs')
+    setAuthOpen(true)
+  }
+
+  const handleTrackProgress = () => {
+    if (profile.isLoggedIn) {
+      trackPathLocally(pathId)
+      setTrackedIds(getTrackedPathIds())
+      return
+    }
+    setAuthMode('track')
+    setAuthOpen(true)
+  }
+
+  const getCourseSourceType = (course: {
+    externalLink?: string
+    type: string
+    sourceType?: 'GOV.UK' | 'National Careers Service' | 'Professional Body' | 'College' | 'Other'
+  }) => {
+    if (course.sourceType) return course.sourceType
     if (course.externalLink) {
-      // Determine based on course type or external link domain
-      if (course.type.toLowerCase().includes('college') || course.type.toLowerCase().includes('level')) {
-        return 'College'
-      }
+      if (course.type.toLowerCase().includes('college') || course.type.toLowerCase().includes('level')) return 'College'
       if (course.type.toLowerCase().includes('professional') || course.type.toLowerCase().includes('certification')) {
         return 'Professional Body'
       }
       return 'Other'
     }
-    // Default to National Careers Service for official UK courses
     return 'National Careers Service'
   }
 
-  // Handle direct links - all courses redirect to official sources
-  const handleViewOfficialCourses = (sourceType: 'GOV.UK' | 'National Careers Service' | 'Professional Body' | 'College' | 'Other', externalLink?: string) => {
+  const handleViewOfficialCourses = (
+    sourceType: 'GOV.UK' | 'National Careers Service' | 'Professional Body' | 'College' | 'Other',
+    externalLink?: string,
+    courseName?: string
+  ) => {
+    void import('@/lib/jobaz-ai/skillPathSignals').then(({ emitLessonCompleted }) =>
+      emitLessonCompleted({ pathId, pathName: path.title, lessonId: courseName ?? sourceType })
+    )
     if (sourceType === 'GOV.UK' || sourceType === 'National Careers Service') {
       window.open('https://nationalcareers.service.gov.uk/find-a-course', '_blank', 'noopener,noreferrer')
     } else if (sourceType === 'Professional Body' && externalLink) {
       window.open(externalLink, '_blank', 'noopener,noreferrer')
     } else {
-      // For other types, still open National Careers Service as fallback
       window.open('https://nationalcareers.service.gov.uk/find-a-course', '_blank', 'noopener,noreferrer')
     }
   }
 
-  const handleFindNearYou = (courseName: string, externalLink?: string, sourceType?: 'GOV.UK' | 'National Careers Service' | 'Professional Body' | 'College' | 'Other') => {
-    setSelectedCourse({ 
-      name: courseName,
-      externalLink,
-      sourceType: sourceType || 'National Careers Service'
-    })
+  const handleFindNearYou = (
+    courseName: string,
+    externalLink?: string,
+    sourceType?: 'GOV.UK' | 'National Careers Service' | 'Professional Body' | 'College' | 'Other'
+  ) => {
+    void import('@/lib/jobaz-ai/skillPathSignals').then(({ emitLessonCompleted }) =>
+      emitLessonCompleted({ pathId, pathName: path.title, lessonId: courseName })
+    )
+    setSelectedCourse({ name: courseName, externalLink, sourceType: sourceType || 'National Careers Service' })
     setLocationModalOpen(true)
   }
 
+  const sourceTypeConfig = {
+    'GOV.UK': { label: 'GOV.UK', style: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+    'National Careers Service': { label: 'National Careers Service', style: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+    'Professional Body': { label: 'Professional Body', style: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+    College: { label: 'College', style: 'bg-green-500/20 text-green-300 border-green-500/30' },
+    Other: { label: 'Other', style: 'bg-slate-500/20 text-slate-300 border-slate-500/30' },
+  }
+
+  const whatItIsPreview = path.whatItIs.split('\n\n')[0]?.slice(0, 120) + '...'
+  const jobsRedirect = `/job-finder?query=${encodeURIComponent(getJobSearchKeyword(path.id))}&location=UK%20(Anywhere)`
+
   return (
     <AppShell>
-      <PageHeader 
-        title={path.title} 
+      <PageHeader
+        title={path.title}
         subtitle={path.description}
         showBackToDashboard={true}
         showBackToAllPaths={true}
@@ -199,458 +283,197 @@ export default function CareerPathPage() {
         caSessionId={caSessionId}
       />
 
-      {/* Page Content Header */}
-      <div className="mb-8">
-        <div className="flex items-start gap-4 mb-4">
-          <div className="text-5xl">{path.icon}</div>
-          <div className="flex-1">
-            <p className="text-sm text-slate-400 italic">
-              {path.whoFor}
-            </p>
-          </div>
-        </div>
+      <div className="mb-6 flex items-start gap-4">
+        <span className="text-5xl">{path.icon}</span>
+        <p className="text-sm text-slate-400 italic flex-1 pt-2">{path.whoFor}</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* What this job really is */}
-          <section className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-6">
-            <h2 className="text-xl font-bold text-slate-200 mb-4">What this job really is</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] gap-8 pb-24 lg:pb-10">
+        <div className="min-w-0 space-y-6">
+          <YourMatchSection match={match} pathTitle={path.title} />
+
+          <section className="rounded-2xl border border-emerald-500/25 bg-emerald-950/10 p-5 md:p-6">
+            <p className="text-[10px] uppercase tracking-widest text-emerald-300 mb-1">What should you do next?</p>
+            <h2 className="text-lg font-bold text-slate-100 mb-2">Recommended courses & licences</h2>
+            <p className="text-sm text-slate-400 mb-5">
+              Start with training that gets you job-ready — jobs come after the right certificates.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              {listPathCourses(pathId)
+                .slice(0, 4)
+                .map((listing) => (
+                  <CareerHubCourseCard
+                    key={listing.slug}
+                    course={listing}
+                    featured={listing.demand === 'high'}
+                    onSave={() =>
+                      upsertCareerPlanItem({
+                        courseName: listing.name,
+                        courseSlug: listing.slug,
+                        pathId,
+                        status: 'saved',
+                        source: 'career_hub',
+                      })
+                    }
+                  />
+                ))}
+            </div>
+          </section>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <SalaryProgressionCard salary={intelligence.salary} />
+            <CareerTimelineSection steps={intelligence.timeline} />
+          </div>
+
+          <PathCollapsibleSection title="What this job really is" preview={whatItIsPreview} defaultOpen={false}>
             {path.whatItIs.split('\n\n').map((paragraph, idx) => (
-              <p key={idx} className="text-slate-300 leading-relaxed mb-3 last:mb-0">
+              <p key={idx} className="text-sm text-slate-300 leading-relaxed mb-3 last:mb-0">
                 {paragraph}
               </p>
             ))}
+          </PathCollapsibleSection>
+
+          <section className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-5 md:p-6">
+            <h2 className="text-lg font-bold text-slate-200 mb-3">Do you need a degree?</h2>
+            <DegreeBadge needsDegree={path.needsDegree} />
+            <p className="text-sm text-slate-300 leading-relaxed mt-3">
+              {path.degreeExplanation ||
+                (path.needsDegree === 'no'
+                  ? 'No university degree required — start with short courses, certificates, and on-the-job training.'
+                  : 'Check specific role requirements before committing to this path.')}
+            </p>
           </section>
 
-          {/* Do you need a degree? */}
-          <section className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-6">
-            <h2 className="text-xl font-bold text-slate-200 mb-4">Do you need a degree?</h2>
-            <div className="flex items-center gap-3 mb-3">
-              {path.needsDegree === 'no' && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/20 border border-green-500/30">
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
-                  <span className="text-sm font-semibold text-green-400">No</span>
-                </div>
-              )}
-              {path.needsDegree === 'yes' && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
-                  <AlertTriangle className="w-4 h-4 text-red-400" />
-                  <span className="text-sm font-semibold text-red-400">Yes</span>
-                </div>
-              )}
-              {path.needsDegree === 'sometimes' && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span className="text-sm font-semibold text-yellow-400">Sometimes</span>
-                </div>
-              )}
-            </div>
-            {path.degreeExplanation && (
-              <p className="text-slate-300 leading-relaxed">
-                {path.degreeExplanation}
-              </p>
-            )}
-            {!path.degreeExplanation && path.needsDegree === 'no' && (
-              <p className="text-slate-300 leading-relaxed">
-                This path does not require a university degree. You can get started with 
-                short courses, certificates, and on-the-job training.
-              </p>
-            )}
-            {path.id === 'electrician' && (
-              <p className="text-slate-300 leading-relaxed mt-3">
-                This path can lead to both employment and self-employment, depending on experience, certification, and registration with UK professional bodies.
-              </p>
-            )}
-            {path.id === 'plumbing-handyman' && (
-              <p className="text-slate-300 leading-relaxed mt-3">
-                This path can lead to employment with companies or self-employment as an independent contractor, depending on experience, certification, and proper registration with UK authorities.
-              </p>
-            )}
-            {path.id === 'driving-transport' && (
-              <p className="text-slate-300 leading-relaxed mt-3">
-                This path can lead to employment with logistics companies, public transport operators, or self-employment, depending on licence category, experience, and compliance with UK driving regulations.
-              </p>
-            )}
-          </section>
-
-          {/* What you actually need */}
-          <section className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-6">
-            <h2 className="text-xl font-bold text-slate-200 mb-4">What you actually need</h2>
-            
-            {path.requirements.shortCourses.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-slate-300 mb-3">Short Courses</h3>
-                <ul className="space-y-2">
-                  {path.requirements.shortCourses.map((course, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-violet-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-slate-300">{course}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {path.requirements.certificates.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-slate-300 mb-3">Certificates</h3>
-                <ul className="space-y-2">
-                  {path.requirements.certificates.map((cert, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-violet-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-slate-300">{cert}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {path.requirements.licences.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-slate-300 mb-3">Licences</h3>
-                <ul className="space-y-2">
-                  {path.requirements.licences.map((licence, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-violet-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-slate-300">{licence}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
+          <section className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-5 md:p-6">
+            <h2 className="text-lg font-bold text-slate-200 mb-4">What you actually need</h2>
+            <RequirementList title="Short courses" items={path.requirements.shortCourses} />
+            <RequirementList title="Certificates" items={path.requirements.certificates} />
+            <RequirementList title="Licences" items={path.requirements.licences} />
             {path.requirements.languageLevel && (
-              <div>
-                <h3 className="text-base font-semibold text-slate-300 mb-3">Language Level</h3>
-                <p className="text-sm text-slate-300">{path.requirements.languageLevel}</p>
+              <div className="mt-4 pt-4 border-t border-slate-800/50">
+                <h3 className="text-sm font-semibold text-slate-300 mb-1">Language level</h3>
+                <p className="text-sm text-slate-400">{path.requirements.languageLevel}</p>
               </div>
             )}
-
-            {/* Regulatory Notice */}
-            <div className="mt-6 pt-6 border-t border-amber-500/20">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-amber-400/80 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  This career path is regulated. Always make sure that any course or qualification you choose is officially recognised by UK authorities or professional bodies (such as National Careers Service, CIOL, or ITI).
-                </p>
-              </div>
+            <div className="mt-4 pt-4 border-t border-amber-500/20 flex gap-2">
+              <Info className="w-4 h-4 text-amber-400/80 shrink-0 mt-0.5" />
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Always verify courses are recognised by UK authorities or professional bodies (National Careers Service, CIOL, ITI, etc.).
+              </p>
             </div>
           </section>
 
-          {/* Reality Check */}
-          <section className="rounded-2xl border border-amber-500/30 bg-amber-950/10 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
-              <h2 className="text-xl font-bold text-slate-200">Reality Check</h2>
-            </div>
-            
-            <div className="mb-6">
-              <h3 className="text-base font-semibold text-slate-300 mb-3">Challenges</h3>
-              <ul className="space-y-2">
-                {path.realityCheck.challenges.map((challenge, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-amber-400 mt-0.5">•</span>
-                    <span className="text-sm text-slate-300">{challenge}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <RealityCheckMetrics
+            metrics={intelligence.realityMetrics}
+            challenges={path.realityCheck.challenges}
+            commonMistakes={path.realityCheck.commonMistakes}
+            timeToReady={path.realityCheck.timeToReady}
+          />
 
-            <div className="mb-6">
-              <h3 className="text-base font-semibold text-slate-300 mb-3">Common Mistakes</h3>
-              <ul className="space-y-2">
-                {path.realityCheck.commonMistakes.map((mistake, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-amber-400 mt-0.5">•</span>
-                    <span className="text-sm text-slate-300">{mistake}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <PeopleLikeYouSection items={intelligence.peopleLikeYouStarts} />
 
-            <div>
-              <h3 className="text-base font-semibold text-slate-300 mb-2">Time needed to become job-ready</h3>
-              <p className="text-sm text-slate-300 font-medium">{path.realityCheck.timeToReady}</p>
-            </div>
-          </section>
-
-          {/* Recommended Courses & Training */}
-          <section className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-6">
-            <h2 className="text-xl font-bold text-slate-200 mb-4">Recommended Courses & Training</h2>
-            
-            <div className="space-y-4 mb-6">
+          <section className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-5 md:p-6">
+            <h2 className="text-lg font-bold text-slate-200 mb-4">All courses & training options</h2>
+            <div className="space-y-4">
               {path.courses.map((course, idx) => {
                 const sourceType = getCourseSourceType(course)
-                
-                // Source type badge colors and labels
-                const sourceTypeConfig = {
-                  'GOV.UK': { 
-                    label: 'GOV.UK', 
-                    style: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-                  },
-                  'National Careers Service': { 
-                    label: 'National Careers Service', 
-                    style: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-                  },
-                  'Professional Body': { 
-                    label: 'Professional Body', 
-                    style: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-                  },
-                  'College': { 
-                    label: 'College', 
-                    style: 'bg-green-500/20 text-green-300 border-green-500/30',
-                  },
-                  'Other': { 
-                    label: 'Other', 
-                    style: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
-                  },
-                }
-
                 const config = sourceTypeConfig[sourceType]
                 const isOfficialCourse = sourceType === 'GOV.UK' || sourceType === 'National Careers Service'
                 const isProfessionalBody = sourceType === 'Professional Body'
-
+                let helperNote: string | undefined
+                if (course.name === 'First Aid Certificate') {
+                  helperNote =
+                    'First Aid courses are offered by many providers. Use the official UK course search to find one near you.'
+                }
+                if (course.name === 'Care Certificate' && path.id === 'care-support') {
+                  helperNote =
+                    'The Care Certificate is often provided by employers after you are hired — you may not need to pay upfront.'
+                }
+                if (course.name === 'Microsoft Office Skills' && path.id === 'office-admin') {
+                  helperNote = 'Basic Office skills are often gained free online or on the job.'
+                }
                 return (
-                  <div
+                  <PathCourseCard
                     key={idx}
-                    className="p-5 rounded-lg border border-slate-700/50 bg-slate-900/30 hover:border-violet-500/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4 mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-base font-semibold text-slate-200">
-                            {course.name}
-                          </h3>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-xs font-medium border",
-                            config.style
-                          )}>
-                            {config.label}
-                          </span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-400">Type:</span>
-                            <span className="text-xs text-slate-300 font-medium">{course.type}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-400">Duration:</span>
-                            <span className="text-xs text-slate-300">{course.duration}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-400">Funding:</span>
-                            <span className="text-xs text-slate-300">{course.funding}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        {isOfficialCourse && (
-                          <button
-                            onClick={() => handleViewOfficialCourses(sourceType)}
-                            className={cn(
-                              "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                              "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white",
-                              "hover:from-violet-500 hover:to-fuchsia-500",
-                              "shadow-[0_0_12px_rgba(139,92,246,0.4)] hover:shadow-[0_0_18px_rgba(139,92,246,0.6)]"
-                            )}
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            View official courses
-                          </button>
-                        )}
-                        {isProfessionalBody && course.externalLink && (
-                          <button
-                            onClick={() => handleViewOfficialCourses(sourceType, course.externalLink)}
-                            className={cn(
-                              "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                              "bg-slate-800/50 text-slate-200 border border-slate-700/50",
-                              "hover:bg-slate-700/50 hover:border-slate-600/50"
-                            )}
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            Visit provider
-                          </button>
-                        )}
-                        {!isOfficialCourse && !isProfessionalBody && (
-                          <button
-                            onClick={() => handleFindNearYou(course.name, course.externalLink, sourceType)}
-                            className={cn(
-                              "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                              "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white",
-                              "hover:from-violet-500 hover:to-fuchsia-500",
-                              "shadow-[0_0_12px_rgba(139,92,246,0.4)] hover:shadow-[0_0_18px_rgba(139,92,246,0.6)]"
-                            )}
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            View official courses
-                          </button>
-                        )}
-                      </div>
-                      {/* Helper text for all official courses */}
-                      {(isOfficialCourse || isProfessionalBody) && (
-                        <p className="text-xs text-slate-400 leading-relaxed">
-                          You'll choose your location and course availability on the official National Careers Service website.
-                        </p>
-                      )}
-                      {/* Specific note for First Aid Certificate */}
-                      {course.name === 'First Aid Certificate' && (
-                        <p className="text-xs text-slate-400 leading-relaxed mt-2">
-                          First Aid courses are offered by many providers and are not specific to security roles. You'll be redirected to the official UK course search to choose a suitable option near you.
-                        </p>
-                      )}
-                      {/* Specific note for Care Certificate in Care & Support path */}
-                      {course.name === 'Care Certificate' && path.id === 'care-support' && (
-                        <p className="text-xs text-slate-400 leading-relaxed mt-2">
-                          Most care roles do not require you to pay for expensive courses upfront. The Care Certificate and mandatory training are often provided by employers after you're hired.
-                        </p>
-                      )}
-                      {/* Specific note for Microsoft Office Skills in Office & Admin path */}
-                      {course.name === 'Microsoft Office Skills' && path.id === 'office-admin' && (
-                        <p className="text-xs text-slate-400 leading-relaxed mt-2">
-                          Basic Microsoft Office skills are often gained through free online courses or on-the-job experience. Employers usually focus on practical ability rather than paid certificates.
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                    course={course}
+                    pathId={pathId}
+                    sourceType={sourceType}
+                    configStyle={config.style}
+                    configLabel={config.label}
+                    isOfficialCourse={isOfficialCourse}
+                    isProfessionalBody={isProfessionalBody}
+                    onViewOfficial={() => handleViewOfficialCourses(sourceType, course.externalLink, course.name)}
+                    onFindNearYou={() => handleFindNearYou(course.name, course.externalLink, sourceType)}
+                    helperNote={helperNote}
+                  />
                 )
               })}
             </div>
-
-            {/* Transparency note for Teaching & School Support */}
-            {path.id === 'teaching-support' && (
-              <div className="mt-4 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50">
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Teaching and school support training is often provided by colleges, local authorities, or directly through schools. Some official course links may show a wide range of results or redirect to local providers, but qualifications remain valid when obtained through recognised UK education bodies and safeguarding requirements.
-                </p>
-              </div>
-            )}
-
-            {/* Transparency note for Maintenance & Facilities */}
-            {path.id === 'maintenance-facilities' && (
-              <div className="mt-4 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50">
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Maintenance and facilities training is delivered by a wide range of colleges and local providers. Some official course links may return broad or varied results, but qualifications are valid when completed through recognised UK bodies and when legal limits of non-qualified electrical or plumbing work are followed.
-                </p>
-              </div>
-            )}
-
-            {/* Global helper text */}
             {path.courseTransparencyNote && (
-              <div className="mt-4 p-4 rounded-lg border border-slate-600/50 bg-slate-800/30">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    {path.courseTransparencyNote}
-                  </p>
-                </div>
+              <div className="mt-4 p-4 rounded-lg border border-slate-600/50 bg-slate-800/30 flex gap-2">
+                <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                <p className="text-sm text-slate-300">{path.courseTransparencyNote}</p>
               </div>
             )}
-
-            <div className="mt-4 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50">
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Course availability, funding, and locations are managed by official UK providers.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-950/10">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-slate-300">
-                  {path.courseWarning}
-                </p>
-              </div>
+            <div className="mt-4 p-3 rounded-lg border border-amber-500/30 bg-amber-950/10 flex gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+              <p className="text-sm text-slate-300">{path.courseWarning}</p>
             </div>
           </section>
 
-          {/* Boost Your Chances */}
-          <section className="rounded-2xl border border-violet-500/30 bg-violet-950/10 p-6">
-            <h2 className="text-xl font-bold text-slate-200 mb-4">Boost Your Chances</h2>
-            <p className="text-sm text-slate-300 mb-4">
-              These general skills help with almost any job and show employers you're serious:
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-lg border border-slate-700/50 bg-slate-900/30">
-                <h3 className="text-sm font-semibold text-slate-200 mb-2">English for Work</h3>
-                <p className="text-xs text-slate-400">
-                  Improve your workplace English - helps with applications, interviews, and daily work.
-                </p>
-              </div>
-              <div className="p-4 rounded-lg border border-slate-700/50 bg-slate-900/30">
-                <h3 className="text-sm font-semibold text-slate-200 mb-2">Health & Safety</h3>
-                <p className="text-xs text-slate-400">
-                  Basic health and safety knowledge is required for many jobs.
-                </p>
-              </div>
-              <div className="p-4 rounded-lg border border-slate-700/50 bg-slate-900/30">
-                <h3 className="text-sm font-semibold text-slate-200 mb-2">First Aid</h3>
-                <p className="text-xs text-slate-400">
-                  First aid certificates are valuable and show responsibility.
-                </p>
-              </div>
-              <div className="p-4 rounded-lg border border-slate-700/50 bg-slate-900/30">
-                <h3 className="text-sm font-semibold text-slate-200 mb-2">Manual Handling</h3>
-                <p className="text-xs text-slate-400">
-                  Essential for any job involving lifting or moving objects.
-                </p>
-              </div>
+          <section className="rounded-2xl border border-violet-500/30 bg-violet-950/10 p-5 md:p-6">
+            <h2 className="text-lg font-bold text-slate-200 mb-3">Boost your chances</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { title: 'English for Work', desc: 'Workplace English for applications and daily tasks' },
+                { title: 'Health & Safety', desc: 'Required knowledge for many UK roles' },
+                { title: 'First Aid', desc: 'Shows responsibility to employers' },
+                { title: 'Manual Handling', desc: 'Essential for physical roles' },
+              ].map((item) => (
+                <div key={item.title} className="p-3 rounded-lg border border-slate-700/50 bg-slate-900/30">
+                  <h3 className="text-sm font-semibold text-slate-200">{item.title}</h3>
+                  <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
+                </div>
+              ))}
             </div>
           </section>
+
+          <RelatedPathsCarousel
+            pathIds={intelligence.relatedPathIds}
+            currentPathId={path.id}
+            caSessionId={caSessionId}
+          />
+
+          <PathFeedOpportunities items={intelligence.feedOpportunities} />
         </div>
 
-        {/* Sidebar - JobAZ AI Integration */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-8 rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-950/20 to-fuchsia-950/20 p-6">
-            <h2 className="text-xl font-bold text-slate-200 mb-2">
-              Prepare with JobAZ
-            </h2>
-            <p className="text-sm text-slate-400 mb-6">
-              Once you're ready to apply, use JobAZ tools to create professional applications, 
-              practice for interviews, and improve your English for work.
-            </p>
-
-            <div className="space-y-3">
-              <button
-                onClick={handleCreateCV}
-                className="w-full flex items-center gap-3 p-4 rounded-lg border border-violet-500/30 bg-slate-950/50 hover:border-violet-400/50 hover:bg-violet-500/10 transition-colors text-left"
-              >
-                <FileText className="w-5 h-5 text-violet-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-slate-200">Create a CV for this path</div>
-                  <div className="text-xs text-slate-400">CV Builder with path-based suggestions</div>
-                </div>
-              </button>
-
-              <button
-                onClick={handleWriteCoverLetter}
-                className="w-full flex items-center gap-3 p-4 rounded-lg border border-violet-500/30 bg-slate-950/50 hover:border-violet-400/50 hover:bg-violet-500/10 transition-colors text-left"
-              >
-                <Mail className="w-5 h-5 text-violet-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-slate-200">Write a cover letter for this role</div>
-                  <div className="text-xs text-slate-400">Cover Letter AI</div>
-                </div>
-              </button>
-
-              <button
-                onClick={handleFindJobs}
-                className="w-full flex items-center gap-3 p-4 rounded-lg border border-violet-500/30 bg-slate-950/50 hover:border-violet-400/50 hover:bg-violet-500/10 transition-colors text-left"
-              >
-                <Search className="w-5 h-5 text-violet-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-slate-200">Find related jobs</div>
-                  <div className="text-xs text-slate-400">Job Finder filtered by this path</div>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
+        <aside className="hidden lg:block space-y-6">
+          <CareerGuideAssistant
+            insights={intelligence.guideInsights}
+            readinessRange={match.readinessRange}
+            quickQuestions={intelligence.quickQuestions}
+            onAsk={askGuide}
+          />
+          <PathPrepareSidebar
+            isLoggedIn={profile.isLoggedIn}
+            isTracked={isTracked}
+            onCreateCv={handleCreateCV}
+            onCoverLetter={handleWriteCoverLetter}
+            onUnlockJobs={handleUnlockJobs}
+            onPracticeInterview={handlePracticeInterview}
+            onTrackProgress={handleTrackProgress}
+          />
+        </aside>
       </div>
 
-      {/* Location Search Modal */}
+      <CareerGuideAssistant
+        variant="mobile"
+        insights={intelligence.guideInsights}
+        readinessRange={match.readinessRange}
+        quickQuestions={intelligence.quickQuestions}
+        onAsk={askGuide}
+      />
+
       {selectedCourse && (
         <LocationSearchModal
           isOpen={locationModalOpen}
@@ -663,8 +486,75 @@ export default function CareerPathPage() {
           sourceType={selectedCourse.sourceType}
         />
       )}
+
+      <CareerAuthWallModal
+        isOpen={authOpen}
+        onClose={() => setAuthOpen(false)}
+        redirectTo={authMode === 'jobs' ? jobsRedirect : `/build-your-path/${pathId}`}
+        title={
+          authMode === 'jobs'
+            ? 'Create a free account to unlock matching jobs'
+            : 'Create a free account to track your journey'
+        }
+        description={
+          authMode === 'jobs'
+            ? 'View real openings for this path and track your applications in one place.'
+            : 'Save your career path, track progress, and unlock the full JobAZ toolkit.'
+        }
+        bullets={
+          authMode === 'jobs'
+            ? ['View real job openings for this path', 'Save and track applications', 'Tailor your CV to each role']
+            : [
+                'Save your career path',
+                'Track progress step by step',
+                'Save courses and milestones',
+                'Unlock matching jobs',
+                'Build your CV later with JobAZ',
+              ]
+        }
+      />
     </AppShell>
   )
 }
 
+function DegreeBadge({ needsDegree }: { needsDegree: 'no' | 'yes' | 'sometimes' }) {
+  if (needsDegree === 'no') {
+    return (
+      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/20 border border-green-500/30">
+        <CheckCircle2 className="w-4 h-4 text-green-400" />
+        <span className="text-sm font-semibold text-green-400">No degree required</span>
+      </div>
+    )
+  }
+  if (needsDegree === 'yes') {
+    return (
+      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
+        <AlertTriangle className="w-4 h-4 text-red-400" />
+        <span className="text-sm font-semibold text-red-400">Degree may be required</span>
+      </div>
+    )
+  }
+  return (
+    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+      <AlertTriangle className="w-4 h-4 text-yellow-400" />
+      <span className="text-sm font-semibold text-yellow-400">Sometimes required</span>
+    </div>
+  )
+}
 
+function RequirementList({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) return null
+  return (
+    <div className="mb-4 last:mb-0">
+      <h3 className="text-sm font-semibold text-slate-300 mb-2">{title}</h3>
+      <ul className="space-y-1.5">
+        {items.map((item, idx) => (
+          <li key={idx} className="flex items-start gap-2 text-sm text-slate-300">
+            <CheckCircle2 className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}

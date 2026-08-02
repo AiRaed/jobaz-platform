@@ -14,6 +14,11 @@ import { NextStepLoadingCard } from '@/components/NextStepLoadingCard'
 import { useNextStepLoadingStore, generateRequestId } from '@/lib/next-step-loading-store'
 import { getBaseCvAnyScope } from '@/lib/cv-storage'
 import { getCurrentUserIdSync, getUserScopedKeySync } from '@/lib/user-storage'
+import { getJazPageProfile, resolveJazPageId } from '@/lib/jaz/pageRegistry'
+import { getQuickActionsForPage, type JazQuickAction } from '@/lib/jaz/quickActions'
+import JazQuickActionsBar from '@/components/jaz/JazQuickActionsBar'
+import JazTranslateControls from '@/components/jaz/JazTranslateControls'
+import JazEyeIcon from '@/components/ui/JazEyeIcon'
 
 export type JazLanguage = 'EN' | 'AR' | 'FA' | 'KU' | 'ES' | 'PL'
 
@@ -110,6 +115,12 @@ export interface CvBuilderContext {
   skillsCount: number
   hasJobDescription: boolean
   template?: 'atsClassic' | 'twoColumnPro' | 'customizeStyle'
+  /** Career Plan mode — user completed Career Brain assessment */
+  careerMode?: boolean
+  targetRole?: string | null
+  pathLabel?: string | null
+  careerReadinessScore?: number | null
+  suggestedSkills?: string[]
 }
 
 export interface CoverLetterContext {
@@ -168,32 +179,25 @@ export default function JazAssistant({}: JazAssistantProps) {
   const { context } = useJazContext()
   const { isOpen, mode, jobData, openJaz, closeJaz, setMode: setStoreMode, setJobData } = useJazStore()
   
-  // Separate message histories for each tab
-  const [askMessages, setAskMessages] = useState<JazMessage[]>([])
-  const [guideMessages, setGuideMessages] = useState<JazMessage[]>([])
-  const [translateMessages, setTranslateMessages] = useState<JazMessage[]>([])
-  
-  const [guideResults, setGuideResults] = useState<ApplyAssistantResult | null>(null) // Guide-specific results
-  
-  // Helper function to append message to the correct tab
-  const appendMessage = useCallback((tab: 'ask' | 'guide' | 'translate', message: JazMessage) => {
-    if (tab === 'ask') {
-      setAskMessages((prev) => [...prev, message])
-    } else if (tab === 'guide') {
-      setGuideMessages((prev) => [...prev, message])
-    } else if (tab === 'translate') {
-      setTranslateMessages((prev) => [...prev, message])
-    }
+  // Unified conversation thread (no Ask/Guide/Translate tabs)
+  const [messages, setMessages] = useState<JazMessage[]>([])
+  const pendingApiModeRef = useRef<'ask' | 'guide' | 'translate'>('ask')
+  const [translatePanelOpen, setTranslatePanelOpen] = useState(false)
+  const [translateInputMode, setTranslateInputMode] = useState(false)
+
+  const pageProfile = useMemo(() => getJazPageProfile(pathname), [pathname])
+  const quickActions = useMemo(
+    () => getQuickActionsForPage(resolveJazPageId(pathname)),
+    [pathname]
+  )
+
+  const [guideResults, setGuideResults] = useState<ApplyAssistantResult | null>(null)
+
+  const appendMessage = useCallback((message: JazMessage) => {
+    setMessages((prev) => [...prev, message])
   }, [])
-  
-  // Helper function to get messages for current tab
-  const getCurrentMessages = useCallback((): JazMessage[] => {
-    if (mode === 'ask') return askMessages
-    if (mode === 'guide') return guideMessages
-    if (mode === 'translate') return translateMessages
-    // For 'apply' mode, use guide messages (apply mode uses guide tab)
-    return guideMessages
-  }, [mode, askMessages, guideMessages, translateMessages])
+
+  const getCurrentMessages = useCallback((): JazMessage[] => messages, [messages])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [translateError, setTranslateError] = useState<string | null>(null)
@@ -254,7 +258,7 @@ export default function JazAssistant({}: JazAssistantProps) {
 
   // Show tooltip when Translate tab becomes active OR when Target Language changes
   useEffect(() => {
-    const isTranslateMode = mode === 'translate'
+    const isTranslateMode = translatePanelOpen || translateInputMode
     const currentLang = targetLanguage || 'EN'
     const normalizedCurrentLang = normalizeLang(currentLang)
     const normalizedPrevLang = normalizeLang(prevTargetLanguageRef.current)
@@ -305,7 +309,7 @@ export default function JazAssistant({}: JazAssistantProps) {
         hoverTooltipTimeoutRef.current = null
       }
     }
-  }, [mode, isOpen, targetLanguage])
+  }, [translatePanelOpen, translateInputMode, isOpen, targetLanguage])
 
   // Calculate tooltip position when it should be shown
   useEffect(() => {
@@ -921,7 +925,12 @@ export default function JazAssistant({}: JazAssistantProps) {
   // Scroll to bottom when messages change for current tab
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [askMessages, guideMessages, translateMessages, mode])
+  }, [messages, mode])
+
+  // Reset greeting when page changes
+  useEffect(() => {
+    hasShownInitialGreeting.current = false
+  }, [pathname])
 
   // Focus input when chat opens
   useEffect(() => {
@@ -930,36 +939,20 @@ export default function JazAssistant({}: JazAssistantProps) {
     }
   }, [isOpen])
 
-  // Set initial greeting based on page when chat opens (only in Ask tab)
+  // Context-aware greeting when chat opens
   useEffect(() => {
-    if (isOpen && !hasShownInitialGreeting.current && askMessages.length === 0) {
-      let initialGreeting = ''
-      
-      if (pathname.startsWith('/dashboard')) {
-        initialGreeting = "I've reviewed your CV and the jobs on this page.\n\nWant help improving your chances?"
-      } else if (pathname.startsWith('/cv-builder-v2')) {
-        initialGreeting = "Hi, I'm JAZ. This is your CV Builder. I can help you with your summary, experience, and skills."
-      } else if (pathname.startsWith('/cover')) {
-        initialGreeting = "Hi, I'm JAZ. This is your Cover Letter Builder. I can help you write and improve your cover letter."
-      } else if (pathname.startsWith('/job-details')) {
-        initialGreeting = "Hi, I'm JAZ. I'll help you understand this job and prepare step by step."
-      } else if (pathname.startsWith('/interview-coach')) {
-        initialGreeting = "Hi, I'm JAZ. I can help you understand questions, practice answers, and improve your interview skills."
-      } else {
-        initialGreeting = "Hi, I'm JAZ. I'm here to help with your job search. Ask me anything about CVs, cover letters, jobs, or interviews."
-      }
-
+    if (isOpen && !hasShownInitialGreeting.current && messages.length === 0) {
       const greetingMessage: JazMessage = {
         id: `assistant-greeting-${Date.now()}`,
         role: 'assistant',
-        content: initialGreeting,
+        content: pageProfile.greeting,
         timestamp: new Date(),
       }
 
-      appendMessage('ask', greetingMessage)
+      appendMessage(greetingMessage)
       hasShownInitialGreeting.current = true
     }
-  }, [isOpen, pathname, askMessages.length, appendMessage])
+  }, [isOpen, messages.length, appendMessage, pageProfile.greeting])
 
   // Reset greeting flag when chat closes
   useEffect(() => {
@@ -967,6 +960,8 @@ export default function JazAssistant({}: JazAssistantProps) {
       hasShownInitialGreeting.current = false
       hasTriggeredApplyMode.current = false
       applyResultsShown.current = false
+      setTranslatePanelOpen(false)
+      setTranslateInputMode(false)
     }
   }, [isOpen])
 
@@ -1141,20 +1136,8 @@ export default function JazAssistant({}: JazAssistantProps) {
     if (isOpen) {
       closeJaz()
     } else {
-      openJaz()
-    }
-  }
-
-  const handleModeChange = (newMode: JazMode) => {
-    if (newMode === 'apply') {
-      // Apply mode can only be triggered from Job Details page
-      return
-    }
-    setStoreMode(newMode)
-    hasTriggeredApplyMode.current = false
-    // Clear guideResults when switching away from guide mode
-    if (newMode !== 'guide') {
-      setGuideResults(null)
+      setStoreMode('ask')
+      openJaz('ask')
     }
   }
 
@@ -1165,7 +1148,7 @@ export default function JazAssistant({}: JazAssistantProps) {
     const { startLoading, stopLoading } = useNextStepLoadingStore.getState()
 
     // Clear previous guide messages and guide results
-    setGuideMessages([])
+    setMessages([])
     setGuideResults(null)
     setIsLoading(true)
     applyResultsShown.current = false
@@ -1201,7 +1184,7 @@ export default function JazAssistant({}: JazAssistantProps) {
           content: '⚠️ **No CV found**\n\nPlease create a CV first using the CV Builder before using the Apply Assistant.',
           timestamp: new Date(),
         }
-        appendMessage('guide', errorMessage)
+        appendMessage(errorMessage)
         setIsLoading(false)
         setLoadingStage(null)
         stopLoading(requestId)
@@ -1264,7 +1247,7 @@ export default function JazAssistant({}: JazAssistantProps) {
           content: '❌ **Error**\n\nSorry, there was an error processing your application analysis. Please try again.',
           timestamp: new Date(),
         }
-        appendMessage('guide', errorMessage)
+        appendMessage(errorMessage)
       }
     } finally {
       setIsLoading(false)
@@ -1496,47 +1479,46 @@ export default function JazAssistant({}: JazAssistantProps) {
     }
   }
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = async (override?: { content?: string; apiMode?: 'ask' | 'guide' | 'translate' }) => {
     if (isLoading) return
 
-    // Special handling for Translate mode: require non-empty input
-    if (mode === 'translate') {
-      if (!inputValue.trim()) {
+    const content = (override?.content ?? inputValue).trim()
+    const apiMode =
+      override?.apiMode ??
+      (translateInputMode ? 'translate' : pendingApiModeRef.current)
+
+    if (apiMode === 'translate') {
+      if (!content) {
         setTranslateError('Please paste the text you want me to translate.')
         setTimeout(() => setTranslateError(null), 4000)
         return
       }
-    } else {
-      // For Ask and Guide modes, allow empty (they have defaults)
-      if (!inputValue.trim()) return
+    } else if (!content) {
+      return
     }
 
-    // Determine which tab to append messages to
-    // In apply mode, after results are shown, allow follow-up questions - use 'ask' mode
-    const effectiveMode = mode === 'apply' && applyResultsShown.current ? 'ask' : mode
-    const targetTab: 'ask' | 'guide' | 'translate' = effectiveMode === 'translate' ? 'translate' : effectiveMode === 'guide' || effectiveMode === 'apply' ? 'guide' : 'ask'
+    if (mode === 'apply' && !applyResultsShown.current) return
 
     const userMessage: JazMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: inputValue.trim(),
+      content,
       timestamp: new Date(),
     }
 
-    appendMessage(targetTab, userMessage)
-    setInputValue('')
+    appendMessage(userMessage)
+    if (!override?.content) setInputValue('')
     setTranslateError(null)
     setIsLoading(true)
+    pendingApiModeRef.current = 'ask'
 
     try {
       const response = await fetch('/api/jaz', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userMessage: userMessage.content,
-          mode: effectiveMode,
+          mode: apiMode,
           language: targetLanguage,
           pathname,
         }),
@@ -1544,25 +1526,35 @@ export default function JazAssistant({}: JazAssistantProps) {
 
       const data = await response.json()
 
-      const assistantMessage: JazMessage = {
+      appendMessage({
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: data.assistantMessage || 'Response received',
         timestamp: new Date(),
-      }
-
-      appendMessage(targetTab, assistantMessage)
-    } catch (error) {
-      const errorMessage: JazMessage = {
+      })
+    } catch {
+      appendMessage({
         id: `error-${Date.now()}`,
         role: 'assistant',
         content: 'Sorry, there was an error processing your request.',
         timestamp: new Date(),
-      }
-      appendMessage(targetTab, errorMessage)
+      })
     } finally {
       setIsLoading(false)
+      setTranslateInputMode(false)
     }
+  }
+
+  const handleQuickAction = (action: JazQuickAction) => {
+    if (action.intent === 'translate') {
+      setTranslatePanelOpen(true)
+      setTranslateInputMode(true)
+      pendingApiModeRef.current = 'translate'
+      inputRef.current?.focus()
+      return
+    }
+    pendingApiModeRef.current = action.intent
+    void handleSendMessage({ content: action.prompt, apiMode: action.intent })
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1582,12 +1574,15 @@ export default function JazAssistant({}: JazAssistantProps) {
 
   // Get CV Builder guidance
   const getCvBuilderGuidance = (ctx: CvBuilderContext): NextBestAction | null => {
+    const role = ctx.targetRole ?? 'your target'
+    const careerPrefix = ctx.careerMode ? `For ${role} roles: ` : ''
+
     // Priority 1: Summary too long
     if (ctx.activeTab === 'summary' && ctx.summaryTextLength > 120) {
       return {
-        action: 'TAILOR_CV' as any, // Using existing action type
-        title: 'Shorten your summary',
-        message: `ATS performs better with 60–100 words. Yours is currently ${ctx.summaryTextLength} words.`,
+        action: 'TAILOR_CV' as any,
+        title: ctx.careerMode ? `Shorten your ${role} summary` : 'Shorten your summary',
+        message: `${careerPrefix}ATS performs better with 60–100 words. Yours is currently ${ctx.summaryTextLength} words.`,
         ctaLabel: 'Make Shorter',
         secondaryCtaLabel: ctx.summaryTextLength > 150 ? 'More Impact' : undefined,
       }
@@ -1597,8 +1592,8 @@ export default function JazAssistant({}: JazAssistantProps) {
     if (ctx.activeTab === 'summary' && ctx.summaryTextLength < 40 && ctx.summaryTextLength > 0) {
       return {
         action: 'TAILOR_CV' as any,
-        title: 'Add a little more',
-        message: 'A summary of 60–100 words helps ATS systems understand your profile better.',
+        title: ctx.careerMode ? `Strengthen your ${role} summary` : 'Add a little more',
+        message: `${careerPrefix}A summary of 60–100 words helps UK employers understand your profile.`,
         ctaLabel: 'Make Longer',
       }
     }
@@ -1607,8 +1602,10 @@ export default function JazAssistant({}: JazAssistantProps) {
     if (ctx.activeTab === 'summary' && ctx.summaryTextLength === 0) {
       return {
         action: 'TAILOR_CV' as any,
-        title: 'Generate a summary',
-        message: 'A professional summary is essential for ATS systems and recruiters.',
+        title: ctx.careerMode ? `Write your ${role} summary` : 'Generate a summary',
+        message: ctx.careerMode
+          ? `I'm improving your summary to better match ${role} jobs from your career plan.`
+          : 'A professional summary is essential for ATS systems and recruiters.',
         ctaLabel: 'Generate from Keywords',
       }
     }
@@ -1618,7 +1615,9 @@ export default function JazAssistant({}: JazAssistantProps) {
       return {
         action: 'TAILOR_CV' as any,
         title: 'Tailor your CV to this job',
-        message: 'Use the job description to optimize your CV for this specific role.',
+        message: ctx.careerMode
+          ? `I'm adding keywords that ${role} employers commonly search for.`
+          : 'Use the job description to optimize your CV for this specific role.',
         ctaLabel: 'Analyze JD',
         secondaryCtaLabel: 'Tailor Experience',
       }
@@ -1626,10 +1625,14 @@ export default function JazAssistant({}: JazAssistantProps) {
 
     // Priority 5: Skills count low
     if (ctx.skillsCount < 8) {
+      const skillHint =
+        ctx.suggestedSkills && ctx.suggestedSkills.length > 0
+          ? ` Missing from your plan: ${ctx.suggestedSkills.slice(0, 3).join(', ')}.`
+          : ''
       return {
         action: 'TAILOR_CV' as any,
-        title: 'Add key skills',
-        message: 'Having 8+ relevant skills improves your ATS score and visibility.',
+        title: ctx.careerMode ? `Add ${role} skills` : 'Add key skills',
+        message: `${careerPrefix}Having 8+ relevant skills improves your readiness.${skillHint}`,
         ctaLabel: 'Suggest Skills',
       }
     }
@@ -1638,8 +1641,10 @@ export default function JazAssistant({}: JazAssistantProps) {
     if (ctx.experienceCount < 2) {
       return {
         action: 'TAILOR_CV' as any,
-        title: 'Add another experience',
-        message: 'Adding at least 2 roles improves ATS and credibility.',
+        title: 'Add measurable achievements',
+        message: ctx.careerMode
+          ? `Let's improve your experience section for ${role} applications.`
+          : 'Adding at least 2 roles improves ATS and credibility.',
         ctaLabel: 'Add Experience',
       }
     }
@@ -1647,8 +1652,10 @@ export default function JazAssistant({}: JazAssistantProps) {
     // All good
     return {
       action: 'FIND_JOBS' as any,
-      title: "You're doing great",
-      message: 'Your CV is ready. Download or search jobs.',
+      title: ctx.careerMode ? "You're almost ready to apply" : "You're doing great",
+      message: ctx.careerMode
+        ? `Your profile is suitable for entry-level ${role} roles. Next: find matching jobs.`
+        : 'Your CV is ready. Download or search jobs.',
       ctaLabel: 'Find Jobs',
     }
   }
@@ -2393,7 +2400,7 @@ export default function JazAssistant({}: JazAssistantProps) {
 
   // Render Dashboard Guide Cards (only on dashboard)
   const renderDashboardGuideCards = () => {
-    if (mode !== 'guide' || !pathname.includes('/dashboard')) return null
+    if (!pathname.includes('/dashboard')) return null
     if (!getDashboardState) return null
 
     const { hasBaseCV, cvId, savedJobs, appliedJobs, latestAppliedJob, cvScore, selectedJobId } = getDashboardState
@@ -2654,7 +2661,7 @@ export default function JazAssistant({}: JazAssistantProps) {
 
   // Determine recommended next action based on guideResults analysis
   const getRecommendedAction = useCallback((): { action: 'cv' | 'cover' | 'interview' | null; reason: string } => {
-    if (!guideResults || mode !== 'guide') {
+    if (!guideResults) {
       return { action: null, reason: '' }
     }
 
@@ -2716,7 +2723,7 @@ export default function JazAssistant({}: JazAssistantProps) {
   // Render Recommended Next Action block (at top of Guide tab)
   const renderRecommendedActionBlock = () => {
     // Only show when in guide mode, have guideResults, and have job context
-    if (mode !== 'guide' || !guideResults || !jobData) return null
+    if (!guideResults || !jobData) return null
 
     const recommended = getRecommendedAction()
     if (!recommended.action) return null
@@ -2815,7 +2822,7 @@ Start exploring to find the right path for you!`
 
   // Render Next Best Action Card (helper for guide mode)
   const renderNextBestActionCard = () => {
-    if (mode !== 'guide') return null
+    if (mode === 'apply') return null
 
     // DASHBOARD: Show dashboard-specific guide cards
     if (pathname.includes('/dashboard')) {
@@ -3385,7 +3392,7 @@ Start exploring to find the right path for you!`
 
   // Orb portal content
   const orbContent = (
-    <div className="fixed bottom-4 right-4 z-40" data-no-translate>
+    <div className="jaz-float-anchor fixed z-40" data-no-translate>
       {/* Hint Bubble */}
       {showHint && !isOpen && (() => {
         const hintMessage = getHintMessage()
@@ -3393,7 +3400,7 @@ Start exploring to find the right path for you!`
         
         return (
           <div 
-            className="absolute bottom-0 right-20 mb-0 w-64 md:w-72 max-w-[calc(100vw-6rem)] bg-slate-900/85 backdrop-blur-md rounded-2xl shadow-2xl border border-violet-500/20 p-4 pointer-events-auto animate-in fade-in slide-in-from-right-2 duration-300"
+            className="jaz-hint-bubble absolute bottom-0 right-20 mb-0 w-64 md:w-72 max-w-[calc(100vw-6rem)] bg-slate-900/85 backdrop-blur-md rounded-2xl shadow-2xl border border-violet-500/20 p-4 pointer-events-auto animate-in fade-in slide-in-from-right-2 duration-300"
             style={{ 
               pointerEvents: 'auto',
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.15), 0 0 30px rgba(124, 58, 237, 0.1)'
@@ -3432,10 +3439,10 @@ Start exploring to find the right path for you!`
       })()}
 
       {/* Floating Orb Button with Label */}
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-1.5">
         {/* Label */}
         <div className="jaz-label-container relative">
-          <span className="jaz-label-text">Ask JAZ</span>
+          <span className="jaz-label-text">JAZ</span>
           {/* Subtle sparkles animation */}
           <div className="jaz-label-sparkles">
             <span className="jaz-sparkle jaz-sparkle-1">✦</span>
@@ -3443,7 +3450,7 @@ Start exploring to find the right path for you!`
             <span className="jaz-sparkle jaz-sparkle-3">✦</span>
           </div>
         </div>
-        
+
         {/* Floating Orb */}
         <div className="jaz-orb-container">
           <button
@@ -3454,23 +3461,19 @@ Start exploring to find the right path for you!`
           >
             {/* Internal glow */}
             <div className="jaz-orb-glow" />
-            
-            {/* Neural rings (show when thinking/active) */}
-            {(isLoading || isOpen) && (
-              <>
-                <div className="jaz-orb-neural-ring jaz-orb-neural-ring-1" />
-                <div className="jaz-orb-neural-ring jaz-orb-neural-ring-2" />
-              </>
+
+            {/* Neural ring — thinking only (avoids stacked idle rings) */}
+            {isLoading && (
+              <div className="jaz-orb-neural-ring jaz-orb-neural-ring-1" />
             )}
-            
-            {/* JobAZ Eye - Large, clear, and dominant */}
-            <div className="jaz-orb-eye">
-              <img 
-                src="/jaz/jaz-eye.png" 
-                alt="JobAZ Eye" 
-                className="jaz-orb-eye-image"
-              />
-            </div>
+
+            {/* JobAZ Eye — fills ~78% of 56px orb */}
+            <JazEyeIcon
+              variant="floating"
+              glow={false}
+              className="relative z-10 pointer-events-none"
+              ariaLabel="JAZ AI assistant"
+            />
           </button>
         </div>
       </div>
@@ -3481,158 +3484,70 @@ Start exploring to find the right path for you!`
   const chatContent = isOpen ? (
     <div
       data-testid="jaz-chat-window"
-      className="jaz-chat-panel fixed bottom-28 right-4 md:w-[360px] md:h-[480px] md:max-h-[calc(100vh-9rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden pointer-events-auto z-50"
+      className="jaz-chat-panel jaz-float-panel fixed md:w-[360px] md:h-[480px] md:max-h-[calc(100vh-9rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden pointer-events-auto z-50"
       data-no-translate
     >
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-700/30 bg-slate-900/30">
-            <div className="flex items-center gap-3">
-              <img 
-                src="/jaz/jaz-eye.png" 
-                alt="JAZ" 
-                className="w-5 h-5 object-contain"
-              />
-              <h3 className="text-sm font-semibold text-slate-100 tracking-wide">JAZ</h3>
-            </div>
-            <button
-              onClick={handleToggleChat}
-              aria-label="Close chat"
-              className="w-6 h-6 rounded-full hover:bg-slate-800/60 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              ×
-            </button>
-          </div>
-
-          {/* Mode Tabs */}
-          <div className="flex border-b border-slate-700/30 bg-slate-900/20">
-            {mode !== 'apply' && (
-              <>
-                <button
-                  onClick={() => handleModeChange('ask')}
-                  className={`flex-1 px-4 py-2.5 text-xs font-medium transition-all duration-200 ${
-                    mode === 'ask'
-                      ? 'text-violet-300 bg-gradient-to-b from-violet-900/20 to-transparent border-b-2 border-violet-400 shadow-[0_2px_8px_rgba(139,92,246,0.15)]'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-                  }`}
-                >
-                  Ask
-                </button>
-                <button
-                  onClick={() => handleModeChange('guide')}
-                  className={`flex-1 px-4 py-2.5 text-xs font-medium transition-all duration-200 ${
-                    mode === 'guide'
-                      ? 'text-violet-300 bg-gradient-to-b from-violet-900/20 to-transparent border-b-2 border-violet-400 shadow-[0_2px_8px_rgba(139,92,246,0.15)]'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-                  }`}
-                >
-                  Guide
-                </button>
-                <button
-                  onClick={() => handleModeChange('translate')}
-                  className={`flex-1 px-4 py-2.5 text-xs font-medium transition-all duration-200 ${
-                    mode === 'translate'
-                      ? 'text-violet-300 bg-gradient-to-b from-violet-900/20 to-transparent border-b-2 border-violet-400 shadow-[0_2px_8px_rgba(139,92,246,0.15)]'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-                  }`}
-                >
-                  Translate
-                </button>
-              </>
-            )}
-            {mode === 'apply' && (
-              <div className="w-full px-4 py-2.5 text-xs font-medium text-violet-300 bg-gradient-to-b from-violet-900/20 to-transparent border-b-2 border-violet-400 flex items-center justify-center gap-2 shadow-[0_2px_8px_rgba(139,92,246,0.15)]">
-                <Sparkles className="w-3 h-3" />
-                Apply Assistant
+          {/* Unified header — no tabs */}
+          <div className="jaz-chat-header flex items-center justify-between px-4 py-3.5 border-b border-slate-700/30 bg-slate-900/30 gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <JazEyeIcon variant="header" ariaLabel="JAZ AI assistant" />
+              <div className="min-w-0">
+                <h3 className="jaz-chat-title text-sm font-semibold text-slate-100 tracking-wide">
+                  {mode === 'apply' ? 'JAZ · Application coach' : pageProfile.title}
+                </h3>
+                <p className="jaz-chat-subtitle text-[10px] text-violet-300/80 truncate">
+                  {mode === 'apply' ? 'Analysing your fit for this role' : pageProfile.subtitle}
+                </p>
               </div>
-            )}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {mode !== 'apply' && (
+                <JazTranslateControls
+                  open={translatePanelOpen}
+                  onToggle={() => {
+                    setTranslatePanelOpen((v) => !v)
+                    if (!translatePanelOpen) {
+                      setTranslateInputMode(true)
+                      pendingApiModeRef.current = 'translate'
+                    }
+                  }}
+                  hoverEnabled={hoverEnabled}
+                  onHoverEnabledChange={setHoverEnabled}
+                />
+              )}
+              <button
+                onClick={handleToggleChat}
+                aria-label="Close chat"
+                className="jaz-chat-close w-7 h-7 rounded-full hover:bg-slate-800/60 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors text-base leading-none"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
-          {/* Translate mode - Sticky hover translation toggle (outside Messages Area to stick to tabs) */}
-          {mode === 'translate' && (
-            <>
-              {(() => {
-                // Check RTL via language or dir attribute
-                const hasRTLDir = typeof document !== 'undefined' && 
-                  (document.documentElement.dir === 'rtl' || 
-                   document.documentElement.getAttribute('dir') === 'rtl' ||
-                   (hoverCheckboxRef.current && hoverCheckboxRef.current.closest('[dir="rtl"]') !== null))
-                const isRTL = isRTLLanguage(targetLanguage || 'EN') || hasRTLDir
-                
-                return (
-                  <div 
-                    ref={hoverCheckboxRef}
-                    className="sticky top-0 z-40 px-4 pt-0 pb-2 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50"
-                  >
-                    <div className="relative flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-2">
-                      <input
-                        type="checkbox"
-                        id="hover-translation-toggle"
-                        checked={hoverEnabled}
-                        onChange={(e) => setHoverEnabled(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-violet-600 focus:ring-2 focus:ring-violet-500 focus:ring-offset-0 cursor-pointer"
-                      />
-                      <label htmlFor="hover-translation-toggle" className="text-xs text-slate-300 cursor-pointer flex-1">
-                        Enable hover translation
-                      </label>
-                    </div>
-                    
-                    {/* Tooltip - always rendered via portal with LTR positioning */}
-                    {showHoverTooltip && tooltipPosition && (() => {
-                      const tooltipText = getTooltipText(targetLanguage || 'EN')
-                      const tooltipContent = (
-                        <div 
-                          dir={tooltipPosition.isRTL ? 'rtl' : 'ltr'}
-                          style={{
-                            position: 'fixed',
-                            top: `${tooltipPosition.top}px`,
-                            left: tooltipPosition.left !== undefined ? `${tooltipPosition.left}px` : undefined,
-                            right: 'auto',
-                            transform: 'none',
-                            zIndex: 1000
-                          }}
-                          className="w-64 bg-slate-900 border border-violet-500/50 rounded-lg shadow-xl p-3 animate-in fade-in slide-in-from-top-2 duration-200 overflow-visible"
-                        >
-                          {/* Arrow pointing up to checkbox - always LTR anchor */}
-                          <div 
-                            className="absolute -top-1.5 w-3 h-3 bg-slate-900 border-l border-t border-violet-500/50 rotate-45"
-                            style={{
-                              left: '24px',
-                              right: 'auto'
-                            }}
-                          ></div>
-                          
-                          {/* Close button */}
-                          <button
-                            onClick={dismissHoverTooltip}
-                            className="absolute top-1.5 right-1.5 text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded hover:bg-slate-800"
-                            aria-label="Close"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                          
-                          {/* Content - text direction follows language, padding accounts for close button */}
-                          <div className={`space-y-1.5 ${tooltipPosition.isRTL ? 'pl-5 text-right' : 'pr-5 text-left'}`}>
-                            <div className="text-xs font-semibold text-violet-300">
-                              {tooltipText.title}
-                            </div>
-                            <div className="text-xs text-slate-300 leading-relaxed">
-                              {tooltipText.message}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                      
-                      // Always render via portal for consistency
-                      return typeof window !== 'undefined' ? createPortal(tooltipContent, document.body) : null
-                    })()}
-                  </div>
-                )
-              })()}
-            </>
+          {mode !== 'apply' && (
+            <JazQuickActionsBar
+              actions={quickActions}
+              onAction={handleQuickAction}
+              disabled={isLoading}
+            />
+          )}
+
+          {mode === 'apply' && (
+            <div className="px-4 py-2 border-b border-violet-500/20 bg-violet-950/20 text-xs text-violet-200 flex items-center gap-2">
+              <Sparkles className="w-3 h-3" />
+              Preparing your application analysis…
+            </div>
+          )}
+
+          {(translatePanelOpen || translateInputMode) && mode !== 'apply' && (
+            <div className="px-4 py-2 text-[11px] text-cyan-200/80 border-b border-cyan-500/15 bg-cyan-950/10">
+              Paste text below to translate · Hover translation {hoverEnabled ? 'is on' : 'is off'}
+            </div>
           )}
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="jaz-chat-messages flex-1 overflow-y-auto px-4 py-4 space-y-3.5">
             {/* Guide mode - Recommended Next Action Block (only when guideResults available) */}
             {renderRecommendedActionBlock()}
             
@@ -3640,14 +3555,14 @@ Start exploring to find the right path for you!`
             {renderNextBestActionCard()}
 
             {/* Guide mode - AI Apply Assistant Results (only in Guide tab) */}
-            {mode === 'guide' && guideResults && (
+            {guideResults && (
               <div className="w-full mb-4">
                 {renderApplyAssistantCards(guideResults)}
               </div>
             )}
 
             {/* Guide mode - Action Plan Checklist (only on job-details page) */}
-            {mode === 'guide' && actionPlan && pathname.startsWith('/job-details') && (
+            {actionPlan && pathname.startsWith('/job-details') && (
               <div className="space-y-2 mb-2">
                 <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
@@ -3704,7 +3619,7 @@ Start exploring to find the right path for you!`
             )}
 
             {/* Translate mode hint */}
-            {mode === 'translate' && (
+            {(translatePanelOpen || translateInputMode) && (
               <>
                 <div className="space-y-2 mb-2">
                   <div className="text-xs text-slate-400 bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-2">
@@ -3740,37 +3655,37 @@ Start exploring to find the right path for you!`
               const filteredMessages = currentMessages.filter(msg => msg.role !== 'assistant-cards')
               
               if (filteredMessages.length === 0) {
-                // Build Your Path guide content
-                const buildYourPathGuide = pathname.startsWith('/build-your-path') && mode === 'guide'
+                const buildYourPathGuide = pathname.startsWith('/build-your-path')
                   ? getBuildYourPathGuideContent(pathname)
                   : null
 
                 return (
                   <div className="text-center text-slate-400 text-sm py-8">
-                    {mode === 'translate' 
-                      ? 'Paste text above to translate it into the selected language.'
-                      : mode === 'guide' && buildYourPathGuide
-                      ? (
-                          <div className="text-left space-y-4 max-w-2xl mx-auto">
-                            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
-                              <h3 className="text-base font-semibold text-violet-300 mb-2">{buildYourPathGuide.title}</h3>
-                              <div className="text-sm text-slate-300 space-y-3 whitespace-pre-line leading-relaxed">
-                                {buildYourPathGuide.content}
+                    {translateInputMode
+                      ? 'Paste text below to translate it into the selected language.'
+                      : buildYourPathGuide
+                        ? (
+                            <div className="text-left space-y-4 max-w-2xl mx-auto">
+                              <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+                                <h3 className="text-base font-semibold text-violet-300 mb-2">{buildYourPathGuide.title}</h3>
+                                <div className="text-sm text-slate-300 space-y-3 whitespace-pre-line leading-relaxed">
+                                  {buildYourPathGuide.content}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )
-                      : mode === 'guide'
-                      ? (guideResults || nextBestAction)
-                        ? (guideResults ? 'See your analysis above.' : 'See your next step above.')
-                        : 'Loading your guidance...'
-                      : 'No messages yet. Start a conversation!'}
+                          )
+                        : guideResults || nextBestAction
+                          ? guideResults
+                            ? 'See your analysis above.'
+                            : 'See your next step above.'
+                          : 'Use quick actions above or type a message.'}
                   </div>
                 )
               }
-              
+
               return filteredMessages.map((message, index) => {
-                const isFirstAssistantMessage = mode === 'ask' && pathname.startsWith('/dashboard') && message.role === 'assistant' && index === 0
+                const isFirstAssistantMessage =
+                  pathname.startsWith('/dashboard') && message.role === 'assistant' && index === 0
                 
                 // Default message rendering (assistant-cards already filtered out)
                 return (
@@ -3785,11 +3700,11 @@ Start exploring to find the right path for you!`
                             : 'jaz-message-bubble'
                         }`}
                       >
-                        <div className={`text-xs font-medium mb-2 ${message.role === 'user' ? 'text-slate-400' : 'text-violet-100'} opacity-90`}>
+                        <div className={`jaz-bubble-label text-xs font-medium mb-1.5 ${message.role === 'user' ? 'text-slate-400' : 'text-violet-100'} opacity-90`}>
                           {message.role === 'user' ? 'You' : 'JAZ'}
                         </div>
-                        <div className={`text-sm whitespace-pre-wrap break-words leading-relaxed ${message.role === 'user' ? 'text-slate-100' : 'text-white'}`}>{message.content}</div>
-                        <div className={`text-xs mt-2 ${message.role === 'user' ? 'text-slate-500' : 'text-violet-200/70'} opacity-70`}>
+                        <div className={`jaz-bubble-body text-sm whitespace-pre-wrap break-words leading-relaxed ${message.role === 'user' ? 'text-slate-100' : 'text-white'}`}>{message.content}</div>
+                        <div className={`jaz-bubble-time text-xs mt-2 ${message.role === 'user' ? 'text-slate-500' : 'text-violet-200/70'} opacity-70`}>
                           {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
@@ -3829,7 +3744,7 @@ Start exploring to find the right path for you!`
             })()}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-slate-800 text-slate-100 border border-slate-700/50 rounded-lg px-3 py-2">
+                <div className="jaz-typing-bubble bg-slate-800 text-slate-100 border border-slate-700/50 rounded-xl px-3.5 py-2.5">
                   <div className="text-xs font-medium mb-1 opacity-80">JAZ</div>
                   <div className="text-sm flex items-center gap-2">
                     <span>{loadingStage || 'Thinking'}</span>
@@ -3846,10 +3761,10 @@ Start exploring to find the right path for you!`
           </div>
 
           {/* Language Selector */}
-          <div className="px-4 py-2 border-t border-slate-700/50 bg-slate-800/30">
+          <div className="jaz-chat-lang px-4 py-2.5 border-t border-slate-700/50 bg-slate-800/30">
             <div className="flex items-center gap-2">
-              <label htmlFor="jaz-language-select" className="text-xs text-slate-400" title="This only changes JAZ responses">
-                {mode === 'translate' ? 'Target Language:' : 'Language:'}
+              <label htmlFor="jaz-language-select" className="jaz-chat-lang-label text-xs text-slate-400" title="This only changes JAZ responses">
+                {translateInputMode ? 'Target language:' : 'Language:'}
               </label>
               <select
                 id="jaz-language-select"
@@ -3859,7 +3774,7 @@ Start exploring to find the right path for you!`
                   handleLanguageChange(newLang)
                 }}
                 title="This only changes JAZ responses"
-                className="flex-1 bg-slate-800 border border-slate-700/50 rounded-md px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="jaz-chat-select flex-1 bg-slate-800 border border-slate-700/50 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
               >
                 <option value="EN">English</option>
                 <option value="AR">Arabic</option>
@@ -3873,23 +3788,29 @@ Start exploring to find the right path for you!`
 
           {/* Input Area */}
           {(mode !== 'apply' || (mode === 'apply' && applyResultsShown.current)) && (
-            <div className="p-4 border-t border-slate-700/30 bg-slate-900/20">
-              <div className="flex gap-2">
+            <div className="jaz-chat-input-bar p-3.5 pt-3 border-t border-slate-700/30 bg-slate-900/20">
+              <div className="flex gap-2 items-end">
                 <textarea
                   ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={mode === 'translate' ? 'Paste text here to translate…' : mode === 'apply' ? 'Ask a follow-up question...' : 'Type your message...'}
+                  placeholder={
+                    translateInputMode
+                      ? 'Paste text here to translate…'
+                      : mode === 'apply'
+                        ? 'Ask a follow-up question…'
+                        : 'Ask JAZ anything…'
+                  }
                   disabled={isLoading}
                   rows={1}
-                  className="flex-1 bg-slate-900/50 border border-slate-700/40 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500/70 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 resize-none max-h-24 backdrop-blur-sm transition-all duration-200"
-                  style={{ minHeight: '40px' }}
+                  className="jaz-chat-input flex-1 bg-slate-900/50 border border-slate-700/40 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500/70 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 resize-none max-h-24 backdrop-blur-sm transition-all duration-200"
+                  style={{ minHeight: '42px' }}
                 />
                 <button
-                  onClick={handleSendMessage}
+                  onClick={() => void handleSendMessage()}
                   disabled={!inputValue.trim() || isLoading}
-                  className="px-4 py-2.5 bg-gradient-to-br from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-lg shadow-violet-900/30 hover:shadow-violet-900/50 disabled:shadow-none"
+                  className="jaz-chat-send px-4 py-2.5 bg-gradient-to-br from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-lg shadow-violet-900/30 hover:shadow-violet-900/50 disabled:shadow-none shrink-0"
                 >
                   Send
                 </button>

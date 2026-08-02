@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "description": "CV focus rules by route. CV Builder improves the CV for the active plan — it is not a second career planner.",
+  "global_warnings": [
+    "Do not give a high CV score if the CV is for a different route.",
+    "A saved CV with old route content should be marked as needing tailoring.",
+    "Adding one qualification should not automatically make the CV strong.",
+    "CV Builder should improve the CV for the active plan, not become a second career planner."
+  ],
+  "rules": [
+    {
+      "route_id": "extra_income_security",
+      "target_roles": [
+        "Matchday Steward",
+        "Event Steward",
+        "Delivery Driver",
+        "Warehouse Operative",
+        "SIA Door Supervisor (next upgrade)"
+      ],
+      "required_keywords": [
+        "reliability",
+        "availability",
+        "customer service",
+        "right to work"
+      ],
+      "recommended_skills": [
+        "event work",
+        "calm under pressure",
+        "teamwork",
+        "punctuality",
+        "following instructions"
+      ],
+      "missing_items_to_check": [
+        "Right to work statement",
+        "Evening/weekend availability",
+        "Customer-facing or public-facing experience",
+        "Whether CV still targets an old unrelated role"
+      ],
+      "cv_warning_rules": [
+        "Do not give a high CV score if the CV is for a different route.",
+        "A saved CV with old route content should be marked as needing tailoring.",
+        "Adding SIA or First Aid alone should not automatically make the CV strong.",
+        "CV Builder should improve the CV for the active Extra Income / Security plan, not become a second career planner."
+      ]
+    },
+    {
+      "route_id": "care_entry_route",
+      "target_roles": [
+        "Care Assistant",
+        "Support Worker",
+        "Healthcare Support Worker"
+      ],
+      "required_keywords": [
+        "empathy",
+        "reliability",
+        "communication",
+        "safeguarding awareness"
+      ],
+      "recommended_skills": [
+        "care values",
+        "patience",
+        "teamwork",
+        "following care plans",
+        "respect and dignity"
+      ],
+      "missing_items_to_check": [
+        "Care or people-support experience language",
+        "Safeguarding awareness",
+        "Whether CV still targets an unrelated technical or office role"
+      ],
+      "cv_warning_rules": [
+        "Do not give a high CV score if the CV is for a different route.",
+        "A saved CV with old route content should be marked as needing tailoring.",
+        "Adding one care qualification should not automatically make the CV strong.",
+        "CV Builder should improve the CV for the active care plan, not become a second career planner."
+      ]
+    },
+    {
+      "route_id": "construction_cscs_route",
+      "target_roles": [
+        "Labourer",
+        "Site Assistant",
+        "Construction Operative"
+      ],
+      "required_keywords": [
+        "reliability",
+        "site safety",
+        "teamwork",
+        "punctuality"
+      ],
+      "recommended_skills": [
+        "physical work",
+        "manual handling awareness",
+        "following site rules",
+        "outdoor / site experience"
+      ],
+      "missing_items_to_check": [
+        "Site safety language",
+        "Physical work readiness",
+        "Whether CV still targets an unrelated office or engineering title without construction framing"
+      ],
+      "cv_warning_rules": [
+        "Do not give a high CV score if the CV is for a different route.",
+        "A saved CV with old route content should be marked as needing tailoring.",
+        "Adding CSCS alone should not automatically make the CV strong.",
+        "CV Builder should improve the CV for the active construction plan, not become a second career planner."
+      ]
+    },
+    {
+      "route_id": "forklift_warehouse_route",
+      "target_roles": [
+        "Warehouse Operative",
+        "Picker/Packer",
+        "Logistics Assistant",
+        "Forklift Operator (after training)"
+      ],
+      "required_keywords": [
+        "accuracy",
+        "reliability",
+        "safety",
+        "shift availability"
+      ],
+      "recommended_skills": [
+        "warehouse systems",
+        "stock handling",
+        "teamwork",
+        "following procedures"
+      ],
+      "missing_items_to_check": [
+        "Shift / night availability if relevant",
+        "Safety and accuracy language",
+        "Whether CV still targets an unrelated customer-facing or office route"
+      ],
+      "cv_warning_rules": [
+        "Do not give a high CV score if the CV is for a different route.",
+        "A saved CV with old route content should be marked as needing tailoring.",
+        "Adding forklift training alone should not automatically make the CV strong.",
+        "CV Builder should improve the CV for the active warehouse plan, not become a second career planner."
+      ]
+    },
+    {
+      "route_id": "teaching_assistant_tefl_route",
+      "target_roles": [
+        "Teaching Assistant",
+        "Learning Support Assistant",
+        "ESOL Support"
+      ],
+      "required_keywords": [
+        "communication",
+        "patience",
+        "classroom support",
+        "safeguarding awareness"
+      ],
+      "recommended_skills": [
+        "language skills",
+        "SEND awareness",
+        "organisation",
+        "supporting learners"
+      ],
+      "missing_items_to_check": [
+        "Safeguarding awareness",
+        "Classroom or learner-support language",
+        "Whether CV still targets an unrelated sales or warehouse route"
+      ],
+      "cv_warning_rules": [
+        "Do not give a high CV score if the CV is for a different route.",
+        "A saved CV with old route content should be marked as needing tailoring.",
+        "Adding TEFL or one TA qualification alone should not automatically make the CV strong.",
+        "CV Builder should improve the CV for the active education plan, not become a second career planner."
+      ]
+    },
+    {
+      "route_id": "engineering_education_route",
+      "target_roles": [
+        "Engineering Technician",
+        "Junior Engineer",
+        "Design Engineer",
+        "Project Assistant"
+      ],
+      "required_keywords": [
+        "technical skills",
+        "projects",
+        "problem solving",
+        "UK standards awareness"
+      ],
+      "recommended_skills": [
+        "software",
+        "AutoCAD if relevant",
+        "project documentation",
+        "team collaboration"
+      ],
+      "missing_items_to_check": [
+        "Project evidence",
+        "UK standards or regulatory awareness where relevant",
+        "Whether CV content matches the active engineering plan rather than an old Extra Income steward plan"
+      ],
+      "cv_warning_rules": [
+        "Do not give a high CV score if the CV is for a different route.",
+        "A saved CV with old route content should be marked as needing tailoring.",
+        "Adding one certification should not automatically make the CV strong.",
+        "CV Builder should improve the CV for the active engineering plan, not become a second career planner."
+      ]
+    }
+  ]
+}

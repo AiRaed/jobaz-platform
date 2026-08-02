@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       return NextResponse.json({
         ok: true,
@@ -41,8 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Evaluate the spoken answer compared to the written target answer using GPT
-    const evaluationCompletion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const evaluationCompletion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -77,12 +72,13 @@ Evaluate and return a JSON object with these exact fields (all scores 0-10):
 Respond only with valid JSON, no additional text.`,
         },
       ],
+      modelTier: 'quality',
       temperature: 0.7,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' },
+      maxTokens: 2000,
+      feature: 'interview/hard-mode',
     })
 
-    const evaluationContent = evaluationCompletion.choices[0]?.message?.content || '{}'
+    const evaluationContent = evaluationCompletion.text || '{}'
     
     let evaluation
     try {

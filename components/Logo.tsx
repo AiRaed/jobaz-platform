@@ -9,9 +9,14 @@ export default function Logo({ className }: LogoProps = {}) {
     <img
       src="/logo.png"
       alt="JobAZ Logo"
-      className={cn("h-10 md:h-14 lg:h-16 object-contain select-none", className)}
+      width={140}
+      height={40}
+      className={cn(
+        'jobaz-logo jobaz-logo--header h-10 md:h-14 lg:h-16 w-auto object-contain select-none',
+        className
+      )}
       draggable="false"
     />
-  );
+  )
 }
 

@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 type SkillsQualityRating = 'excellent' | 'good' | 'needs-improvement'
 
@@ -24,7 +20,7 @@ export async function POST(req: Request) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY - using basic analysis')
       // Fallback to basic analysis
       return NextResponse.json({
@@ -91,8 +87,7 @@ Tone: Supportive, professional, and practical. Avoid judgmental language.
 
 Return ONLY valid JSON, no other text.`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -103,11 +98,13 @@ Return ONLY valid JSON, no other text.`
           content: evaluationPrompt,
         },
       ],
+      modelTier: 'default',
       temperature: 0.3,
-      max_tokens: 800,
+      maxTokens: 800,
+      feature: 'cv/check-skills-quality',
     })
 
-    const result = completion.choices[0]?.message?.content?.trim()
+    const result = completion.text?.trim()
     
     if (!result) {
       throw new Error('No response from AI')

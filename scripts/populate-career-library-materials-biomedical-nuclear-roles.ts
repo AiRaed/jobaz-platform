@@ -1,0 +1,1881 @@
+/**
+ * Populate Career Knowledge Library roles for THREE specialisms in one run:
+ *   1) Materials Engineering
+ *   2) Biomedical Engineering
+ *   3) Nuclear Engineering
+ *
+ * Each specialism: ~30 draft roles (Degree / Master's / PhD).
+ * Titles unique across packs and skip exact overlaps with completed specialisms.
+ *
+ *   npx tsx scripts/populate-career-library-materials-biomedical-nuclear-roles.ts
+ */
+
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { normalizeSlug } from '../lib/admin/career-library/guards'
+import type {
+  CareerLibraryAcademicRequirement,
+  CareerLibraryFitClassification,
+  CareerLibraryRegistrationRequirement,
+  CareerLibraryRoleCategory,
+  CareerLibrarySeniorityLevel,
+} from '../lib/admin/career-library/types'
+
+function loadEnvLocal() {
+  const envPath = resolve(process.cwd(), '.env.local')
+  if (!existsSync(envPath)) return
+  const text = readFileSync(envPath, 'utf8')
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim()
+    let val = trimmed.slice(eq + 1).trim()
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
+
+type StageKey = 'degree' | 'masters' | 'phd'
+
+type RoleSeed = {
+  name: string
+  description: string
+  roleCategory: CareerLibraryRoleCategory
+  seniorityLevel: CareerLibrarySeniorityLevel
+  minimumExperienceYears: number
+  experienceRequirementLabel: string
+  professionalRegistrationRequirement: CareerLibraryRegistrationRequirement
+  professionalMembershipRequirement: CareerLibraryRegistrationRequirement
+  academicRequirement: CareerLibraryAcademicRequirement
+  isResearchRole: boolean
+  isAcademicRole: boolean
+  isRegulatedOrRestricted: boolean
+  eligibilityNote: string
+  fitClassification: CareerLibraryFitClassification
+  priority: number
+}
+
+type SpecialismPack = {
+  slug: string
+  label: string
+  professionalBody: string
+  relatedBodies: string[]
+  sources: string[]
+  siblingSlugs: string[]
+  degree: RoleSeed[]
+  masters: RoleSeed[]
+  phd: RoleSeed[]
+}
+
+function role(
+  partial: Omit<
+    RoleSeed,
+    | 'professionalRegistrationRequirement'
+    | 'professionalMembershipRequirement'
+    | 'isResearchRole'
+    | 'isAcademicRole'
+    | 'isRegulatedOrRestricted'
+  > &
+    Partial<
+      Pick<
+        RoleSeed,
+        | 'professionalRegistrationRequirement'
+        | 'professionalMembershipRequirement'
+        | 'isResearchRole'
+        | 'isAcademicRole'
+        | 'isRegulatedOrRestricted'
+      >
+    >
+): RoleSeed {
+  return {
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    ...partial,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 1) Materials Engineering — IOM3
+// ---------------------------------------------------------------------------
+const MATERIALS: SpecialismPack = {
+  slug: 'materials-engineering',
+  label: 'Materials Engineering',
+  professionalBody: 'Institute of Materials, Minerals and Mining (IOM3)',
+  relatedBodies: ['Engineering Council'],
+  sources: [
+    'national_careers_service_materials_engineer',
+    'iom3_membership_ceng',
+    'engineering_council_ceng_pathway',
+    'prospects_materials_degree_context',
+  ],
+  siblingSlugs: [
+    'mechanical-engineering',
+    'industrial-engineering',
+    'chemical-engineering',
+    'biomedical-engineering',
+    'nuclear-engineering',
+    'aerospace-engineering',
+    'automotive-engineering',
+    'electronic-engineering',
+    'renewable-energy-engineering',
+  ],
+  degree: [
+    role({
+      name: 'Graduate Materials Engineer',
+      description:
+        'Entry UK role supporting materials selection, testing and failure investigation in manufacturing, aerospace, energy or research toward IOM3 professional development.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior industry experience required',
+      academicRequirement: 'accredited_degree_preferred',
+      eligibilityNote:
+        'Immediate graduate-entry materials pathway. IOM3 CEng/IEng is a later goal. Mechanical design and industrial OpEx sit in sibling specialisms.',
+      fitClassification: 'immediate',
+      priority: 10,
+    }),
+    role({
+      name: 'Metallurgist (Graduate)',
+      description:
+        'Supports ferrous and non-ferrous metallurgy, heat treatment and microstructure analysis under senior metallurgists in UK industry or research.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; metallurgy modules helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate metallurgy pathway — not Mechanical structural design or Nuclear fuel cycle roles.',
+      fitClassification: 'immediate',
+      priority: 20,
+    }),
+    role({
+      name: 'Polymer Materials Engineer (Graduate)',
+      description:
+        'Supports polymer selection, processing and property testing for plastics, elastomers and composite matrix materials under senior materials engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes in polymers, packaging or automotive materials',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate polymer materials focus — not Chemical process plant design or Biomedical device regulatory roles.',
+      fitClassification: 'immediate',
+      priority: 30,
+    }),
+    role({
+      name: 'Ceramics Materials Engineer (Graduate)',
+      description:
+        'Supports ceramics and refractory materials development, processing and quality testing for industrial, aerospace or energy applications.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; ceramics/refractories modules helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate ceramics materials pathway within Materials Engineering.',
+      fitClassification: 'immediate',
+      priority: 40,
+    }),
+    role({
+      name: 'Composites Materials Engineer (Graduate)',
+      description:
+        'Supports composite laminate design, layup, cure and mechanical testing for aerospace, automotive or marine structures under senior materials engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; composites modules or placement helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Composite materials focus — structural design ownership may sit under Aerospace or Mechanical Engineering.',
+      fitClassification: 'immediate',
+      priority: 50,
+    }),
+    role({
+      name: 'Materials Testing Engineer (Junior)',
+      description:
+        'Conducts mechanical, thermal and microstructural testing of materials and reports results under senior test engineers or laboratory leads.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years materials testing or laboratory experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Realistic next after graduate materials exposure. Not general industrial quality OpEx roles.',
+      fitClassification: 'realistic_next',
+      priority: 60,
+    }),
+    role({
+      name: 'Corrosion Engineer (Junior)',
+      description:
+        'Supports corrosion assessment, coating selection and degradation monitoring for UK infrastructure, energy or marine assets under senior corrosion engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years corrosion or materials degradation experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Corrosion/degradation materials focus — not Nuclear radiation protection or Environmental compliance roles.',
+      fitClassification: 'realistic_next',
+      priority: 70,
+    }),
+    role({
+      name: 'Materials Characterisation Engineer (Graduate)',
+      description:
+        'Supports SEM, XRD, spectroscopy and other characterisation techniques to analyse material structure and properties under senior scientists or engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; characterisation lab experience helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate characterisation pathway — not pure Electronic semiconductor device design.',
+      fitClassification: 'immediate',
+      priority: 80,
+    }),
+    role({
+      name: 'Surface Engineering / Coatings Engineer (Graduate)',
+      description:
+        'Supports surface treatments, coatings and tribology solutions for wear, corrosion and performance under senior surface engineering specialists.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes in coatings, aerospace or automotive',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Surface engineering materials focus — not Mechanical machine design or Medical device roles.',
+      fitClassification: 'immediate',
+      priority: 90,
+    }),
+    role({
+      name: 'Materials Engineering Technician / EngTech pathway',
+      description:
+        'Provides laboratory, testing or production materials technical support; may align with EngTech development via IOM3.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior experience required; EngTech/IEng pathway available',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate technical pathway. Professional registration is a later goal, not an entry gate.',
+      fitClassification: 'immediate',
+      priority: 100,
+    }),
+  ],
+  masters: [
+    role({
+      name: 'Metallurgy Engineer',
+      description:
+        'Leads metallurgical process development, alloy design and microstructure optimisation for UK manufacturing, aerospace or energy sectors.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years metallurgy experience; MSc often valued',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Master’s-relevant metallurgy specialist role. Not Mechanical design or Nuclear fuel engineering.',
+      fitClassification: 'realistic_next',
+      priority: 10,
+    }),
+    role({
+      name: 'Advanced Composites Materials Engineer',
+      description:
+        'Develops advanced composite materials, manufacturing processes and property databases for high-performance structural applications.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years composites materials experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Advanced composites materials — structural design ownership may sit under Aerospace Engineering.',
+      fitClassification: 'realistic_next',
+      priority: 20,
+    }),
+    role({
+      name: 'Failure Analysis Engineer (Materials)',
+      description:
+        'Investigates material failures using fractography, metallography and root-cause methods for UK industry, insurance or legal clients.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years failure analysis or forensic materials experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Materials failure analysis focus — not Mechanical maintenance reliability OpEx titles.',
+      fitClassification: 'realistic_next',
+      priority: 30,
+    }),
+    role({
+      name: 'Welding and Joining Materials Engineer',
+      description:
+        'Specifies welding, brazing and joining processes, qualifications and materials compatibility for UK fabrication and energy sectors.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years welding/joining materials experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Joining materials specialism — not Industrial manufacturing line management.',
+      fitClassification: 'realistic_next',
+      priority: 40,
+    }),
+    role({
+      name: 'Additive Manufacturing Materials Engineer',
+      description:
+        'Develops metal and polymer additive manufacturing materials, powder specifications and process-property relationships for UK industry.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years AM materials or process development experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'AM materials focus — machine/process automation may sit under Mechatronics or Mechanical Engineering.',
+      fitClassification: 'realistic_next',
+      priority: 50,
+    }),
+    role({
+      name: 'Battery Materials Engineer',
+      description:
+        'Develops electrode, electrolyte and cell materials for lithium-ion and next-generation battery technologies in UK energy and automotive sectors.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years battery materials R&D or application experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'desirable',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Battery materials chemistry focus — not Renewable Energy project/grid storage engineering.',
+      fitClassification: 'realistic_next',
+      priority: 60,
+    }),
+    role({
+      name: 'Semiconductor Materials Engineer',
+      description:
+        'Supports semiconductor wafer, thin-film and packaging materials development and characterisation for UK electronics and photonics sectors.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years semiconductor materials experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'desirable',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Semiconductor materials focus — device/circuit design remains Electronic Engineering.',
+      fitClassification: 'realistic_next',
+      priority: 70,
+    }),
+    role({
+      name: 'Sustainable / Circular Materials Engineer',
+      description:
+        'Develops recycled, bio-based and circular-economy material solutions and life-cycle assessments for UK sustainability programmes.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years sustainable materials or LCA experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'desirable',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Circular materials focus — not general Environmental compliance or Renewable Energy project roles.',
+      fitClassification: 'realistic_next',
+      priority: 80,
+    }),
+    role({
+      name: 'Materials Selection Engineer',
+      description:
+        'Leads materials selection, trade studies and specification writing for UK engineering projects across aerospace, energy and manufacturing.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years materials selection or design support experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Materials selection ownership needs demonstrated project experience beyond postgraduate study.',
+      fitClassification: 'realistic_next',
+      priority: 90,
+    }),
+    role({
+      name: 'Senior Materials Engineer',
+      description:
+        'Leads complex materials engineering packages, mentors juniors and assures technical quality across metallurgy, polymers or composites domains.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 6,
+      experienceRequirementLabel: 'Typically 6+ years materials engineering experience; CEng commonly expected',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Seniority requires significant industry experience. Master’s alone is not Senior status.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+  phd: [
+    role({
+      name: 'Research Associate / Postdoctoral Researcher (Materials Engineering)',
+      description:
+        'Conducts postdoctoral research in metallurgy, polymers, composites or functional materials in UK universities or research centres.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD (or near completion) in materials engineering or closely related field',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Academic/research fit. A PhD is not automatic industry Senior Materials Engineer seniority.',
+      fitClassification: 'academic_or_research',
+      priority: 10,
+    }),
+    role({
+      name: 'University Lecturer / Assistant Professor (Materials Engineering)',
+      description:
+        'Delivers teaching and research in materials engineering programmes within UK higher education.',
+      roleCategory: 'academic',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD typically required; teaching/research track record expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      isAcademicRole: true,
+      eligibilityNote:
+        'Academic pathway. Not an industry chartered-engineer seniority substitute.',
+      fitClassification: 'academic_or_research',
+      priority: 20,
+    }),
+    role({
+      name: 'Corrosion / Degradation Research Specialist',
+      description:
+        'Advances research on corrosion mechanisms, protective coatings and long-term materials degradation for UK infrastructure and energy assets.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with corrosion or materials degradation research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Corrosion research — not Nuclear radiation protection or Environmental policy roles.',
+      fitClassification: 'academic_or_research',
+      priority: 30,
+    }),
+    role({
+      name: 'Battery Materials Research Specialist',
+      description:
+        'Researches next-generation battery chemistries, electrode materials and cell performance for UK energy storage research programmes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with battery materials research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Battery materials research — not Renewable Energy project/grid storage engineering.',
+      fitClassification: 'academic_or_research',
+      priority: 40,
+    }),
+    role({
+      name: 'Advanced Composites Research Specialist',
+      description:
+        'Researches composite manufacturing, damage tolerance and multifunctional materials for UK aerospace and automotive research.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with advanced composites research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Composites materials research — structural design research may sit under Aerospace Engineering.',
+      fitClassification: 'academic_or_research',
+      priority: 50,
+    }),
+    role({
+      name: 'Failure Analysis Research Specialist (Materials)',
+      description:
+        'Researches fracture mechanics, fatigue and forensic materials analysis methods for UK industry and academic programmes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with failure analysis or fracture mechanics research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Failure analysis research within Materials Engineering.',
+      fitClassification: 'academic_or_research',
+      priority: 60,
+    }),
+    role({
+      name: 'Innovation / Materials R&D Engineer',
+      description:
+        'Leads applied R&D for novel materials, coatings or manufacturing processes in UK industry or research organisations.',
+      roleCategory: 'research',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 5,
+      experienceRequirementLabel: 'Typically 5+ years R&D or advanced materials delivery; PhD often valued',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Industry R&D progression needs delivery experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 70,
+    }),
+    role({
+      name: 'Principal / Specialist Materials Consultant',
+      description:
+        'Provides expert advisory on materials selection, failures, metallurgy and compliance for UK clients in manufacturing, energy and legal sectors.',
+      roleCategory: 'consultancy',
+      seniorityLevel: 'principal',
+      minimumExperienceYears: 10,
+      experienceRequirementLabel: 'Typically 10+ years materials engineering delivery; deep domain expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Principal consultancy needs track record beyond doctoral study. CEng via IOM3 commonly expected.',
+      fitClassification: 'future_progression',
+      priority: 80,
+    }),
+    role({
+      name: 'Technical Authority / Expert Witness (Materials Engineering)',
+      description:
+        'Sets materials engineering technical standards and may provide expert evidence on material failures or disputes in UK courts and tribunals.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 12,
+      experienceRequirementLabel: 'Typically 12+ years materials engineering leadership and specialist expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Leadership/expert roles require extensive experience. Academic stage alone is insufficient.',
+      fitClassification: 'future_progression',
+      priority: 90,
+    }),
+    role({
+      name: 'Research & Innovation Manager (Materials)',
+      description:
+        'Manages research portfolios and innovation programmes spanning metallurgy, polymers, composites and functional materials.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years research/innovation leadership in materials',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Management of research programmes needs leadership experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// 2) Biomedical Engineering — IPEM
+// ---------------------------------------------------------------------------
+const BIOMEDICAL: SpecialismPack = {
+  slug: 'biomedical-engineering',
+  label: 'Biomedical Engineering',
+  professionalBody: 'Institute of Physics and Engineering in Medicine (IPEM)',
+  relatedBodies: [
+    'Engineering Council',
+    'Health and Care Professions Council (HCPC)',
+    'Institution of Engineering and Technology (IET)',
+    'Institution of Mechanical Engineers (IMechE)',
+  ],
+  sources: [
+    'prospects_biomedical_engineer',
+    'nhs_healthcareers_clinical_engineering',
+    'nhs_scientist_training_programme',
+    'ipem_clinical_engineering',
+    'engineering_council_ceng_pathway',
+  ],
+  siblingSlugs: [
+    'materials-engineering',
+    'electronic-engineering',
+    'mechanical-engineering',
+    'chemical-engineering',
+    'nuclear-engineering',
+    'mechatronics',
+    'electrical-engineering',
+  ],
+  degree: [
+    role({
+      name: 'Graduate Biomedical Engineer',
+      description:
+        'Entry UK role supporting medical device design, hospital equipment or healthcare technology projects toward IPEM professional development.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior industry experience required',
+      academicRequirement: 'accredited_degree_preferred',
+      eligibilityNote:
+        'Immediate graduate-entry biomedical engineering pathway. Not doctor or nurse roles. Pure electronics and general materials sit in sibling specialisms.',
+      fitClassification: 'immediate',
+      priority: 10,
+    }),
+    role({
+      name: 'Medical Device Design Engineer (Graduate)',
+      description:
+        'Supports design of medical devices, instruments and consumables under senior biomedical engineers in UK medtech companies or consultancies.',
+      roleCategory: 'design',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes in medtech or healthcare engineering',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Medical device design focus — not Chemical pharma process engineering or pure Mechanical machine design.',
+      fitClassification: 'immediate',
+      priority: 20,
+    }),
+    role({
+      name: 'Biomedical Equipment Engineer (Graduate)',
+      description:
+        'Supports installation, maintenance and technical support of hospital biomedical equipment under clinical engineering teams or OEM service departments.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via NHS estates, OEM service or healthcare technology companies',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Hospital equipment engineering — not Electrical power distribution or Nuclear instrumentation roles.',
+      fitClassification: 'immediate',
+      priority: 30,
+    }),
+    role({
+      name: 'Rehabilitation Engineering Support (Graduate)',
+      description:
+        'Supports design and fitting of assistive and rehabilitation technologies for patients under senior rehabilitation engineers or clinical teams.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via NHS, charities or assistive technology companies',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Rehabilitation/assistive technology focus — not clinical doctor or nursing pathways.',
+      fitClassification: 'immediate',
+      priority: 40,
+    }),
+    role({
+      name: 'Medical Imaging Engineering Support (Graduate)',
+      description:
+        'Supports installation, calibration and technical troubleshooting of MRI, CT, ultrasound and other imaging systems in UK hospitals or OEMs.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via NHS clinical engineering or imaging OEM graduate schemes',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Imaging equipment engineering — not pure Electronic signal processing design or Nuclear radiation protection.',
+      fitClassification: 'immediate',
+      priority: 50,
+    }),
+    role({
+      name: 'Assistive Technology Engineer (Graduate)',
+      description:
+        'Develops and supports assistive devices, prosthetics interfaces and accessibility technologies for UK healthcare and disability sectors.',
+      roleCategory: 'design',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via assistive technology companies, NHS or research spin-outs',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Assistive technology engineering — not Mechatronics factory automation roles.',
+      fitClassification: 'immediate',
+      priority: 60,
+    }),
+    role({
+      name: 'Biomechanics Engineer (Junior)',
+      description:
+        'Supports biomechanical testing, gait analysis and musculoskeletal modelling for medical devices, sports or research applications under senior engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years biomechanics or medical device experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Realistic next after graduate biomedical exposure. Not Mechanical general structural design.',
+      fitClassification: 'realistic_next',
+      priority: 70,
+    }),
+    role({
+      name: 'Medical Device Verification & Validation Engineer (Junior)',
+      description:
+        'Supports V&V testing, protocols and documentation for medical devices under quality and regulatory teams in UK medtech companies.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years medical device V&V or quality experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Medical device V&V focus — not Chemical pharma validation or Industrial quality OpEx.',
+      fitClassification: 'realistic_next',
+      priority: 80,
+    }),
+    role({
+      name: 'Digital Health Hardware Engineer (Graduate)',
+      description:
+        'Supports hardware design for wearable monitors, remote patient monitoring and connected health devices under senior biomedical engineers.',
+      roleCategory: 'design',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via digital health or medtech graduate schemes',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Digital health hardware — software-only roles and pure Electronic circuit design sit elsewhere.',
+      fitClassification: 'immediate',
+      priority: 90,
+    }),
+    role({
+      name: 'Biomedical Engineering Technician / EngTech pathway',
+      description:
+        'Provides hospital equipment, laboratory or device technical support; may align with EngTech development via IPEM or IET.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior experience required; EngTech/IEng pathway available',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate technical pathway. HCPC Clinical Scientist registration is not conferred by degree alone.',
+      fitClassification: 'immediate',
+      priority: 100,
+    }),
+  ],
+  masters: [
+    role({
+      name: 'Clinical Engineer (NHS Healthcare Science)',
+      description:
+        'Provides clinical engineering services in NHS Trusts, managing medical equipment lifecycle, safety and technology under Healthcare Science frameworks.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years clinical engineering experience; STP/HCPC pathway often required for Clinical Scientist registration',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'STP/HCPC Clinical Scientist pathway. Master’s stage is educational relevance not automatic HCPC registration; degree alone does not confer clinical scientist registration. Not doctor or nurse roles.',
+      fitClassification: 'realistic_next',
+      priority: 10,
+    }),
+    role({
+      name: 'Medical Device Engineer',
+      description:
+        'Designs and develops medical devices covering mechanical, electronic and software interfaces for UK medtech manufacturers or consultancies.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years medical device engineering experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Medical device engineering — not Chemical pharma process or general Materials roles.',
+      fitClassification: 'realistic_next',
+      priority: 20,
+    }),
+    role({
+      name: 'Healthcare Technology Management Engineer',
+      description:
+        'Manages medical equipment inventories, replacement planning and technology risk for NHS Trusts or private healthcare providers.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years healthcare technology management experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Healthcare technology management — not Industrial OpEx or general IT management.',
+      fitClassification: 'realistic_next',
+      priority: 30,
+    }),
+    role({
+      name: 'Quality Engineer (Medical Devices)',
+      description:
+        'Leads quality systems, CAPA and design control for medical device manufacturers under UKCA/MDR and ISO 13485 frameworks.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years medical device quality experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Medtech quality focus — not Chemical pharma GMP or Industrial general quality roles.',
+      fitClassification: 'realistic_next',
+      priority: 40,
+    }),
+    role({
+      name: 'Medical Device Regulatory Engineer',
+      description:
+        'Supports UKCA, CE and FDA regulatory submissions, technical files and conformity assessments for medical device companies.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years medical device regulatory experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Medical device regulatory focus — not Nuclear ONR licensing or Chemical REACH roles.',
+      fitClassification: 'realistic_next',
+      priority: 50,
+    }),
+    role({
+      name: 'Biomaterials Engineer (Medical Applications)',
+      description:
+        'Develops biocompatible materials for implants, scaffolds and medical devices in UK medtech and research organisations.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years biomaterials or medtech materials experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Biomaterials for medical applications — general Materials Engineering roles sit in sibling specialism.',
+      fitClassification: 'realistic_next',
+      priority: 60,
+    }),
+    role({
+      name: 'Medical Electronics Integration Engineer',
+      description:
+        'Integrates sensors, electronics and embedded systems into medical devices and hospital equipment for UK medtech companies.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years medical electronics integration experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Medical electronics integration — pure Electronic circuit/semiconductor design sits under Electronic Engineering.',
+      fitClassification: 'realistic_next',
+      priority: 70,
+    }),
+    role({
+      name: 'Human Factors Engineer (Medical Devices)',
+      description:
+        'Applies human factors and usability engineering to medical device design for UKCA/MDR compliance and patient safety.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years human factors or usability engineering in medtech',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'desirable',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Human factors for medical devices — not general Industrial ergonomics or UX software roles.',
+      fitClassification: 'realistic_next',
+      priority: 80,
+    }),
+    role({
+      name: 'Surgical / Diagnostic Technology Engineer',
+      description:
+        'Engineers surgical instruments, diagnostic platforms and point-of-care devices for UK medtech manufacturers and NHS innovation programmes.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years surgical or diagnostic technology engineering experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Surgical/diagnostic technology — not clinical surgeon or radiologist roles.',
+      fitClassification: 'realistic_next',
+      priority: 90,
+    }),
+    role({
+      name: 'Senior Biomedical Engineer',
+      description:
+        'Leads complex biomedical engineering packages, mentors juniors and assures technical quality across devices, imaging or clinical engineering.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 6,
+      experienceRequirementLabel: 'Typically 6+ years biomedical engineering experience; CEng commonly expected',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Seniority requires significant industry experience. Master’s alone is not Senior status. HCPC registration is separate from academic stage.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+  phd: [
+    role({
+      name: 'Research Associate / Postdoctoral Researcher (Biomedical Engineering)',
+      description:
+        'Conducts postdoctoral research in medical devices, biomechanics, imaging or biomaterials in UK universities or research centres.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD (or near completion) in biomedical engineering or closely related field',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Academic/research fit. A PhD is not automatic industry Senior Biomedical Engineer seniority.',
+      fitClassification: 'academic_or_research',
+      priority: 10,
+    }),
+    role({
+      name: 'University Lecturer / Assistant Professor (Biomedical Engineering)',
+      description:
+        'Delivers teaching and research in biomedical engineering programmes within UK higher education.',
+      roleCategory: 'academic',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD typically required; teaching/research track record expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      isAcademicRole: true,
+      eligibilityNote:
+        'Academic pathway. Not an industry chartered-engineer or HCPC clinical scientist substitute.',
+      fitClassification: 'academic_or_research',
+      priority: 20,
+    }),
+    role({
+      name: 'Biomechanics Research Specialist',
+      description:
+        'Advances research on musculoskeletal biomechanics, implant mechanics and movement analysis for UK academic and medtech programmes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with biomechanics research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Biomechanics research within Biomedical Engineering.',
+      fitClassification: 'academic_or_research',
+      priority: 30,
+    }),
+    role({
+      name: 'Medical Imaging Systems Research Specialist',
+      description:
+        'Researches MRI, CT, ultrasound and novel imaging technologies for UK healthcare and academic research programmes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with medical imaging systems research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Medical imaging research — not pure Electronic signal processing or Nuclear radiation physics.',
+      fitClassification: 'academic_or_research',
+      priority: 40,
+    }),
+    role({
+      name: 'Biomaterials (Medical Applications) Research Specialist',
+      description:
+        'Researches biocompatible materials, tissue scaffolds and implant interfaces for UK medtech and regenerative medicine programmes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with biomaterials for medical applications research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Medical biomaterials research — general Materials Engineering research sits in sibling specialism.',
+      fitClassification: 'academic_or_research',
+      priority: 50,
+    }),
+    role({
+      name: 'Rehabilitation / Assistive Technology Research Specialist',
+      description:
+        'Researches prosthetics, orthotics, assistive devices and rehabilitation technologies for UK healthcare and disability research.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with rehabilitation or assistive technology research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Rehabilitation/assistive technology research — not clinical therapy or nursing roles.',
+      fitClassification: 'academic_or_research',
+      priority: 60,
+    }),
+    role({
+      name: 'Innovation / Medical Device R&D Engineer',
+      description:
+        'Leads applied R&D for novel medical devices, diagnostics or healthcare technologies in UK industry or research organisations.',
+      roleCategory: 'research',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 5,
+      experienceRequirementLabel: 'Typically 5+ years R&D or advanced medtech delivery; PhD often valued',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Industry R&D progression needs delivery experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 70,
+    }),
+    role({
+      name: 'Principal / Specialist Medical Device Consultant',
+      description:
+        'Provides expert advisory on medical device design, regulatory strategy and clinical engineering for UK medtech clients and NHS programmes.',
+      roleCategory: 'consultancy',
+      seniorityLevel: 'principal',
+      minimumExperienceYears: 10,
+      experienceRequirementLabel: 'Typically 10+ years medtech delivery; deep domain expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Principal consultancy needs track record beyond doctoral study. CEng via IPEM/IET commonly expected.',
+      fitClassification: 'future_progression',
+      priority: 80,
+    }),
+    role({
+      name: 'Technical Authority (Clinical / Biomedical Engineering)',
+      description:
+        'Sets clinical and biomedical engineering standards for NHS Trusts, medtech companies or national healthcare technology programmes.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 12,
+      experienceRequirementLabel: 'Typically 12+ years clinical/biomedical engineering leadership and specialist expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Leadership roles require extensive experience. Academic stage alone is insufficient. HCPC registration is separate from academic qualifications.',
+      fitClassification: 'future_progression',
+      priority: 90,
+    }),
+    role({
+      name: 'Research & Innovation Manager (Biomedical Systems)',
+      description:
+        'Manages research portfolios and innovation programmes spanning medical devices, imaging, biomaterials and digital health systems.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years research/innovation leadership in biomedical systems',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Management of research programmes needs leadership experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// 3) Nuclear Engineering — Nuclear Institute
+// ---------------------------------------------------------------------------
+const NUCLEAR: SpecialismPack = {
+  slug: 'nuclear-engineering',
+  label: 'Nuclear Engineering',
+  professionalBody: 'Nuclear Institute',
+  relatedBodies: ['Engineering Council', 'Office for Nuclear Regulation (ONR)'],
+  sources: [
+    'national_careers_service_nuclear_engineer',
+    'prospects_nuclear_engineer',
+    'nuclear_institute_membership',
+    'onr_regulatory_context',
+    'nuclear_graduates_scheme',
+  ],
+  siblingSlugs: [
+    'materials-engineering',
+    'mechanical-engineering',
+    'electrical-engineering',
+    'chemical-engineering',
+    'environmental-engineering',
+    'renewable-energy-engineering',
+    'biomedical-engineering',
+    'petroleum-engineering',
+  ],
+  degree: [
+    role({
+      name: 'Graduate Nuclear Engineer',
+      description:
+        'Entry UK role supporting reactor systems, nuclear safety or decommissioning projects toward Nuclear Institute professional development.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior industry experience required; security clearance may be required later',
+      academicRequirement: 'accredited_degree_preferred',
+      eligibilityNote:
+        'Immediate graduate-entry nuclear pathway. Academic level ≠ site authorisation, security clearance, or professional authority. Not Renewable Energy or general Environmental roles.',
+      fitClassification: 'immediate',
+      priority: 10,
+    }),
+    role({
+      name: 'Reactor Systems Engineer (Graduate)',
+      description:
+        'Supports reactor systems design, analysis and operational support for UK civil nuclear operators or supply chain companies.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via nuclear graduate schemes; clearance often required',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Reactor systems nuclear focus — not Mechanical general plant design or Renewable Energy project roles.',
+      fitClassification: 'immediate',
+      priority: 20,
+    }),
+    role({
+      name: 'Nuclear Safety Support Engineer (Graduate)',
+      description:
+        'Supports nuclear safety cases, hazard assessments and compliance documentation under senior safety engineers in UK nuclear organisations.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via nuclear graduate schemes; ONR-regulated environment awareness required',
+      academicRequirement: 'degree_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Nuclear safety support pathway. Academic level ≠ site authorisation or ONR professional authority. Not general Environmental health and safety roles.',
+      fitClassification: 'immediate',
+      priority: 30,
+    }),
+    role({
+      name: 'Radiation Protection Engineer (Graduate)',
+      description:
+        'Supports radiation protection programmes, dose assessments and ALARP justification for UK nuclear sites under senior RP advisors.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via nuclear graduate schemes; RP training and clearance often required',
+      academicRequirement: 'degree_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Radiation protection nuclear focus. Academic level ≠ site authorisation or RPA certification. Not Biomedical imaging or general Environmental roles.',
+      fitClassification: 'immediate',
+      priority: 40,
+    }),
+    role({
+      name: 'Nuclear Mechanical Systems Engineer (Graduate)',
+      description:
+        'Supports mechanical systems design, maintenance and integrity for UK nuclear power stations and decommissioning projects.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via nuclear graduate schemes; nuclear safety culture training required',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Nuclear mechanical systems — not general Mechanical Engineering or Marine Engineering roles.',
+      fitClassification: 'immediate',
+      priority: 50,
+    }),
+    role({
+      name: 'Nuclear Instrumentation Engineer (Graduate)',
+      description:
+        'Supports instrumentation and control systems for UK nuclear reactors, waste facilities and research installations.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via nuclear graduate schemes; I&C modules helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Nuclear I&C focus — not general Electronic or Electrical grid engineering roles.',
+      fitClassification: 'immediate',
+      priority: 60,
+    }),
+    role({
+      name: 'Nuclear Operations Engineer (Graduate)',
+      description:
+        'Supports operational engineering, outage planning and plant performance for UK nuclear power generation under senior operations engineers.',
+      roleCategory: 'site_delivery',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via nuclear graduate schemes; site authorisation training required over time',
+      academicRequirement: 'degree_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Nuclear operations support. Academic level ≠ site authorisation or licensed operator status. Not Industrial OpEx or Renewable O&M roles.',
+      fitClassification: 'immediate',
+      priority: 70,
+    }),
+    role({
+      name: 'Nuclear Maintenance Engineer (Graduate)',
+      description:
+        'Supports planned maintenance, defect rectification and outage work packages for UK nuclear plant systems and components.',
+      roleCategory: 'site_delivery',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via nuclear operators or supply chain; nuclear safety training required',
+      academicRequirement: 'degree_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Nuclear maintenance engineering. Academic level ≠ site authorisation. Not general Mechanical maintenance roles.',
+      fitClassification: 'immediate',
+      priority: 80,
+    }),
+    role({
+      name: 'Nuclear Project Engineer (Graduate)',
+      description:
+        'Supports nuclear new build, life extension or decommissioning project packages under senior project engineers in UK nuclear sector.',
+      roleCategory: 'project_management',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via nuclear graduate schemes in project delivery teams',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Nuclear project engineering — not Renewable Energy or Petroleum project roles.',
+      fitClassification: 'immediate',
+      priority: 90,
+    }),
+    role({
+      name: 'Nuclear Engineering Technician / EngTech pathway',
+      description:
+        'Provides technical support in nuclear laboratories, workshops or site operations; may align with EngTech development via Nuclear Institute.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior experience required; EngTech/IEng pathway available; clearance may be required',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate technical pathway. Site authorisation and professional registration are later goals, not entry gates.',
+      fitClassification: 'immediate',
+      priority: 100,
+    }),
+  ],
+  masters: [
+    role({
+      name: 'Nuclear Safety Case Engineer',
+      description:
+        'Develops and maintains nuclear safety cases, hazard analyses and licensing submissions for UK ONR-regulated nuclear facilities.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 4,
+      experienceRequirementLabel: 'Typically 4–8 years nuclear safety experience; substantial ONR-regulated delivery expected',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Senior safety-case roles need substantial experience. Academic level ≠ site authorisation or ONR professional authority. Not general Environmental compliance roles.',
+      fitClassification: 'future_progression',
+      priority: 10,
+    }),
+    role({
+      name: 'Reactor Physics Support Engineer',
+      description:
+        'Supports reactor physics calculations, core design inputs and neutronics analysis for UK nuclear operators and research organisations.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years reactor physics or neutronics experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Reactor physics nuclear focus — not general Physics research or Renewable Energy roles.',
+      fitClassification: 'realistic_next',
+      priority: 20,
+    }),
+    role({
+      name: 'Thermal Hydraulics Engineer (Nuclear)',
+      description:
+        'Analyses thermal-hydraulic behaviour of reactor coolant systems, heat transfer and safety margins for UK nuclear facilities.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years nuclear thermal hydraulics experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Nuclear thermal hydraulics — not Chemical process plant or Mechanical HVAC general roles.',
+      fitClassification: 'realistic_next',
+      priority: 30,
+    }),
+    role({
+      name: 'Nuclear Fuel Engineer',
+      description:
+        'Supports nuclear fuel design, fabrication quality, performance analysis and cycle management for UK nuclear operators and suppliers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years nuclear fuel engineering experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Nuclear fuel cycle focus — not general Materials metallurgy or Chemical process roles.',
+      fitClassification: 'realistic_next',
+      priority: 40,
+    }),
+    role({
+      name: 'Nuclear Materials Engineer',
+      description:
+        'Assesses irradiated materials behaviour, structural integrity and ageing for UK reactor systems and waste containers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years nuclear materials or irradiation effects experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Nuclear irradiated materials — general Materials Engineering roles sit in sibling specialism.',
+      fitClassification: 'realistic_next',
+      priority: 50,
+    }),
+    role({
+      name: 'Radioactive Waste Engineer',
+      description:
+        'Engineers radioactive waste characterisation, treatment, packaging and disposal solutions for UK nuclear decommissioning programmes.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years radioactive waste engineering experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Radioactive waste nuclear focus. Academic level ≠ site authorisation. Not general Environmental waste management roles.',
+      fitClassification: 'realistic_next',
+      priority: 60,
+    }),
+    role({
+      name: 'Nuclear Decommissioning Engineer',
+      description:
+        'Plans and delivers decommissioning engineering for UK nuclear sites covering dismantling, waste routing and safety case interfaces.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years nuclear decommissioning experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Nuclear decommissioning focus — not general Civil demolition or Environmental remediation roles.',
+      fitClassification: 'realistic_next',
+      priority: 70,
+    }),
+    role({
+      name: 'Nuclear Assurance Engineer',
+      description:
+        'Provides independent assurance, audit and compliance support for UK nuclear safety, quality and regulatory requirements.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 4,
+      experienceRequirementLabel: 'Typically 4–8 years nuclear assurance or quality experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Nuclear assurance/regulatory focus. Academic level ≠ ONR professional authority. Not general Industrial quality roles.',
+      fitClassification: 'realistic_next',
+      priority: 80,
+    }),
+    role({
+      name: 'Nuclear New Build Project Engineer',
+      description:
+        'Delivers engineering packages for UK nuclear new build programmes covering systems, interfaces and construction technical assurance.',
+      roleCategory: 'project_management',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years nuclear project engineering experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Nuclear new build project focus — not Renewable Energy or Civil infrastructure project roles.',
+      fitClassification: 'realistic_next',
+      priority: 90,
+    }),
+    role({
+      name: 'Senior Nuclear Systems Engineer',
+      description:
+        'Leads complex nuclear systems engineering packages, mentors juniors and assures technical quality across reactor, waste or decommissioning domains.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 6,
+      experienceRequirementLabel: 'Typically 6+ years nuclear systems experience; CEng commonly expected',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Seniority requires significant nuclear industry experience. Master’s alone is not Senior status. Site authorisation is separate from academic stage.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+  phd: [
+    role({
+      name: 'Research Associate / Postdoctoral Researcher (Nuclear Engineering)',
+      description:
+        'Conducts postdoctoral research in reactor physics, nuclear materials or safety in UK universities or national laboratories.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD (or near completion) in nuclear engineering or closely related field',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Academic/research fit. A PhD is not automatic industry Senior Nuclear Engineer seniority or site authorisation.',
+      fitClassification: 'academic_or_research',
+      priority: 10,
+    }),
+    role({
+      name: 'University Lecturer / Assistant Professor (Nuclear Engineering)',
+      description:
+        'Delivers teaching and research in nuclear engineering programmes within UK higher education.',
+      roleCategory: 'academic',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD typically required; teaching/research track record expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      isAcademicRole: true,
+      eligibilityNote:
+        'Academic pathway. Not an industry chartered-engineer or ONR professional authority substitute.',
+      fitClassification: 'academic_or_research',
+      priority: 20,
+    }),
+    role({
+      name: 'Fusion Engineering Research Specialist',
+      description:
+        'Advances research on fusion reactor engineering, plasma-facing materials and tokamak systems for UK fusion programmes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with fusion engineering research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Fusion engineering research — not Renewable Energy wind/solar research roles.',
+      fitClassification: 'academic_or_research',
+      priority: 30,
+    }),
+    role({
+      name: 'Reactor Physics Research Specialist',
+      description:
+        'Researches neutronics, core physics and computational methods for UK nuclear research and advanced reactor programmes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with reactor physics research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Reactor physics research within Nuclear Engineering.',
+      fitClassification: 'academic_or_research',
+      priority: 40,
+    }),
+    role({
+      name: 'Nuclear Safety Research Specialist',
+      description:
+        'Researches nuclear safety methodologies, probabilistic risk assessment and severe accident analysis for UK academic and industry programmes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with nuclear safety research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Nuclear safety research — not general Environmental health and safety research.',
+      fitClassification: 'academic_or_research',
+      priority: 50,
+    }),
+    role({
+      name: 'Nuclear Decommissioning Research Specialist',
+      description:
+        'Researches decommissioning technologies, waste immobilisation and remote handling for UK nuclear cleanup programmes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with nuclear decommissioning research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Nuclear decommissioning research — not general Environmental remediation research.',
+      fitClassification: 'academic_or_research',
+      priority: 60,
+    }),
+    role({
+      name: 'Innovation / Nuclear R&D Engineer',
+      description:
+        'Leads applied R&D for advanced reactors, SMRs or nuclear technology innovation in UK industry or national laboratories.',
+      roleCategory: 'research',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 5,
+      experienceRequirementLabel: 'Typically 5+ years R&D or advanced nuclear delivery; PhD often valued',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Industry R&D progression needs delivery experience beyond the PhD award itself. Security clearance may be required.',
+      fitClassification: 'future_progression',
+      priority: 70,
+    }),
+    role({
+      name: 'Principal / Specialist Nuclear Consultant',
+      description:
+        'Provides expert advisory on nuclear safety, decommissioning, licensing and technology for UK operators, regulators and investors.',
+      roleCategory: 'consultancy',
+      seniorityLevel: 'principal',
+      minimumExperienceYears: 10,
+      experienceRequirementLabel: 'Typically 10+ years nuclear delivery; deep domain expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Principal consultancy needs track record beyond doctoral study. CEng via Nuclear Institute commonly expected.',
+      fitClassification: 'future_progression',
+      priority: 80,
+    }),
+    role({
+      name: 'Technical Authority / Expert Witness (Nuclear Safety)',
+      description:
+        'Sets nuclear safety technical standards and may provide expert evidence on nuclear incidents, licensing or regulatory disputes in UK proceedings.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 12,
+      experienceRequirementLabel: 'Typically 12+ years nuclear safety leadership and specialist expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Senior safety-case/technical authority roles need substantial experience. Academic level ≠ site authorisation, security clearance, or ONR professional authority.',
+      fitClassification: 'future_progression',
+      priority: 90,
+    }),
+    role({
+      name: 'Research & Innovation Manager (Nuclear Systems)',
+      description:
+        'Manages research portfolios and innovation programmes spanning reactor systems, fusion, materials and nuclear safety.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years research/innovation leadership in nuclear systems',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Management of research programmes needs leadership experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+}
+
+const PACKS = [MATERIALS, BIOMEDICAL, NUCLEAR]
+
+async function insertRolesForStage(
+  supabase: SupabaseClient,
+  pack: SpecialismPack,
+  specialismId: string,
+  stage: { id: string; stage_key: string; label: string },
+  roles: RoleSeed[],
+  existingSlugs: Set<string>,
+  reservedNames: Set<string>
+): Promise<{ created: string[]; skipped: string[]; crossSkipped: string[] }> {
+  const created: string[] = []
+  const skipped: string[] = []
+  const crossSkipped: string[] = []
+
+  for (const seed of roles) {
+    const nameKey = seed.name.trim().toLowerCase()
+    if (reservedNames.has(nameKey)) {
+      crossSkipped.push(seed.name)
+      continue
+    }
+
+    const baseSlug = normalizeSlug(undefined, seed.name)
+    if (!baseSlug) {
+      skipped.push(seed.name)
+      continue
+    }
+    const slug = `${stage.stage_key}-${baseSlug}`
+
+    if (existingSlugs.has(slug)) {
+      skipped.push(seed.name)
+      continue
+    }
+
+    const { error } = await supabase.from('career_library_roles').insert({
+      specialism_id: specialismId,
+      stage_id: stage.id,
+      name: seed.name,
+      slug,
+      description: seed.description,
+      status: 'draft',
+      active: true,
+      sort_order: seed.priority,
+      priority: seed.priority,
+      role_category: seed.roleCategory,
+      seniority_level: seed.seniorityLevel,
+      minimum_experience_years: seed.minimumExperienceYears,
+      experience_requirement_label: seed.experienceRequirementLabel,
+      professional_registration_requirement: seed.professionalRegistrationRequirement,
+      professional_membership_requirement: seed.professionalMembershipRequirement,
+      academic_requirement: seed.academicRequirement,
+      is_research_role: seed.isResearchRole,
+      is_academic_role: seed.isAcademicRole,
+      is_regulated_or_restricted: seed.isRegulatedOrRestricted,
+      eligibility_note: seed.eligibilityNote,
+      fit_classification: seed.fitClassification,
+      metadata: {
+        stage_id: stage.id,
+        stage_key: stage.stage_key as StageKey,
+        stage_label: stage.label,
+        academic_level: stage.stage_key,
+        specialism_slug: pack.slug,
+        country_focus: 'uk',
+        professional_body_focus: pack.professionalBody,
+        related_bodies: pack.relatedBodies,
+        eligibility_model_version: 1,
+        sources: pack.sources,
+      },
+    })
+
+    if (error) {
+      if (error.code === '23505') {
+        skipped.push(seed.name)
+        continue
+      }
+      throw new Error(`${pack.label}: ${seed.name} [${stage.stage_key}]: ${error.message}`)
+    }
+
+    created.push(seed.name)
+    existingSlugs.add(slug)
+    reservedNames.add(nameKey)
+  }
+
+  return { created, skipped, crossSkipped }
+}
+
+async function populatePack(
+  supabase: SupabaseClient,
+  pack: SpecialismPack,
+  stageByKey: Map<string, { id: string; stage_key: string; label: string }>,
+  reservedNames: Set<string>
+) {
+  const { data: specialism, error: specErr } = await supabase
+    .from('career_library_specialisms')
+    .select('id, name, slug, professional_body, regulated_profession')
+    .eq('slug', pack.slug)
+    .maybeSingle()
+
+  if (specErr || !specialism) {
+    throw new Error(`${pack.label} specialism not found: ${specErr?.message ?? 'missing row'}`)
+  }
+
+  if (!specialism.professional_body) {
+    await supabase
+      .from('career_library_specialisms')
+      .update({
+        professional_body: pack.professionalBody,
+        regulated_profession: true,
+      })
+      .eq('id', specialism.id)
+  }
+
+  const { data: siblings } = await supabase
+    .from('career_library_specialisms')
+    .select('id, slug')
+    .in('slug', pack.siblingSlugs)
+
+  for (const sib of siblings ?? []) {
+    const { data: roles } = await supabase
+      .from('career_library_roles')
+      .select('name')
+      .eq('specialism_id', sib.id)
+    for (const r of roles ?? []) reservedNames.add(r.name.trim().toLowerCase())
+  }
+
+  const { data: existingRoles, error: rolesErr } = await supabase
+    .from('career_library_roles')
+    .select('slug, name')
+    .eq('specialism_id', specialism.id)
+
+  if (rolesErr) throw new Error(rolesErr.message)
+  const existingSlugs = new Set((existingRoles ?? []).map((r) => r.slug))
+  for (const r of existingRoles ?? []) reservedNames.add(r.name.trim().toLowerCase())
+
+  const degree = await insertRolesForStage(
+    supabase,
+    pack,
+    specialism.id,
+    stageByKey.get('degree')!,
+    pack.degree,
+    existingSlugs,
+    reservedNames
+  )
+  const masters = await insertRolesForStage(
+    supabase,
+    pack,
+    specialism.id,
+    stageByKey.get('masters')!,
+    pack.masters,
+    existingSlugs,
+    reservedNames
+  )
+  const phd = await insertRolesForStage(
+    supabase,
+    pack,
+    specialism.id,
+    stageByKey.get('phd')!,
+    pack.phd,
+    existingSlugs,
+    reservedNames
+  )
+
+  const { count } = await supabase
+    .from('career_library_roles')
+    .select('id', { count: 'exact', head: true })
+    .eq('specialism_id', specialism.id)
+    .eq('status', 'draft')
+
+  return { specialism, degree, masters, phd, draftCount: count ?? 0 }
+}
+
+async function main() {
+  loadEnvLocal()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  }
+
+  const supabase = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const allSeedNames = PACKS.flatMap((p) => [...p.degree, ...p.masters, ...p.phd].map((r) => r.name))
+  const seen = new Set<string>()
+  const internalDupes: string[] = []
+  for (const n of allSeedNames) {
+    const k = n.trim().toLowerCase()
+    if (seen.has(k)) internalDupes.push(n)
+    seen.add(k)
+  }
+  if (internalDupes.length) {
+    throw new Error(`Duplicate titles within seed packs: ${internalDupes.join('; ')}`)
+  }
+
+  const { data: model, error: modelErr } = await supabase
+    .from('career_library_stage_models')
+    .select('id')
+    .eq('model_key', 'academic_level')
+    .maybeSingle()
+
+  if (modelErr || !model) {
+    throw new Error(`academic_level stage model not found: ${modelErr?.message ?? 'missing'}`)
+  }
+
+  const { data: stages, error: stagesErr } = await supabase
+    .from('career_library_stages')
+    .select('id, stage_key, label, sort_order')
+    .eq('stage_model_id', model.id)
+    .in('stage_key', ['degree', 'masters', 'phd'])
+    .order('sort_order', { ascending: true })
+
+  if (stagesErr || !stages?.length) {
+    throw new Error(`Academic stages not found: ${stagesErr?.message ?? 'empty'}`)
+  }
+
+  const stageByKey = new Map(stages.map((s) => [s.stage_key, s]))
+  for (const key of ['degree', 'masters', 'phd'] as const) {
+    if (!stageByKey.has(key)) throw new Error(`Missing academic stage: ${key}`)
+  }
+
+  // Reserve titles from all other specialisms (skip overwriting / cross-duplicates)
+  const packSlugs = new Set(PACKS.map((p) => p.slug))
+  const { data: allSpecs } = await supabase
+    .from('career_library_specialisms')
+    .select('id, slug')
+
+  const reservedNames = new Set<string>()
+  for (const sib of allSpecs ?? []) {
+    if (packSlugs.has(sib.slug)) continue
+    const { data: roles } = await supabase
+      .from('career_library_roles')
+      .select('name')
+      .eq('specialism_id', sib.id)
+    for (const r of roles ?? []) reservedNames.add(r.name.trim().toLowerCase())
+  }
+
+  let totalCreated = 0
+  let totalSameSkipped = 0
+  let totalCrossSkipped = 0
+
+  console.log('\n=== Materials + Biomedical + Nuclear roles populate ===')
+  console.log('Stage model: academic_level | Status: draft | active: true\n')
+
+  for (const pack of PACKS) {
+    const result = await populatePack(supabase, pack, stageByKey, reservedNames)
+    const created =
+      result.degree.created.length + result.masters.created.length + result.phd.created.length
+    const sameSkipped =
+      result.degree.skipped.length + result.masters.skipped.length + result.phd.skipped.length
+    const crossSkipped =
+      result.degree.crossSkipped.length +
+      result.masters.crossSkipped.length +
+      result.phd.crossSkipped.length
+
+    totalCreated += created
+    totalSameSkipped += sameSkipped
+    totalCrossSkipped += crossSkipped
+
+    console.log(`--- ${result.specialism.name} (${result.specialism.slug}) ---`)
+    console.log(`Created this run: ${created} | Draft total: ${result.draftCount}`)
+    console.log(`Skipped same-specialism: ${sameSkipped} | Skipped title conflicts: ${crossSkipped}`)
+    if (crossSkipped) {
+      for (const n of [
+        ...result.degree.crossSkipped,
+        ...result.masters.crossSkipped,
+        ...result.phd.crossSkipped,
+      ]) {
+        console.log(`  - skipped: ${n}`)
+      }
+    }
+    console.log('Degree:')
+    for (const n of result.degree.created) console.log(`  + ${n}`)
+    console.log("Master's:")
+    for (const n of result.masters.created) console.log(`  + ${n}`)
+    console.log('PhD:')
+    for (const n of result.phd.created) console.log(`  + ${n}`)
+    console.log('')
+  }
+
+  console.log('=== Combined totals ===')
+  console.log(`Total roles created: ${totalCreated}`)
+  console.log(`Duplicates skipped (same specialism): ${totalSameSkipped}`)
+  console.log(`Duplicates skipped (cross-specialism / prior specialism title conflict): ${totalCrossSkipped}`)
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

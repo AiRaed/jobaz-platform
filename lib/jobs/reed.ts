@@ -8,6 +8,7 @@ export interface ReedSearchParams {
   keyword: string
   location?: string
   page?: number
+  pageSize?: number
 }
 
 export interface ReedApiResponse {
@@ -54,7 +55,7 @@ export async function fetchReedJobs(
   const url = new URL(`${apiBase}/search`)
   url.searchParams.set('keywords', keyword)
   url.searchParams.set('locationName', location)
-  url.searchParams.set('resultsToTake', '20')
+  url.searchParams.set('resultsToTake', String(params.pageSize ?? 20))
   url.searchParams.set('resultsToSkip', String((page - 1) * 20))
 
   try {

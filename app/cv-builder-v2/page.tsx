@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Download, FileText, Loader2, CheckCircle2, X, Save, Sparkles, ChevronDown, ChevronUp, FileEdit } from 'lucide-react'
 import Link from 'next/link'
@@ -15,12 +15,75 @@ import EducationTab from '@/components/cv-builder-v2/EducationTab'
 import SkillsTab from '@/components/cv-builder-v2/SkillsTab'
 import MoreTab from '@/components/cv-builder-v2/MoreTab'
 import JobDescriptionPanel from '@/components/cv-builder-v2/JobDescriptionPanel'
+import CvHealthPanel from '@/components/cv-builder-v2/CvHealthPanel'
+import CvAiWorkflowStrip from '@/components/cv-builder-v2/CvAiWorkflowStrip'
+import CvBuilderJourneyHeader from '@/components/cv-builder-v2/CvBuilderJourneyHeader'
+import CvBuilderCompletionPanel from '@/components/cv-builder-v2/CvBuilderCompletionPanel'
+import CvQualificationCompletionPrompt from '@/components/cv-builder-v2/CvQualificationCompletionPrompt'
+import CvCourseActionPrompt from '@/components/cv-builder-v2/CvCourseActionPrompt'
 import CvCustomizationPanel, { type CvCustomizationOptions } from '@/components/cv-builder-v2/CvCustomizationPanel'
-import PageHeader from '@/components/PageHeader'
+import PublicToolLayout from '@/components/guest-tools/PublicToolLayout'
 import { useJazContext } from '@/contexts/JazContextContext'
 import type { CvBuilderContext } from '@/components/JazAssistant'
 import { getUserScopedKeySync, getCurrentUserIdSync, initUserStorageCache } from '@/lib/user-storage'
-import { computeCvScore } from '@/lib/cv-score'
+import { useToolGuestMode } from '@/lib/guest-tools/useToolGuestMode'
+import { certificationLabel, type CvCertificationEntry } from '@/lib/cv/cvCertification'
+import {
+  hasGuestDraft,
+  readGuestDraft,
+  writeGuestDraft,
+  clearGuestDraft,
+} from '@/lib/guest-tools/storage'
+import GuestDraftPickerModal from '@/components/guest-tools/GuestDraftPickerModal'
+import { useCvHealth } from '@/hooks/useCvHealth'
+import { useCvBuilderCareerMode } from '@/hooks/useCvBuilderCareerMode'
+import { useCvPlanSuggestions } from '@/hooks/useCvPlanSuggestions'
+import CvPlanStageSwitcher from '@/components/cv-builder-v2/CvPlanStageSwitcher'
+import {
+  ACTION_PLAN_TASK,
+  markActionPlanTask,
+} from '@/lib/dashboard/careerOs/actionPlanProgress'
+import { useCvTrainingQualifications } from '@/hooks/useCvTrainingQualifications'
+import {
+  buildCvCareerReadiness,
+  getCvJourneyNextStep,
+  type CvReadinessBoost,
+} from '@/lib/cv-builder/cvCareerReadiness'
+import {
+  mergeQualificationIntoCvData,
+  persistCvDraftFromData,
+} from '@/lib/cv-builder/addTrainingQualification'
+import {
+  loadRecentQualificationBoost,
+  pickPendingCvCompletionPrompt,
+  pickQualificationReminder,
+  saveRecentQualificationBoost,
+  isQualificationInCvData,
+  type CvTrainingQualification,
+} from '@/lib/cv-builder/trainingQualifications'
+import {
+  dismissCourseInterest,
+  pickPendingCourseActionPrompt,
+  updateCourseInterestStatus,
+  type CourseInterestRecord,
+} from '@/lib/cv-builder/courseInterest'
+import { upsertCareerPlanItem } from '@/lib/career-hub/myPlan'
+import { slugifyCourseName } from '@/lib/career-hub/slug'
+import { enrichQualificationsForCvPanel } from '@/lib/cv-builder/cvQualificationScoring'
+import {
+  resolveActiveCv,
+  setSessionDraftChoice,
+  wasGuestPickerShownThisSession,
+  markGuestPickerShownThisSession,
+  setStoredActiveCvId,
+  normalizeToCvData,
+  type ActiveCvSource,
+} from '@/lib/cv/getActiveCv'
+import { isMeaningfulCv } from '@/lib/cv/isMeaningfulCv'
+import {
+  enrichAiHintsWithCareerPlan,
+  getCareerWorkflowSubtitle,
+} from '@/lib/cv-builder/careerGuidanceCopy'
 import { logEvent } from '@/lib/analytics/logEvent'
 
 export type CvTemplateId = 'atsClassic' | 'twoColumnPro' | 'customizeStyle'
@@ -60,7 +123,8 @@ export type CvData = {
     url?: string
   }>
   languages?: string[]
-  certifications?: string[]
+  /** Legacy strings or structured certification objects */
+  certifications?: import('@/lib/cv/cvCertification').CvCertificationEntry[]
   publications?: Array<{
     title: string
     authors?: string
@@ -73,7 +137,54 @@ export type CvData = {
 
 type Tab = 'personal' | 'summary' | 'experience' | 'education' | 'skills' | 'more'
 
+/** Heuristic: CV has enough content to count as completed for AI readiness. */
+function isCvCompletedForAi(data: CvData): boolean {
+  const hasName = Boolean(data.personalInfo?.fullName?.trim())
+  const hasSummary = Boolean(data.summary?.trim())
+  const hasExperience = data.experience?.some(
+    (e) => Boolean(e.jobTitle?.trim()) || Boolean(e.company?.trim())
+  )
+  const hasSkills = (data.skills?.length ?? 0) > 0
+  return hasName && (hasSummary || hasExperience) && hasSkills
+}
+
 const STORAGE_KEY = 'jobaz-cv-v2-draft'
+
+/** Ensure builder UI always has editable experience/education shells. */
+function prepareCvForEditor(raw: CvData): CvData {
+  const normalized = normalizeToCvData(raw)
+  const defaultPersonalInfo = {
+    fullName: '',
+    email: '',
+    phone: '',
+    location: '',
+    linkedin: '',
+    website: '',
+  }
+  const loadedExperience =
+    Array.isArray(normalized.experience) && normalized.experience.length > 0
+      ? normalized.experience
+      : [{ id: Date.now().toString(), jobTitle: '', company: '', bullets: [''] }]
+  const loadedEducation =
+    Array.isArray(normalized.education) && normalized.education.length > 0
+      ? normalized.education
+      : [{ degree: '', school: '' }]
+
+  return {
+    ...normalized,
+    personalInfo: {
+      ...defaultPersonalInfo,
+      ...normalized.personalInfo,
+    },
+    experience: loadedExperience,
+    education: loadedEducation,
+    skills: Array.isArray(normalized.skills) ? normalized.skills : [],
+    projects: Array.isArray(normalized.projects) ? normalized.projects : [],
+    languages: Array.isArray(normalized.languages) ? normalized.languages : [],
+    certifications: Array.isArray(normalized.certifications) ? normalized.certifications : [],
+    publications: Array.isArray(normalized.publications) ? normalized.publications : [],
+  }
+}
 
 // Accordion component for grouped grammar issues
 function GrammarSectionAccordion({
@@ -232,7 +343,10 @@ function getFieldValue(state: CvData, fieldPath: string): string {
   const skillMatch = fieldPath.match(/^skills\[(\d+)\]$/)
   if (skillMatch) return state.skills?.[parseInt(skillMatch[1], 10)] ?? ''
   const certMatch = fieldPath.match(/^certifications\[(\d+)\]$/)
-  if (certMatch) return state.certifications?.[parseInt(certMatch[1], 10)] ?? ''
+  if (certMatch) {
+    const entry = state.certifications?.[parseInt(certMatch[1], 10)]
+    return entry != null ? certificationLabel(entry) : ''
+  }
   const langMatch = fieldPath.match(/^languages\[(\d+)\]$/)
   if (langMatch) return state.languages?.[parseInt(langMatch[1], 10)] ?? ''
   const projMatch = fieldPath.match(/^projects\[(\d+)\]\.(\w+)$/)
@@ -269,6 +383,10 @@ export default function CvBuilderV2Page() {
   const searchParams = useSearchParams()
   const jobId = searchParams.get('jobId')
   const mode = searchParams.get('mode') || 'tailorCv'
+  const improveTargetRole = searchParams.get('targetRole')
+  const improveRoute = searchParams.get('route')
+  const improveFocus = searchParams.get('focus')
+  const planTask = searchParams.get('planTask')
   const previewRef = useRef<HTMLDivElement>(null)
   const prefillCheckedRef = useRef(false)
   const [activeTab, setActiveTab] = useState<Tab>('personal')
@@ -299,6 +417,15 @@ export default function CvBuilderV2Page() {
   useEffect(() => {
     initUserStorageCache()
   }, [])
+
+  const guest = useToolGuestMode('cv')
+  const [draftPickerOpen, setDraftPickerOpen] = useState(false)
+  const [cvSource, setCvSource] = useState<ActiveCvSource>('none')
+  const [activeCvId, setActiveCvId] = useState<string | null>(null)
+  const [cvLastUpdated, setCvLastUpdated] = useState<string | null>(null)
+  const [cvHydrated, setCvHydrated] = useState(false)
+  const [cvLoadWarnings, setCvLoadWarnings] = useState<string[]>([])
+  const draftPickerCheckedRef = useRef(false)
 
   // Helper function to get user-scoped storage keys
   const getUserKey = (baseKey: string) => {
@@ -342,15 +469,172 @@ export default function CvBuilderV2Page() {
   const initialCvDataRef = useRef<string>('')
   const initialTemplateRef = useRef<CvTemplateId>('atsClassic')
 
-  // Compute CV score for badge display
-  const cvScore = useMemo(() => {
-    try {
-      return computeCvScore(cvData)
-    } catch (error) {
-      console.error('Error computing CV score:', error)
-      return null
+  const { isCareerMode, plan, roleHeadline, mission } = useCvBuilderCareerMode()
+  const {
+    suggestions: planSuggestions,
+    setStageOverride,
+  } = useCvPlanSuggestions({
+    plan,
+    routeTitle: improveRoute || plan?.planTitle || plan?.pathLabel,
+    currentTarget: improveTargetRole || plan?.currentTarget || plan?.targetRole,
+    nextUpgrade: plan?.nextUpgrade,
+    cvData,
+  })
+
+  // First Action Plan: opening CV Builder marks the CV step in progress
+  useEffect(() => {
+    if (planTask === ACTION_PLAN_TASK.CV || planTask === 'cv-security') {
+      markActionPlanTask(ACTION_PLAN_TASK.CV, 'in_progress')
     }
-  }, [cvData])
+  }, [planTask])
+
+  const readinessCareerPlan = useMemo(() => {
+    // Do not read localStorage/sync plan here — that breaks SSR hydration.
+    // Prefer URL params + plan from useCvBuilderCareerMode (post-mount).
+    const fromUrl = improveFocus
+      ? improveFocus.split(',').map((s) => s.trim()).filter(Boolean)
+      : []
+    const planTitle = improveRoute || plan?.planTitle || plan?.pathLabel || null
+    const currentTarget =
+      improveTargetRole || plan?.currentTarget || plan?.targetRole || null
+    const nextUpgrade = plan?.nextUpgrade || null
+    const focusKeywords =
+      fromUrl.length > 0
+        ? fromUrl
+        : plan?.cvFocusKeywords?.length
+          ? plan.cvFocusKeywords
+          : undefined
+
+    return {
+      targetRole: currentTarget,
+      currentTarget,
+      nextUpgrade,
+      routeTitle: planTitle,
+      focusKeywords,
+      planSource: plan?.planSource || ('none' as const),
+      planId: plan?.planId || null,
+    }
+  }, [improveTargetRole, improveRoute, improveFocus, plan])
+
+  const { report: cvHealthReport, scoreDelta } = useCvHealth(
+    cvData,
+    jobDescription,
+    readinessCareerPlan
+  )
+
+  const {
+    qualifications,
+    completedCount,
+    totalCount,
+    roadmapReadinessPercent,
+    loaded: qualificationsLoaded,
+  } = useCvTrainingQualifications()
+  const [completionDismissed, setCompletionDismissed] = useState(false)
+  const [dismissedPromptSlug, setDismissedPromptSlug] = useState<string | null>(null)
+  const [courseActionTick, setCourseActionTick] = useState(0)
+  const [recentBoost, setRecentBoost] = useState<CvReadinessBoost | null>(() => {
+    const stored = loadRecentQualificationBoost()
+    return stored ? { label: stored.name, delta: stored.delta } : null
+  })
+  const jdPanelRef = useRef<HTMLDivElement>(null)
+
+  const showTrainingJourney = qualifications.length > 0
+  const qualificationReminder = useMemo(
+    () => (showTrainingJourney ? pickQualificationReminder(qualifications, cvData, cvHealthReport.overallScore) : null),
+    [showTrainingJourney, qualifications, cvData, cvHealthReport.overallScore]
+  )
+  const pendingCourseAction = useMemo(() => {
+    void courseActionTick
+    const pending = pickPendingCourseActionPrompt()
+    if (!pending) return null
+    if (pending.slug === dismissedPromptSlug) return null
+    return pending
+  }, [courseActionTick, qualificationsLoaded, dismissedPromptSlug])
+  const pendingQualificationPrompt = useMemo(() => {
+    // Prefer course-action prompt: a click must never look like auto-completion.
+    if (pendingCourseAction) return null
+    if (!showTrainingJourney) return null
+    const pending = pickPendingCvCompletionPrompt(qualifications, cvData)
+    if (!pending || pending.slug === dismissedPromptSlug) return null
+    return pending
+  }, [showTrainingJourney, qualifications, cvData, dismissedPromptSlug, pendingCourseAction])
+
+  useEffect(() => {
+    const refresh = () => setCourseActionTick((n) => n + 1)
+    window.addEventListener('jobaz-course-interest-updated', refresh)
+    return () => window.removeEventListener('jobaz-course-interest-updated', refresh)
+  }, [])
+
+  const atsMatch = cvHealthReport.metrics.find((m) => m.id === 'ats')?.progress ?? 0
+
+  const careerAiHints = useMemo(() => {
+    if (!plan) return cvHealthReport.aiHints
+    return enrichAiHintsWithCareerPlan(cvHealthReport.aiHints, plan)
+  }, [cvHealthReport.aiHints, plan])
+
+  const displayPotentialScore = useMemo(() => {
+    const fromHealth = cvHealthReport.potentialScore
+    if (!showTrainingJourney) return fromHealth
+    const train = enrichQualificationsForCvPanel(qualifications, cvHealthReport.overallScore)
+    return Math.max(fromHealth, train.potentialScore)
+  }, [cvHealthReport.potentialScore, cvHealthReport.overallScore, showTrainingJourney, qualifications])
+
+  const needsRouteTailoring =
+    cvSource === 'saved' &&
+    (cvHealthReport.planCvMatch === 'mismatch' || cvHealthReport.planCvMatch === 'partial_match')
+
+  const careerReadiness = useMemo(() => {
+    if (!isCareerMode && !showTrainingJourney) return null
+    return buildCvCareerReadiness(
+      cvData,
+      cvHealthReport.overallScore,
+      atsMatch,
+      jobDescription.trim().length > 0,
+      mission,
+      {
+        planReadinessScore: plan?.readinessScore,
+        completedQualifications: completedCount,
+        totalQualifications: totalCount,
+        roadmapReadinessPercent,
+        recentBoost,
+      }
+    )
+  }, [
+    isCareerMode,
+    showTrainingJourney,
+    cvData,
+    cvHealthReport.overallScore,
+    atsMatch,
+    jobDescription,
+    mission,
+    plan?.readinessScore,
+    completedCount,
+    totalCount,
+    roadmapReadinessPercent,
+    recentBoost,
+  ])
+
+  const journeyNextStep = useMemo(() => {
+    if (!isCareerMode) return null
+    return getCvJourneyNextStep(
+      cvHealthReport.overallScore,
+      jobDescription.trim().length > 0,
+      atsMatch,
+      mission.appliedJobsCount
+    )
+  }, [
+    isCareerMode,
+    cvHealthReport.overallScore,
+    jobDescription,
+    atsMatch,
+    mission.appliedJobsCount,
+  ])
+
+  const showCompletionPanel =
+    isCareerMode &&
+    !completionDismissed &&
+    cvHealthReport.overallScore >= 55 &&
+    journeyNextStep !== null
 
   // Compute JAZ context for CV Builder
   const jazContext = useMemo<CvBuilderContext>(() => {
@@ -360,20 +644,61 @@ export default function CvBuilderV2Page() {
     return {
       page: 'cv-builder',
       activeTab,
-      atsScore: cvScore?.score || null,
+      atsScore: cvHealthReport.overallScore || null,
       summaryTextLength,
       experienceCount: cvData.experience.length,
       skillsCount: cvData.skills.length,
       hasJobDescription: jobDescription.trim().length > 0,
       template: selectedTemplate,
+      careerMode: isCareerMode,
+      targetRole: plan?.targetRole ?? null,
+      pathLabel: plan?.pathLabel ?? null,
+      careerReadinessScore: cvHealthReport.overallScore ?? null,
+      suggestedSkills: plan?.suggestedSkills ?? [],
     }
-  }, [activeTab, cvData.summary, cvData.experience.length, cvData.skills.length, jobDescription, selectedTemplate, cvScore])
+  }, [
+    activeTab,
+    cvData.summary,
+    cvData.experience.length,
+    cvData.skills.length,
+    jobDescription,
+    selectedTemplate,
+    cvHealthReport.overallScore,
+    isCareerMode,
+    plan,
+  ])
 
   // Update JAZ context when it changes
   useEffect(() => {
     setContext(jazContext)
     return () => setContext(null) // Cleanup on unmount
   }, [jazContext, setContext])
+
+  // Dev console only — never show plan/cv debug on the page
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || !cvHydrated) return
+    console.debug('[cvBuilder]', {
+      activePlanId: plan?.planId || readinessCareerPlan.planId || null,
+      activePlanTitle: plan?.planTitle || readinessCareerPlan.routeTitle || null,
+      planSource: plan?.planSource || readinessCareerPlan.planSource || 'none',
+      cvId: activeCvId,
+      cvSource: cvSource === 'none' ? 'empty' : cvSource === 'guest_draft' ? 'guest' : 'saved',
+      readinessScore: cvHealthReport.overallScore,
+      planCvMatch: cvHealthReport.planCvMatch,
+    })
+  }, [
+    cvHydrated,
+    plan?.planId,
+    plan?.planTitle,
+    plan?.planSource,
+    readinessCareerPlan.planId,
+    readinessCareerPlan.routeTitle,
+    readinessCareerPlan.planSource,
+    activeCvId,
+    cvSource,
+    cvHealthReport.overallScore,
+    cvHealthReport.planCvMatch,
+  ])
 
   // Listen for JAZ tab switch events
   useEffect(() => {
@@ -390,111 +715,75 @@ export default function CvBuilderV2Page() {
     }
   }, [])
 
-  // Load CV from localStorage on mount
+  // Resolve active CV: saved account CV first (by cvId / primary), guest draft only when chosen / no saved
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    
-    let cvLoaded = false
-    
-    try {
-      // Check if cvId query parameter is present
-      const cvId = searchParams.get('cvId')
-      
-      if (cvId) {
-        // Load specific CV from saved CVs array (user-scoped)
-        const cvsKey = getUserKey('cvs')
-        const savedCvsJson = localStorage.getItem(cvsKey)
-        if (savedCvsJson) {
-          const savedCvs = JSON.parse(savedCvsJson)
-          if (Array.isArray(savedCvs)) {
-            const foundCv = savedCvs.find((cv: any) => cv.id === cvId)
-            if (foundCv) {
-              // Load the found CV
-              const defaultPersonalInfo = {
-                fullName: '',
-                email: '',
-                phone: '',
-                location: '',
-                linkedin: '',
-                website: '',
-              }
-              const loadedExperience = Array.isArray(foundCv.experience) && foundCv.experience.length > 0
-                ? foundCv.experience
-                : [{ id: Date.now().toString(), jobTitle: '', company: '', bullets: [''] }]
-              const loadedEducation = Array.isArray(foundCv.education) && foundCv.education.length > 0
-                ? foundCv.education
-                : [{ degree: '', school: '' }]
-              
-              setCvData({
-                personalInfo: foundCv.personalInfo && typeof foundCv.personalInfo === 'object'
-                  ? { ...defaultPersonalInfo, ...foundCv.personalInfo }
-                  : defaultPersonalInfo,
-                summary: foundCv.summary || '',
-                experience: loadedExperience,
-                education: loadedEducation,
-                skills: Array.isArray(foundCv.skills) ? foundCv.skills : [],
-                projects: Array.isArray(foundCv.projects) ? foundCv.projects : [],
-                languages: Array.isArray(foundCv.languages) ? foundCv.languages : [],
-                certifications: Array.isArray(foundCv.certifications) ? foundCv.certifications : [],
-                publications: Array.isArray(foundCv.publications) ? foundCv.publications : [],
-              })
-              if (foundCv.template) {
-                setSelectedTemplate(foundCv.template)
-              }
-              cvLoaded = true
-            }
-          }
-        }
-      }
-      
-      // Fallback to loading draft if CV wasn't loaded (user-scoped)
-      if (!cvLoaded) {
-        const draftKey = getUserKey(STORAGE_KEY)
-        const saved = localStorage.getItem(draftKey)
-        if (saved) {
-          const parsed = JSON.parse(saved)
-          // Ensure personalInfo has all required fields and is never null/undefined
-          const defaultPersonalInfo = {
-            fullName: '',
-            email: '',
-            phone: '',
-            location: '',
-            linkedin: '',
-            website: '',
-          }
-          const loadedExperience = Array.isArray(parsed.experience) && parsed.experience.length > 0
-            ? parsed.experience
-            : [{ id: Date.now().toString(), jobTitle: '', company: '', bullets: [''] }]
-          const loadedEducation = Array.isArray(parsed.education) && parsed.education.length > 0
-            ? parsed.education
-            : [{ degree: '', school: '' }]
-          
-          setCvData({
-            ...parsed,
-            personalInfo: parsed.personalInfo && typeof parsed.personalInfo === 'object'
-              ? { ...defaultPersonalInfo, ...parsed.personalInfo }
-              : defaultPersonalInfo,
-            experience: loadedExperience,
-            education: loadedEducation,
-            skills: Array.isArray(parsed.skills) ? parsed.skills : [],
-          })
-        }
-      }
-      
-    } catch (error) {
-      console.error('Error loading CV:', error)
-    }
-  }, [searchParams])
+    if (typeof window === 'undefined' || !guest.authReady) return
 
-  // Load prefill summary from localStorage on mount (separate useEffect as required)
-  // This runs after CV loading to ensure it overrides the summary
+    let cancelled = false
+
+    const hydrate = async () => {
+      setCvHydrated(false)
+
+      if (guest.isGuest) {
+        const draft = readGuestDraft<{ cvData?: CvData; selectedTemplate?: CvTemplateId }>('cv')
+        if (!cancelled && draft?.cvData) {
+          setCvData(prepareCvForEditor(draft.cvData))
+          if (draft.selectedTemplate) setSelectedTemplate(draft.selectedTemplate)
+          setCvSource('guest_draft')
+          setActiveCvId(null)
+          setCvLastUpdated(null)
+          setCvLoadWarnings(['Editing guest draft.'])
+        } else if (!cancelled) {
+          setCvSource('none')
+          setActiveCvId(null)
+        }
+        if (!cancelled) setCvHydrated(true)
+        return
+      }
+
+      const cvIdFromUrl = searchParams.get('cvId')
+      const resolved = await resolveActiveCv({ cvIdFromUrl })
+
+      if (cancelled) return
+
+      // Conflict: saved + guest — show modal once per session (unless URL forces a cvId)
+      if (
+        !cvIdFromUrl &&
+        resolved.source === 'saved' &&
+        hasGuestDraft('cv') &&
+        !wasGuestPickerShownThisSession()
+      ) {
+        markGuestPickerShownThisSession()
+        setDraftPickerOpen(true)
+      }
+
+      if (resolved.cv) {
+        setCvData(prepareCvForEditor(resolved.cv))
+        // Keep a local draft mirror so autosave/quals use the same key
+        persistCvDraftFromData(prepareCvForEditor(resolved.cv))
+      }
+
+      setCvSource(resolved.source)
+      setActiveCvId(resolved.activeCvId)
+      setCvLastUpdated(resolved.lastUpdated)
+      setCvLoadWarnings(resolved.warnings)
+      if (resolved.activeCvId) setStoredActiveCvId(resolved.activeCvId)
+      setCvHydrated(true)
+    }
+
+    void hydrate()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, guest.authReady, guest.isGuest])
+
+  // Prefill summary from localStorage on mount (after CV hydrates)
   useEffect(() => {
-    if (typeof window === 'undefined' || prefillCheckedRef.current) return
-    
-    // Use a small delay to ensure this runs after CV loading useEffect
+    if (typeof window === 'undefined' || prefillCheckedRef.current || !cvHydrated) return
+
     const timeoutId = setTimeout(() => {
       if (prefillCheckedRef.current) return
-      
+
       const prefillKey = getUserKey('prefill_summary')
       const prefill = localStorage.getItem(prefillKey)
       if (prefill && prefill.trim().length > 0) {
@@ -503,14 +792,12 @@ export default function CvBuilderV2Page() {
           summary: prefill,
         }))
         localStorage.removeItem(prefillKey)
-        prefillCheckedRef.current = true
-      } else {
-        prefillCheckedRef.current = true
       }
+      prefillCheckedRef.current = true
     }, 100)
-    
+
     return () => clearTimeout(timeoutId)
-  }, [])
+  }, [cvHydrated])
 
   // Track initial state after CV data is loaded from storage
   // Wait for data to be loaded, then set initial state once
@@ -565,11 +852,15 @@ export default function CvBuilderV2Page() {
     }
   }, [isDirty])
 
-  // Save draft to localStorage (debounced, user-scoped)
+  // Save draft to localStorage (debounced; guest or user-scoped)
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || !guest.authReady) return
     const timeout = setTimeout(() => {
       try {
+        if (guest.isGuest) {
+          writeGuestDraft('cv', { cvData, selectedTemplate, savedAt: Date.now() })
+          return
+        }
         const draftKey = getUserKey(STORAGE_KEY)
         localStorage.setItem(draftKey, JSON.stringify(cvData))
       } catch (error) {
@@ -577,7 +868,30 @@ export default function CvBuilderV2Page() {
       }
     }, 500)
     return () => clearTimeout(timeout)
-  }, [cvData])
+  }, [cvData, selectedTemplate, guest.authReady, guest.isGuest])
+
+  // Sync live CV when dashboard/training journey updates the shared draft
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onDraftUpdated = () => {
+      try {
+        const draftKey = getUserKey(STORAGE_KEY)
+        const saved = localStorage.getItem(draftKey)
+        if (!saved) return
+        const parsed = JSON.parse(saved) as CvData
+        setCvData((prev) => ({
+          ...prev,
+          certifications: parsed.certifications ?? prev.certifications,
+          education: parsed.education ?? prev.education,
+          skills: parsed.skills ?? prev.skills,
+        }))
+      } catch {
+        // ignore invalid draft
+      }
+    }
+    window.addEventListener('jobaz-cv-draft-updated', onDraftUpdated)
+    return () => window.removeEventListener('jobaz-cv-draft-updated', onDraftUpdated)
+  }, [])
 
   const updateCvData = (updates: Partial<CvData>) => {
     setCvData((prev) => ({ ...prev, ...updates }))
@@ -587,6 +901,187 @@ export default function CvBuilderV2Page() {
     setToast({ type, message })
     setTimeout(() => setToast(null), 3000)
   }
+
+  const handleAddQualificationToCv = useCallback(async (qual: CvTrainingQualification) => {
+    if (cvSource === 'guest_draft') {
+      const ok = window.confirm(
+        'Save this draft to your account before adding qualifications?\n\nClick OK to save, then add the qualification to your saved CV.'
+      )
+      if (!ok) return
+      try {
+        const response = await fetch('/api/cv/upsert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'Main CV', data: cvData }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok || !data?.ok) {
+          showToast('error', 'Could not save draft. Sign in and try again.')
+          return
+        }
+        if (data.cv?.id) {
+          setStoredActiveCvId(data.cv.id)
+          setActiveCvId(data.cv.id)
+        }
+        setCvSource('saved')
+        clearGuestDraft('cv')
+        setSessionDraftChoice('saved')
+      } catch {
+        showToast('error', 'Could not save draft. Try again.')
+        return
+      }
+    }
+
+    const beforeStrength = careerReadiness?.cvStrength ?? cvHealthReport.overallScore
+    const merged = mergeQualificationIntoCvData(cvData, qual)
+    setCvData(merged)
+    persistCvDraftFromData(merged)
+
+    // Persist to the active saved CV so Documents sees the same content
+    if (guest.isLoggedIn || cvSource === 'saved') {
+      try {
+        const response = await fetch('/api/cv/upsert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'Main CV', data: merged }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (response.ok && data?.cv?.id) {
+          setStoredActiveCvId(data.cv.id)
+          setActiveCvId(data.cv.id)
+          setCvSource('saved')
+          setCvLastUpdated(data.cv.updated_at || new Date().toISOString())
+        }
+      } catch {
+        // Draft still updated locally
+      }
+    }
+
+    const after = buildCvCareerReadiness(
+      merged,
+      cvHealthReport.overallScore,
+      atsMatch,
+      jobDescription.trim().length > 0,
+      mission,
+      {
+        planReadinessScore: plan?.readinessScore,
+        completedQualifications: completedCount,
+        totalQualifications: totalCount,
+        roadmapReadinessPercent,
+      }
+    )
+    const delta = Math.max(1, after.cvStrength - beforeStrength)
+    const boost = { label: qual.name, delta }
+    saveRecentQualificationBoost(qual.slug, qual.name, delta)
+    setRecentBoost(boost)
+    setDismissedPromptSlug(qual.slug)
+    setActiveTab('more')
+    const planLabel =
+      improveRoute || readinessCareerPlan.routeTitle || 'your current plan'
+    showToast(
+      'success',
+      `${qual.name} added. Your CV still needs tailoring for ${planLabel}.`
+    )
+  }, [
+    careerReadiness?.cvStrength,
+    cvData,
+    cvHealthReport.overallScore,
+    atsMatch,
+    jobDescription,
+    mission,
+    plan?.readinessScore,
+    completedCount,
+    totalCount,
+    roadmapReadinessPercent,
+    cvSource,
+    guest.isLoggedIn,
+    improveRoute,
+    readinessCareerPlan.routeTitle,
+  ])
+
+  const handleCourseBooked = useCallback((interest: CourseInterestRecord) => {
+    updateCourseInterestStatus(interest.title, 'booked')
+    upsertCareerPlanItem({
+      courseName: interest.title,
+      courseSlug: interest.slug || slugifyCourseName(interest.title),
+      courseId: interest.courseId,
+      status: 'in_progress',
+      source: 'manual',
+      routeLabel: interest.route || undefined,
+    })
+    setDismissedPromptSlug(interest.slug)
+    setCourseActionTick((n) => n + 1)
+    showToast('success', `${interest.title} marked as booked / training in progress.`)
+  }, [])
+
+  const handleCourseCompleted = useCallback(
+    (interest: CourseInterestRecord) => {
+      updateCourseInterestStatus(interest.title, 'completed')
+      upsertCareerPlanItem({
+        courseName: interest.title,
+        courseSlug: interest.slug || slugifyCourseName(interest.title),
+        courseId: interest.courseId,
+        status: 'completed',
+        source: 'manual',
+        routeLabel: interest.route || undefined,
+      })
+      const qual: CvTrainingQualification = {
+        id: interest.courseId,
+        slug: interest.slug || slugifyCourseName(interest.title),
+        name: interest.title,
+        status: 'completed',
+        type: /sia|licence|license/i.test(interest.title) ? 'licence' : 'course',
+      }
+      setDismissedPromptSlug(interest.slug)
+      setCourseActionTick((n) => n + 1)
+      if (!isQualificationInCvData(cvData, qual.name)) {
+        void handleAddQualificationToCv(qual)
+      } else {
+        showToast('success', `${interest.title} marked as completed.`)
+      }
+    },
+    [cvData, handleAddQualificationToCv]
+  )
+
+  const handleCourseNotYet = useCallback((interest: CourseInterestRecord) => {
+    // Keep as interest only — do not add certification / complete
+    setDismissedPromptSlug(interest.slug)
+    setCourseActionTick((n) => n + 1)
+  }, [])
+
+  const handleCourseDontAsk = useCallback((interest: CourseInterestRecord) => {
+    dismissCourseInterest(interest.title)
+    setDismissedPromptSlug(interest.slug)
+    setCourseActionTick((n) => n + 1)
+  }, [])
+
+  const deepLinkHandledRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !cvHydrated || !qualificationsLoaded || deepLinkHandledRef.current)
+      return
+    const addName = searchParams.get('add')?.trim()
+    if (!addName) return
+
+    deepLinkHandledRef.current = true
+    const qual =
+      qualifications.find((q) => q.name.toLowerCase() === decodeURIComponent(addName).toLowerCase()) ??
+      ({
+        name: decodeURIComponent(addName),
+        type: 'certification' as const,
+        slug: addName,
+        id: addName,
+        status: 'completed' as const,
+      } satisfies CvTrainingQualification)
+
+    if (!isQualificationInCvData(cvData, qual.name)) {
+      void handleAddQualificationToCv(qual)
+    }
+
+    const highlight = searchParams.get('highlight')
+    if (highlight === 'education') setActiveTab('education')
+    else if (highlight === 'skills') setActiveTab('skills')
+    else if (highlight === 'certifications') setActiveTab('more')
+  }, [cvHydrated, qualificationsLoaded, searchParams, cvData, qualifications, handleAddQualificationToCv])
 
   const handleCvCheck = async () => {
     setShowCvCheck(true)
@@ -811,11 +1306,17 @@ export default function CvBuilderV2Page() {
       if (certMatch && state.certifications && state.certifications[parseInt(certMatch[1], 10)]) {
         const idx = parseInt(certMatch[1], 10)
         const newCertifications = [...state.certifications]
-          const current = newCertifications[idx] ?? ''
-          newCertifications[idx] = replaceFirstSpan(current, original, suggestion)
-          updates.certifications = newCertifications
-        }
-      } 
+        const current = newCertifications[idx]
+        const currentLabel = current != null ? certificationLabel(current) : ''
+        const nextLabel = replaceFirstSpan(currentLabel, original, suggestion)
+        const nextEntry: CvCertificationEntry =
+          typeof current === 'string' || current == null
+            ? nextLabel
+            : { ...current, title: nextLabel }
+        newCertifications[idx] = nextEntry
+        updates.certifications = newCertifications
+      }
+    } 
     // Languages
     else if (fieldPath.startsWith('languages[')) {
       const langMatch = fieldPath.match(/languages\[(\d+)\]/)
@@ -911,6 +1412,7 @@ export default function CvBuilderV2Page() {
   const selectedCount = visibleIssues.filter((issue) => selectedIssueIds.has(getIssueId(issue))).length
 
   const handleExport = async (format: 'pdf' | 'docx') => {
+    if (guest.promptForAuth('download')) return
     setLoading((prev) => ({ ...prev, export: true }))
     try {
       const name = cvData.personalInfo.fullName || 'CV'
@@ -1007,6 +1509,19 @@ export default function CvBuilderV2Page() {
         showToast('success', 'DOCX exported successfully!')
         logEvent('cv_downloaded', { format: 'docx' })
       }
+
+      const { emitAiSignal } = await import('@/lib/jobaz-ai/emitSignal')
+      void emitAiSignal({
+        type: 'cv_exported',
+        source: 'cv-builder',
+        impact: { readiness: 3, engagement: 4 },
+        metadata: {
+          dedupeId: `${format}-${date}`,
+          template: selectedTemplate,
+          action: 'exported',
+          format,
+        },
+      })
     } catch (error: any) {
       console.error('Export error:', error)
       showToast('error', error.message || 'Export failed. Please try again.')
@@ -1017,6 +1532,14 @@ export default function CvBuilderV2Page() {
 
   const handleFindJobs = async () => {
     try {
+      // Prefer plan stage search query when available
+      if (planSuggestions?.jobSearchQuery) {
+        router.push(
+          `/job-finder?query=${encodeURIComponent(planSuggestions.jobSearchQuery)}`
+        )
+        return
+      }
+
       // Collect data for smart role extraction
       const summaryText = cvData.summary || ''
       
@@ -1089,6 +1612,7 @@ export default function CvBuilderV2Page() {
   }
 
   const handleSaveCvToDashboard = async () => {
+    if (guest.promptForAuth('save')) return
     try {
       if (typeof window === 'undefined') return
 
@@ -1106,6 +1630,17 @@ export default function CvBuilderV2Page() {
         publications: cvData.publications || [],
       }
 
+      let hadCvBeforeSave = false
+      try {
+        const checkRes = await fetch('/api/cv/get-latest')
+        if (checkRes.ok) {
+          const checkData = await checkRes.json()
+          hadCvBeforeSave = Boolean(checkData?.hasCv)
+        }
+      } catch {
+        // ignore — progression still runs on save
+      }
+
       // Call API to upsert CV
       const response = await fetch('/api/cv/upsert', {
         method: 'POST',
@@ -1113,7 +1648,7 @@ export default function CvBuilderV2Page() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: 'My CV',
+          title: 'Main CV',
           data: cvDataToSave,
         }),
       })
@@ -1128,6 +1663,40 @@ export default function CvBuilderV2Page() {
         throw new Error(result.error || 'Failed to save CV')
       }
 
+      const cvId = result.cv?.id as string | undefined
+      const cvCompleted = isCvCompletedForAi(cvData)
+      const { emitAiSignal } = await import('@/lib/jobaz-ai/emitSignal')
+
+      if (hadCvBeforeSave) {
+        void emitAiSignal({
+          type: 'cv_updated',
+          source: 'cv-builder',
+          impact: cvCompleted
+            ? { readiness: 10, engagement: 4 }
+            : undefined,
+          metadata: {
+            dedupeId: cvId,
+            cv_id: cvId,
+            template: selectedTemplate,
+            action: 'updated',
+            cvCompleted,
+          },
+        })
+      } else {
+        void emitAiSignal({
+          type: 'cv_created',
+          source: 'cv-builder',
+          impact: { readiness: 15, engagement: 5 },
+          metadata: {
+            dedupeId: cvId,
+            cv_id: cvId,
+            template: selectedTemplate,
+            action: 'created',
+            cvCompleted,
+          },
+        })
+      }
+
       // Re-fetch latest CV from API to ensure we have the updated version
       const refreshResponse = await fetch('/api/cv/get-latest')
       if (refreshResponse.ok) {
@@ -1135,7 +1704,7 @@ export default function CvBuilderV2Page() {
         if (refreshData.ok && refreshData.hasCv && refreshData.cv) {
           // Update local state with the latest CV from API
           // This ensures we're always working with the saved version
-          const savedCv = refreshData.cv.data || {}
+          const savedCv = refreshData.cv || {}
           const updates: Partial<CvData> = {}
           if (savedCv.personalInfo) updates.personalInfo = savedCv.personalInfo
           if (savedCv.summary !== undefined) updates.summary = savedCv.summary
@@ -1149,6 +1718,11 @@ export default function CvBuilderV2Page() {
           if (Object.keys(updates).length > 0) {
             updateCvData(updates)
           }
+          if (refreshData.cvId) {
+            setActiveCvId(refreshData.cvId)
+            setStoredActiveCvId(refreshData.cvId)
+            setCvSource('saved')
+          }
           if (savedCv.template) {
             setSelectedTemplate(savedCv.template as CvTemplateId)
           }
@@ -1158,6 +1732,7 @@ export default function CvBuilderV2Page() {
       // Dispatch custom event to notify dashboard of CV save
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('jobaz-cv-saved'))
+        markActionPlanTask(ACTION_PLAN_TASK.CV, 'done')
       }
 
       // Mark as saved (reset dirty state)
@@ -1174,64 +1749,262 @@ export default function CvBuilderV2Page() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 relative overflow-hidden">
-      {/* Background glows */}
-      <div className="pointer-events-none absolute -top-40 -left-24 h-72 w-72 rounded-full bg-violet-600/30 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-fuchsia-500/25 blur-3xl" />
+    <PublicToolLayout
+      title={isCareerMode ? 'Career Journey · Build Your CV' : 'CV Optimization Engine'}
+      subtitle={
+        isCareerMode && plan
+          ? roleHeadline
+          : 'Build your CV for your next UK role.'
+      }
+      guest={guest}
+      compactHero
+      secondaryBackLinks={
+        jobId
+          ? [
+              {
+                label: 'Back to Job Details',
+                onClick: () => {
+                  const modeParam = mode || 'tailorCv'
+                  router.push(`/job-details/${jobId}?mode=${modeParam}&from=cvBuilder`)
+                },
+              },
+            ]
+          : []
+      }
+      footer={
+        <>
+          {toast && (
+            <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
+              <div
+                className={cn(
+                  'rounded-lg px-4 py-3 shadow-lg flex items-center gap-2',
+                  toast.type === 'success'
+                    ? 'bg-green-600/90 text-white'
+                    : 'bg-red-600/90 text-white'
+                )}
+              >
+                {toast.type === 'success' ? (
+                  <CheckCircle2 className="w-5 h-5" />
+                ) : (
+                  <X className="w-5 h-5" />
+                )}
+                <span className="text-sm font-medium">{toast.message}</span>
+              </div>
+            </div>
+          )}
 
-      {/* Main container */}
-      <main className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10">
-        <PageHeader
-          title="JobAZ – AI CV Builder"
-          subtitle="Dark Neon CV Builder with AI tailoring"
-          jobId={jobId}
-          mode={mode}
-          from="cvBuilder"
-        />
+          <GuestDraftPickerModal
+            isOpen={draftPickerOpen}
+            onClose={() => setDraftPickerOpen(false)}
+            toolLabel="CV"
+            onUseSaved={() => {
+              setSessionDraftChoice('saved')
+              void resolveActiveCv({ ignoreGuestDraft: true }).then((resolved) => {
+                if (!resolved.cv) return
+                const prepared = prepareCvForEditor(resolved.cv)
+                setCvData(prepared)
+                persistCvDraftFromData(prepared)
+                setCvSource('saved')
+                setActiveCvId(resolved.activeCvId)
+                setCvLastUpdated(resolved.lastUpdated)
+                setCvLoadWarnings(resolved.warnings)
+                if (resolved.activeCvId) setStoredActiveCvId(resolved.activeCvId)
+              })
+            }}
+            onUseGuest={() => {
+              setSessionDraftChoice('guest')
+              const draft = readGuestDraft<{ cvData?: CvData; selectedTemplate?: CvTemplateId }>('cv')
+              if (!draft?.cvData) return
+              setCvData(prepareCvForEditor(draft.cvData))
+              if (draft.selectedTemplate) setSelectedTemplate(draft.selectedTemplate)
+              setCvSource('guest_draft')
+              setActiveCvId(null)
+              setCvLastUpdated(null)
+              setCvLoadWarnings(['Editing: Guest Draft — not your saved account CV until you save.'])
+            }}
+            onMergeLater={() => {
+              setSessionDraftChoice('later')
+            }}
+          />
+        </>
+      }
+    >
+        {/* Compact route / status header */}
+        {(mode === 'improve' || readinessCareerPlan.routeTitle || planSuggestions || isCareerMode || showTrainingJourney) && (
+          <div className="mb-2.5 rounded-xl border border-violet-500/20 bg-violet-950/15 px-3 py-2">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-medium text-violet-100">
+                    {(improveRoute ||
+                      planSuggestions?.routeTitle ||
+                      readinessCareerPlan.routeTitle) && (
+                      <>
+                        <span className="text-slate-400 font-normal">Route:</span>{' '}
+                        {improveRoute ||
+                          planSuggestions?.routeTitle ||
+                          readinessCareerPlan.routeTitle}
+                      </>
+                    )}
+                    {!improveRoute && !planSuggestions?.routeTitle && !readinessCareerPlan.routeTitle && isCareerMode && (
+                      <span>Building your CV</span>
+                    )}
+                  </p>
+                  <span
+                    className={cn(
+                      'inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                      cvSource === 'saved'
+                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                        : cvSource === 'guest_draft'
+                          ? 'border-sky-500/30 bg-sky-500/10 text-sky-200'
+                          : 'border-slate-600/50 bg-slate-800/40 text-slate-400'
+                    )}
+                  >
+                    {cvSource === 'saved'
+                      ? 'Saved CV'
+                      : cvSource === 'guest_draft'
+                        ? 'Guest Draft'
+                        : 'New CV'}
+                  </span>
+                  {!cvHydrated && (
+                    <span className="text-[10px] text-slate-500">Loading…</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  <span className="text-slate-500">Target:</span>{' '}
+                  {planSuggestions?.currentTarget ||
+                    improveTargetRole ||
+                    readinessCareerPlan.currentTarget ||
+                    '—'}
+                  {(planSuggestions?.nextUpgrade || readinessCareerPlan.nextUpgrade) && (
+                    <>
+                      <span className="text-slate-600 mx-1.5">·</span>
+                      <span className="text-slate-500">Upgrade:</span>{' '}
+                      {planSuggestions?.nextUpgrade || readinessCareerPlan.nextUpgrade}
+                    </>
+                  )}
+                </p>
+                {showTrainingJourney && qualificationsLoaded && qualifications.length > 0 && (
+                  <p className="text-[10px] text-slate-500 truncate">
+                    Training:{' '}
+                    {qualifications
+                      .map((q) => q.name?.trim())
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .join(', ')}
+                  </p>
+                )}
+                {needsRouteTailoring && (
+                  <p className="text-[10px] text-amber-200/90">
+                    This CV was started for another route — you can update it for your current plan.
+                  </p>
+                )}
+              </div>
 
-        {/* Action buttons */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          <button
-            onClick={handleFindJobs}
-            data-jaz-action="cv_find_jobs"
-            className="rounded-full bg-slate-900/80 px-4 py-2 text-xs md:text-sm font-medium text-slate-100 border border-slate-600/70 hover:border-violet-400/60 hover:text-violet-100 transition"
-          >
-            Find jobs for this CV
-          </button>
-          <div className="flex flex-col gap-1.5">
-            <button
-              onClick={handleSaveCvToDashboard}
-              className={cn(
-                'rounded-full px-4 py-2 text-xs md:text-sm font-medium text-slate-100 border transition flex items-center gap-2 relative',
-                isDirty
-                  ? 'bg-violet-900/80 border-violet-500/70 hover:border-violet-400/80 hover:bg-violet-800/80 shadow-[0_0_20px_rgba(139,92,246,0.4)]'
-                  : 'bg-slate-900/80 border-slate-600/70 hover:border-violet-400/60 hover:text-violet-100'
-              )}
-            >
-              {isDirty && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(234,179,8,0.6)]" />
-              )}
-              <Save className="w-4 h-4" />
-              {isDirty ? 'Save changes' : 'Save this CV to Dashboard'}
-            </button>
-            {isDirty && (
-              <div className="flex items-center gap-1.5 text-xs text-amber-400/90 ml-1">
-                <span>⚠️</span>
-                <span>You have unsaved changes. Don't forget to save your CV.</span>
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                {planSuggestions && (
+                  <CvPlanStageSwitcher
+                    activeStage={planSuggestions.activeStage}
+                    recommendedStage={planSuggestions.recommendedStage}
+                    stageLabel={planSuggestions.stageLabel}
+                    showAfterWarning={planSuggestions.trainingStatus !== 'completed'}
+                    workNowButtonLabel={planSuggestions.workNowButtonLabel}
+                    afterTrainingButtonLabel={planSuggestions.afterTrainingButtonLabel}
+                    afterTrainingWarning={planSuggestions.afterTrainingWarning}
+                    onChange={setStageOverride}
+                  />
+                )}
+                <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                  {(showTrainingJourney || qualificationReminder) && (
+                    <Link
+                      href="/dashboard#recommended-training"
+                      className="text-[10px] font-medium text-violet-300/90 hover:text-violet-200 hover:underline"
+                    >
+                      View training in My Plan
+                    </Link>
+                  )}
+                  <Link
+                    href="/dashboard"
+                    className="text-[10px] font-medium text-slate-400 hover:text-slate-200 hover:underline"
+                  >
+                    View in My Plan
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {isCareerMode && (
+              <div className="mt-1.5 pt-1.5 border-t border-violet-500/10">
+                <CvBuilderJourneyHeader className="border-0 bg-transparent px-0 py-0" />
+              </div>
+            )}
+            {showCompletionPanel && journeyNextStep && (
+              <div className="mt-1.5">
+                <CvBuilderCompletionPanel
+                  cvScore={cvHealthReport.overallScore}
+                  nextStep={journeyNextStep}
+                  onDismiss={() => setCompletionDismissed(true)}
+                  onScrollToTailor={() =>
+                    jdPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                />
               </div>
             )}
           </div>
-        </div>
+        )}
 
-        {/* Two-column layout */}
-        <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.2fr)] items-start">
+        {/* Standalone source chip when no route header */}
+        {!(mode === 'improve' || readinessCareerPlan.routeTitle || planSuggestions || isCareerMode || showTrainingJourney) && (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                'inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium',
+                cvSource === 'saved'
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                  : cvSource === 'guest_draft'
+                    ? 'border-sky-500/30 bg-sky-500/10 text-sky-200'
+                    : 'border-slate-600/50 bg-slate-800/40 text-slate-400'
+              )}
+            >
+              {cvSource === 'saved'
+                ? 'Editing: Saved CV'
+                : cvSource === 'guest_draft'
+                  ? 'Editing: Guest Draft'
+                  : 'Editing: New CV'}
+            </span>
+            {!cvHydrated && (
+              <span className="text-[11px] text-slate-500">Loading CV…</span>
+            )}
+          </div>
+        )}
+
+        {pendingCourseAction && (
+          <CvCourseActionPrompt
+            interest={pendingCourseAction}
+            onBooked={() => handleCourseBooked(pendingCourseAction)}
+            onCompleted={() => handleCourseCompleted(pendingCourseAction)}
+            onNotYet={() => handleCourseNotYet(pendingCourseAction)}
+            onDontAsk={() => handleCourseDontAsk(pendingCourseAction)}
+          />
+        )}
+        {!pendingCourseAction && pendingQualificationPrompt && (
+          <CvQualificationCompletionPrompt
+            qualification={pendingQualificationPrompt}
+            onAdd={() => handleAddQualificationToCv(pendingQualificationPrompt)}
+            onDismiss={() => setDismissedPromptSlug(pendingQualificationPrompt.slug)}
+            onNeverAsk={() => setDismissedPromptSlug(pendingQualificationPrompt.slug)}
+          />
+        )}
+
+        {/* Two-column layout — preview starts early on desktop */}
+        <section className="grid gap-4 lg:gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.95fr)] 2xl:grid-cols-[minmax(0,1fr)_minmax(300px,1fr)] items-start">
           {/* LEFT: Editor & AI */}
-          <div className="space-y-6">
+          <div className="space-y-3 min-w-0">
             {/* Tabs */}
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur overflow-hidden">
-              <div className="flex border-b border-slate-700/60 gap-0.5">
+            <div className="rounded-xl border border-slate-700/60 bg-slate-950/70 shadow-[0_12px_28px_rgba(15,23,42,0.75)] backdrop-blur overflow-hidden">
+              <div className="flex border-b border-slate-700/60 gap-0.5 overflow-x-auto">
                 {[
-                  { id: 'personal' as Tab, label: 'Personal Info' },
+                  { id: 'personal' as Tab, label: 'Personal' },
                   { id: 'summary' as Tab, label: 'Summary' },
                   { id: 'experience' as Tab, label: 'Experience' },
                   { id: 'education' as Tab, label: 'Education' },
@@ -1242,22 +2015,19 @@ export default function CvBuilderV2Page() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      'px-2 py-2.5 text-xs font-medium transition whitespace-nowrap relative',
+                      'px-2.5 py-2 text-[11px] font-medium transition whitespace-nowrap relative',
                       activeTab === tab.id
                         ? 'text-violet-300 border-b-2 border-violet-500'
                         : 'text-slate-400 hover:text-slate-200'
                     )}
                   >
                     {tab.label}
-                    {activeTab === tab.id && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-violet-500 to-fuchsia-500" />
-                    )}
                   </button>
                 ))}
               </div>
 
               {/* Tab content */}
-              <div className="p-4 md:p-5">
+              <div className="p-3 md:p-3.5">
                 {activeTab === 'personal' && (
                   <div data-cv-tab="personal">
                     <PersonalInfoTab
@@ -1278,6 +2048,7 @@ export default function CvBuilderV2Page() {
                       experience={cvData.experience}
                       onUpdate={(summary) => updateCvData({ summary })}
                       onLoadingChange={(loading) => setLoading((prev) => ({ ...prev, ai: loading }))}
+                      planSuggestions={planSuggestions}
                     />
                   </div>
                 )}
@@ -1286,6 +2057,7 @@ export default function CvBuilderV2Page() {
                     <ExperienceTab
                       experience={cvData.experience}
                       onUpdate={(experience) => updateCvData({ experience })}
+                      planBulletSuggestions={planSuggestions?.experienceBullets}
                     />
                   </div>
                 )}
@@ -1298,14 +2070,7 @@ export default function CvBuilderV2Page() {
                   </div>
                 )}
                 {activeTab === 'skills' && (() => {
-                  // Build context for AI suggestions
-                  // Target role: use first experience job title, or empty if none
-                  const targetRole = cvData.experience?.[0]?.jobTitle || ''
-                  
-                  // Summary text
                   const summaryText = cvData.summary || ''
-                  
-                  // Experience preview: build from first 1-2 experience entries
                   const experiencePreview = cvData.experience
                     .slice(0, 2)
                     .map((exp) => {
@@ -1323,11 +2088,16 @@ export default function CvBuilderV2Page() {
                       <SkillsTab
                         skills={cvData.skills}
                         onUpdate={(skills) => updateCvData({ skills })}
-                        targetRole={targetRole}
+                        targetRole={
+                          planSuggestions?.currentTarget ||
+                          cvData.experience?.[0]?.jobTitle ||
+                          ''
+                        }
                         summaryText={summaryText}
                         experiencePreview={experiencePreview}
                         onToast={showToast}
                         jobDescription={jobDescription}
+                        planSkillSuggestions={planSuggestions?.skills}
                       />
                     </div>
                   )
@@ -1340,145 +2110,150 @@ export default function CvBuilderV2Page() {
                       certifications={cvData.certifications || []}
                       publications={cvData.publications || []}
                       onUpdate={(updates) => updateCvData({ ...updates })}
+                      planQualificationSuggestions={planSuggestions?.qualificationSuggestions}
                     />
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Job Description & AI Tailoring Panel */}
+            {/* AI Optimization Mission */}
+            <CvAiWorkflowStrip
+              steps={cvHealthReport.workflowSteps}
+              subtitle={plan ? getCareerWorkflowSubtitle(plan) : undefined}
+              title={isCareerMode ? 'Improve your CV' : undefined}
+            />
+
+            <div ref={jdPanelRef}>
             <JobDescriptionPanel
               cvData={cvData}
               onCvDataUpdate={updateCvData}
               onLoadingChange={(loading) => setLoading((prev) => ({ ...prev, ai: loading }))}
               onJobDescriptionChange={setJobDescription}
+              aiHints={careerAiHints}
+              onFixGrammar={handleGrammarCheck}
+              grammarLoading={grammarLoading}
             />
+            </div>
           </div>
 
-          {/* RIGHT: Templates & Preview */}
-          <div className="space-y-3">
-            {/* Compact sticky toolbar (desktop sticky, mobile normal) */}
-            <div className="lg:sticky lg:top-4 lg:z-40">
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur px-3 py-1.5">
-                <div className="w-full space-y-1.5">
-                  {/* Responsive button container with flex-wrap */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {/* Left group: Template buttons */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm text-slate-400 font-medium shrink-0 py-0.5">Template</span>
-                      <button
-                        onClick={() => setSelectedTemplate('atsClassic')}
-                        className={cn(
-                          'inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-medium rounded-lg border transition shrink-0',
-                          selectedTemplate === 'atsClassic'
-                            ? 'border-violet-500 text-violet-200 bg-violet-500/15 shadow-[0_0_10px_rgba(139,92,246,0.45)]'
-                            : 'border-slate-700/60 text-slate-300 bg-slate-900/40 hover:border-slate-600/80 hover:text-slate-100 hover:bg-slate-800/50'
-                        )}
-                      >
-                        ATS Classic
-                      </button>
-                      <button
-                        onClick={() => setSelectedTemplate('twoColumnPro')}
-                        className={cn(
-                          'inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-medium rounded-lg border transition shrink-0',
-                          selectedTemplate === 'twoColumnPro'
-                            ? 'border-violet-500 text-violet-200 bg-violet-500/15 shadow-[0_0_10px_rgba(139,92,246,0.45)]'
-                            : 'border-slate-700/60 text-slate-300 bg-slate-900/40 hover:border-slate-600/80 hover:text-slate-100 hover:bg-slate-800/50'
-                        )}
-                      >
-                        Two Column Pro
-                      </button>
-                      <button
-                        onClick={() => setSelectedTemplate('customizeStyle')}
-                        className={cn(
-                          'inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-medium rounded-lg border transition shrink-0',
-                          selectedTemplate === 'customizeStyle'
-                            ? 'border-violet-500 text-violet-200 bg-violet-500/15 shadow-[0_0_10px_rgba(139,92,246,0.45)]'
-                            : 'border-slate-700/60 text-slate-300 bg-slate-900/40 hover:border-slate-600/80 hover:text-slate-100 hover:bg-slate-800/50'
-                        )}
-                      >
-                        Customize Style
-                      </button>
-                    </div>
-                    
-                    {/* Center group: Grammar & Spelling + CV Check (AI) */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <button
-                        onClick={handleGrammarCheck}
-                        disabled={reviewLoading || grammarLoading}
-                        className="inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-semibold rounded-lg bg-gradient-to-br from-amber-900/30 to-slate-800/50 border border-amber-500/60 text-amber-200 hover:border-amber-400/70 hover:text-amber-100 shadow-lg shadow-amber-900/20 hover:shadow-amber-900/30 backdrop-blur-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-amber-500/60 disabled:hover:text-amber-200 disabled:hover:shadow-amber-900/20 shrink-0 gap-2"
-                      >
-                        <FileEdit className="w-4 h-4" />
-                        Grammar &amp; Spelling
-                      </button>
-                      <button
-                        onClick={handleCvCheck}
-                        disabled={reviewLoading || grammarLoading}
-                        className="inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-semibold rounded-lg bg-gradient-to-br from-sky-900/30 to-slate-800/50 border border-sky-500/70 text-sky-200 hover:border-sky-400/80 hover:text-sky-100 shadow-lg shadow-sky-900/30 hover:shadow-sky-900/40 backdrop-blur-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-sky-500/70 disabled:hover:text-sky-200 disabled:hover:shadow-sky-900/30 shrink-0 gap-2"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        CV Check AI
-                      </button>
-                    </div>
-                    
-                    {/* Right group: PDF + DOCX */}
-                    <div className="flex items-center gap-1.5 flex-wrap ml-auto">
-                      <button
-                        onClick={() => handleExport('pdf')}
-                        disabled={loading.export}
-                        className="inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-semibold text-white rounded-lg bg-violet-600/90 border border-violet-400/60 shadow-[0_0_18px_rgba(139,92,246,0.55)] hover:bg-violet-500 hover:border-violet-300 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 gap-2"
-                      >
-                        {loading.export ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                        PDF
-                      </button>
-                      <button
-                        onClick={() => handleExport('docx')}
-                        disabled={loading.export}
-                        className="inline-flex items-center justify-center h-7 px-3 py-1 text-sm font-semibold text-white rounded-lg bg-violet-600/90 border border-violet-400/60 shadow-[0_0_18px_rgba(139,92,246,0.55)] hover:bg-violet-500 hover:border-violet-300 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 gap-2"
-                      >
-                        {loading.export ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                        DOCX
-                      </button>
-                    </div>
-                    
-                    {/* CV Score - full width on small screens */}
-                    {cvScore && (
-                      <div 
-                        className="w-full sm:w-auto text-center sm:text-left whitespace-nowrap"
-                        title="CV Score shows how complete and ATS-ready your CV is."
-                      >
-                        <span className="text-sm text-slate-400">
-                          CV Score{' '}
-                          <span
-                            className={cn(
-                              'text-sm font-bold',
-                              cvScore.score >= 70
-                                ? 'text-green-400'
-                                : cvScore.score >= 40 && cvScore.score <= 69
-                                ? 'text-yellow-400'
-                                : 'text-red-400'
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'inline-block mr-1',
-                                cvScore.score >= 70
-                                  ? 'text-green-400'
-                                  : cvScore.score >= 40 && cvScore.score <= 69
-                                  ? 'text-yellow-400'
-                                  : 'text-red-400'
-                              )}
-                            >
-                              •
-                            </span>
-                            {cvScore.score}/100
-                          </span>
-                        </span>
-                      </div>
-                    )}
-                  </div>
+          {/* RIGHT: Readiness + toolbar + preview (sticky, no nested page scroll) */}
+          <div className="space-y-2 min-w-0 lg:sticky lg:top-[calc(var(--jobaz-header-h,4.5rem)+0.75rem)] lg:self-start lg:max-w-full">
+            <CvHealthPanel
+              overallScore={cvHealthReport.overallScore}
+              metrics={cvHealthReport.metrics}
+              scoreDelta={scoreDelta}
+              potentialScore={displayPotentialScore}
+              missingItems={cvHealthReport.missingSections}
+              statusLabel={cvHealthReport.statusLabel}
+            />
+
+            {/* Unified compact action toolbar */}
+            <div className="rounded-xl border border-slate-700/60 bg-slate-950/80 shadow-[0_8px_24px_rgba(15,23,42,0.55)] backdrop-blur px-2 py-1.5">
+              <div className="flex flex-wrap items-center gap-1">
+                <button
+                  onClick={handleFindJobs}
+                  data-jaz-action="cv_find_jobs"
+                  className="inline-flex items-center justify-center h-7 px-2.5 text-[11px] font-medium rounded-md border border-slate-600/70 text-slate-200 bg-slate-900/50 hover:border-violet-400/50 hover:text-violet-100 transition shrink-0"
+                >
+                  Find jobs
+                </button>
+                <button
+                  onClick={handleSaveCvToDashboard}
+                  className={cn(
+                    'inline-flex items-center justify-center h-7 px-2.5 text-[11px] font-medium rounded-md border transition shrink-0 gap-1 relative',
+                    isDirty
+                      ? 'bg-violet-900/80 border-violet-500/70 text-violet-100 shadow-[0_0_12px_rgba(139,92,246,0.35)]'
+                      : 'border-slate-600/70 text-slate-200 bg-slate-900/50 hover:border-violet-400/50'
+                  )}
+                >
+                  {isDirty && (
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-yellow-400 rounded-full" />
+                  )}
+                  <Save className="w-3 h-3" />
+                  {isDirty ? 'Save changes' : 'Save CV'}
+                </button>
+
+                <span className="hidden sm:inline w-px h-4 bg-slate-700/80 mx-0.5" />
+
+                <span className="text-[10px] text-slate-500 font-medium shrink-0 px-0.5 hidden sm:inline">Template</span>
+                <button
+                  onClick={() => setSelectedTemplate('atsClassic')}
+                  className={cn(
+                    'inline-flex items-center justify-center h-7 px-2 text-[11px] font-medium rounded-md border transition shrink-0',
+                    selectedTemplate === 'atsClassic'
+                      ? 'border-violet-500 text-violet-200 bg-violet-500/15'
+                      : 'border-slate-700/60 text-slate-300 bg-slate-900/40 hover:border-slate-600/80'
+                  )}
+                >
+                  ATS
+                </button>
+                <button
+                  onClick={() => setSelectedTemplate('twoColumnPro')}
+                  className={cn(
+                    'inline-flex items-center justify-center h-7 px-2 text-[11px] font-medium rounded-md border transition shrink-0',
+                    selectedTemplate === 'twoColumnPro'
+                      ? 'border-violet-500 text-violet-200 bg-violet-500/15'
+                      : 'border-slate-700/60 text-slate-300 bg-slate-900/40 hover:border-slate-600/80'
+                  )}
+                >
+                  2-Col
+                </button>
+                <button
+                  onClick={() => setSelectedTemplate('customizeStyle')}
+                  className={cn(
+                    'inline-flex items-center justify-center h-7 px-2 text-[11px] font-medium rounded-md border transition shrink-0',
+                    selectedTemplate === 'customizeStyle'
+                      ? 'border-violet-500 text-violet-200 bg-violet-500/15'
+                      : 'border-slate-700/60 text-slate-300 bg-slate-900/40 hover:border-slate-600/80'
+                  )}
+                >
+                  Style
+                </button>
+
+                <span className="hidden sm:inline w-px h-4 bg-slate-700/80 mx-0.5" />
+
+                <button
+                  onClick={handleGrammarCheck}
+                  disabled={reviewLoading || grammarLoading}
+                  className="inline-flex items-center justify-center h-7 px-2 text-[11px] font-semibold rounded-md bg-amber-900/25 border border-amber-500/50 text-amber-200 hover:border-amber-400/70 transition disabled:opacity-50 shrink-0 gap-1"
+                >
+                  <FileEdit className="w-3 h-3" />
+                  Grammar
+                </button>
+                <button
+                  onClick={handleCvCheck}
+                  disabled={reviewLoading || grammarLoading}
+                  className="inline-flex items-center justify-center h-7 px-2 text-[11px] font-semibold rounded-md bg-sky-900/25 border border-sky-500/60 text-sky-200 hover:border-sky-400/80 transition disabled:opacity-50 shrink-0 gap-1"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  CV Check
+                </button>
+
+                <div className="flex items-center gap-1 ml-auto">
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    disabled={loading.export}
+                    className="inline-flex items-center justify-center h-7 px-2.5 text-[11px] font-semibold text-white rounded-md bg-violet-600/90 border border-violet-400/50 hover:bg-violet-500 transition disabled:opacity-50 shrink-0 gap-1"
+                  >
+                    {loading.export ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                    PDF
+                  </button>
+                  <button
+                    onClick={() => handleExport('docx')}
+                    disabled={loading.export}
+                    className="inline-flex items-center justify-center h-7 px-2.5 text-[11px] font-semibold text-white rounded-md bg-violet-600/90 border border-violet-400/50 hover:bg-violet-500 transition disabled:opacity-50 shrink-0 gap-1"
+                  >
+                    {loading.export ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                    DOCX
+                  </button>
                 </div>
               </div>
+              {isDirty && (
+                <p className="text-[10px] text-amber-400/90 mt-1 px-0.5">
+                  Unsaved changes — save your CV when ready.
+                </p>
+              )}
             </div>
 
             {/* Customization Panel - shown only when customizeStyle is active */}
@@ -1491,13 +2266,13 @@ export default function CvBuilderV2Page() {
               />
             )}
 
-            {/* A4 Preview - keep preview component unchanged */}
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-3 md:p-4 flex items-center justify-center min-h-[600px]">
-              <div className="mx-auto aspect-[1/1.414] w-full max-w-[460px] bg-white text-slate-900 shadow-lg overflow-hidden rounded-md">
+            {/* A4 Preview — page scroll only; no nested layout scrollbar */}
+            <div className="rounded-xl border border-slate-700/60 bg-slate-950/70 shadow-[0_12px_28px_rgba(15,23,42,0.75)] backdrop-blur p-2 md:p-2.5 flex items-start justify-center">
+              <div className="mx-auto aspect-[1/1.414] w-full max-w-[400px] xl:max-w-[440px] bg-white text-slate-900 shadow-lg overflow-hidden rounded-md">
                 <div
                   id="cv-preview"
                   ref={previewRef}
-                  className={cn('p-8 h-full overflow-y-auto', selectedTemplate === 'customizeStyle' && 'cv-customize-style')}
+                  className={cn('p-6 h-full', selectedTemplate === 'customizeStyle' && 'cv-customize-style')}
                   style={
                     selectedTemplate === 'customizeStyle'
                       ? {
@@ -1575,7 +2350,6 @@ export default function CvBuilderV2Page() {
             </div>
           </div>
         </section>
-      </main>
 
       {/* CV Check modal */}
       {showCvCheck && (
@@ -1807,27 +2581,7 @@ export default function CvBuilderV2Page() {
         </div>
       )}
 
-      {/* Toast notification */}
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
-          <div
-            className={cn(
-              'rounded-lg px-4 py-3 shadow-lg flex items-center gap-2',
-              toast.type === 'success'
-                ? 'bg-green-600/90 text-white'
-                : 'bg-red-600/90 text-white'
-            )}
-          >
-            {toast.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5" />
-            ) : (
-              <X className="w-5 h-5" />
-            )}
-            <span className="text-sm font-medium">{toast.message}</span>
-          </div>
-        </div>
-      )}
-    </div>
+    </PublicToolLayout>
   )
 }
 

@@ -121,7 +121,7 @@ export function getMicroStatus(
     // Move away question
     if (nextQuestionId === 'move_away') {
       return {
-        line: "Checking location flexibility…",
+        line: "Understanding what you want to leave behind…",
         chips: []
       }
     }

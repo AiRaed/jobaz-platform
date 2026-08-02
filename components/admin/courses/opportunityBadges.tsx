@@ -1,0 +1,151 @@
+import { cn } from '@/lib/utils'
+
+function norm(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+export function trackerBadgeClass(value: string): string {
+  const v = norm(value)
+
+  if (
+    ['approved affiliate', 'approved', 'active', 'published', 'provider found', 'course ready', 'linked to published course'].includes(v) ||
+    v.includes('ready to publish')
+  ) {
+    return 'border-emerald-500/40 bg-emerald-950/40 text-emerald-300'
+  }
+
+  if (
+    ['pending', 'applied', 'applied to provider', 'need follow-up', 'need custom link', 'draft'].includes(v)
+  ) {
+    return 'border-amber-500/40 bg-amber-950/35 text-amber-300'
+  }
+
+  if (['rejected', 'rejected provider', 'problem', 'not suitable'].includes(v)) {
+    return 'border-red-500/40 bg-red-950/35 text-red-300'
+  }
+
+  if (['later', 'hidden'].includes(v)) {
+    return 'border-slate-600/50 bg-slate-900/50 text-slate-500'
+  }
+
+  if (
+    ['need provider', 'need check', 'unknown', 'idea', 'not published', 'not affiliate'].includes(v)
+  ) {
+    return 'border-slate-600/60 bg-slate-900/60 text-slate-400'
+  }
+
+  return 'border-slate-700/60 bg-slate-950/50 text-slate-300'
+}
+
+export function TrackerBadge({ value, className }: { value: string; className?: string }) {
+  if (!value?.trim()) return <span className="text-slate-600">—</span>
+  return (
+    <span
+      className={cn(
+        'inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium border whitespace-nowrap',
+        trackerBadgeClass(value),
+        className
+      )}
+    >
+      {value}
+    </span>
+  )
+}
+
+export function RouteChips({ labels, max = 3 }: { labels: string[]; max?: number }) {
+  if (!labels.length) return <span className="text-slate-600 text-[10px]">—</span>
+  const shown = labels.slice(0, max)
+  const rest = labels.length - shown.length
+
+  return (
+    <div className="flex flex-wrap gap-0.5">
+      {shown.map((label) => (
+        <span
+          key={label}
+          className="inline-flex rounded-full border border-violet-500/25 bg-violet-950/25 px-1.5 py-px text-[9px] text-violet-200 leading-tight"
+        >
+          {label}
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="inline-flex rounded-full border border-slate-700/60 px-1.5 py-px text-[9px] text-slate-500 leading-tight">
+          +{rest} more
+        </span>
+      )}
+    </div>
+  )
+}
+
+export function ProviderChips({ names, max = 2 }: { names: string[]; max?: number }) {
+  if (!names.length) return <span className="text-slate-600 text-[10px]">—</span>
+  const shown = names.slice(0, max)
+  const rest = names.length - shown.length
+
+  return (
+    <div className="flex flex-wrap gap-0.5">
+      {shown.map((name) => (
+        <span
+          key={name}
+          className="inline-flex rounded-full border border-cyan-500/25 bg-cyan-950/20 px-1.5 py-px text-[9px] text-cyan-200 leading-tight max-w-[120px] truncate"
+          title={name}
+        >
+          {name}
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="inline-flex rounded-full border border-slate-700/60 px-1.5 py-px text-[9px] text-slate-500 leading-tight">
+          +{rest} more
+        </span>
+      )}
+    </div>
+  )
+}
+
+export function VisibilityBadge({ value }: { value: string }) {
+  const label =
+    value === 'recommendation_only'
+      ? 'Recommendation-only'
+      : value === 'public_listed'
+        ? 'Public listed'
+        : value === 'internal'
+          ? 'Internal'
+          : value
+  return <TrackerBadge value={label} />
+}
+
+export function CommercialStatusBadge({ value }: { value: string }) {
+  const label =
+    value === 'no_link'
+      ? 'No link'
+      : value === 'official_link'
+        ? 'Official link'
+        : value === 'affiliate_ready'
+          ? 'Affiliate ready'
+          : value
+  return <TrackerBadge value={label} />
+}
+
+export function GoalChips({ labels, max = 2 }: { labels: string[]; max?: number }) {
+  if (!labels.length) return <span className="text-slate-600 text-[10px]">—</span>
+  const shown = labels.slice(0, max)
+  const rest = labels.length - shown.length
+
+  return (
+    <div className="flex flex-wrap gap-0.5">
+      {shown.map((label) => (
+        <span
+          key={label}
+          className="inline-flex rounded-full border border-fuchsia-500/25 bg-fuchsia-950/20 px-1.5 py-px text-[9px] text-fuchsia-200 leading-tight max-w-[130px] truncate"
+          title={label}
+        >
+          {label}
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="inline-flex rounded-full border border-slate-700/60 px-1.5 py-px text-[9px] text-slate-500 leading-tight">
+          +{rest} more
+        </span>
+      )}
+    </div>
+  )
+}

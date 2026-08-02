@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+
+ing, wantsSkillUnlockMode } from './speedDevelopmentMode'
+import {
+  buildFlexibleEmploymentRecommendations,
+  wantsFlexibleEmploymentMode,
+} from './flexibleEmployme

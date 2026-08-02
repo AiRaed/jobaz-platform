@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, FileText, Trash2, Loader2, X, CheckCircle2, AlertCircle, BookOpen, Briefcase, Sparkles, Check, XCircle, RefreshCw, Mail, Copy, Save, Wand2, Upload, Info, Download, ArrowLeft } from 'lucide-react'
+import { Plus, FileText, Trash2, Loader2, X, CheckCircle2, AlertCircle, BookOpen, Briefcase, Sparkles, Check, XCircle, RefreshCw, Mail, Copy, Save, Wand2, Upload, Info, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { parseEmail } from '@/lib/email-parser'
 import type { EmailPurpose, RecipientType, Tone } from '@/lib/email-templates'
@@ -10,6 +10,28 @@ import { exportProofreadingToDocx } from '@/lib/docx'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { useToast } from '@/components/ui/toast'
 import { useJazContext } from '@/contexts/JazContextContext'
+import { fetchProofreadingJson } from '@/lib/proofreading/fetchJson'
+import { postProofreadingAnalyze } from '@/lib/proofreading/analyzeApi'
+import { applyTextFix, sortIssuesForApply, type FixableIssue } from '@/lib/proofreading/applyFix'
+import { buildWritingReviewReport } from '@/lib/proofreading/reviewReport'
+import type { WritingReviewReport } from '@/lib/proofreading/types'
+import WritingReviewSummary from '@/components/proofreading/WritingReviewSummary'
+import ReviewStrengthsPanel from '@/components/proofreading/ReviewStrengthsPanel'
+import DocumentInsightsPanel from '@/components/proofreading/DocumentInsightsPanel'
+import JobAZNextStepsPanel from '@/components/proofreading/JobAZNextStepsPanel'
+import IssueCard from '@/components/proofreading/IssueCard'
+import AnalysisEmptyState from '@/components/proofreading/AnalysisEmptyState'
+import { useToolGuestMode } from '@/lib/guest-tools/useToolGuestMode'
+import { GUEST_LIMITS } from '@/lib/guest-tools/constants'
+import {
+  incrementGuestUsage,
+  readGuestDraft,
+  readGuestUsage,
+  writeGuestDraft,
+} from '@/lib/guest-tools/storage'
+import PublicToolLayout from '@/components/guest-tools/PublicToolLayout'
+
+const GUEST_WRITING_PROJECT_ID = 'guest-writing-review'
 
 interface ProofreadingProject {
   id: string
@@ -156,7 +178,8 @@ export default function ProofreadingPage() {
   const [pageIssues, setPageIssues] = useState<Record<string, ProofreadingIssue[]>>({})
   // When a page becomes empty, we "clear analysis" and keep it cleared until Run Analysis is clicked again.
   const [clearedPages, setClearedPages] = useState<Record<string, boolean>>({})
-  const [issueFilter, setIssueFilter] = useState<IssueFilter>('all')
+  const [issueFilter, setIssueFilter] = useState<IssueFilter>('open')
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
   // Multi-page support: pages stored in React state only
   const [pages, setPages] = useState<Array<{ id: string; content: string }>>([{ id: '1', content: '' }])
   const [activePageIndex, setActivePageIndex] = useState(0)
@@ -168,6 +191,10 @@ export default function ProofreadingPage() {
   const [isImporting, setIsImporting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [analysisFailed, setAnalysisFailed] = useState(false)
+  const [reviewReport, setReviewReport] = useState<WritingReviewReport | null>(null)
+  /** Session fixes removed from the list after re-analysis — shown under Applied tab. */
+  const [appliedHistory, setAppliedHistory] = useState<ProofreadingIssue[]>([])
   const [newProjectTitle, setNewProjectTitle] = useState('')
   const [newProjectCategory, setNewProjectCategory] = useState('general')
   const [showNewProjectForm, setShowNewProjectForm] = useState(false)
@@ -192,6 +219,7 @@ export default function ProofreadingPage() {
   const router = useRouter()
   const { addToast } = useToast()
   const { setContext } = useJazContext()
+  const guest = useToolGuestMode('writingReview')
   
   // Email Builder state
   const [emailProjects, setEmailProjects] = useState<EmailProject[]>([])
@@ -264,6 +292,18 @@ export default function ProofreadingPage() {
     return 'general'
   }, [activeProjectId, projects])
 
+  const syncReviewReport = useCallback(
+    (content: string, issueList: ProofreadingIssue[], apiReview?: WritingReviewReport | null) => {
+      if (apiReview) {
+        setReviewReport(apiReview)
+        return
+      }
+      const cat = projects.find((p) => p.id === activeProjectId)?.category
+      setReviewReport(buildWritingReviewReport(content, issueList, getAnalysisMode(), cat))
+    },
+    [activeProjectId, projects, getAnalysisMode]
+  )
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -273,14 +313,40 @@ export default function ProofreadingPage() {
     }
   }, [])
 
-  // Load projects on mount
+  // Load projects on mount (or guest preview draft)
   useEffect(() => {
+    if (!guest.authReady) return
+
+    if (guest.isGuest && activeTab === 'proofreading') {
+      const draft = readGuestDraft<{
+        pages?: Array<{ id: string; content: string }>
+        activePageIndex?: number
+      }>('writingReview')
+      if (draft?.pages?.length) {
+        setPages(draft.pages)
+        if (draft.activePageIndex != null) setActivePageIndex(draft.activePageIndex)
+      }
+      const now = new Date().toISOString()
+      setProjects([
+        {
+          id: GUEST_WRITING_PROJECT_ID,
+          title: 'Guest preview',
+          category: 'general',
+          created_at: now,
+          updated_at: now,
+        },
+      ])
+      setActiveProjectId(GUEST_WRITING_PROJECT_ID)
+      setIsLoading(false)
+      return
+    }
+
     if (activeTab === 'proofreading') {
       loadProjects()
     } else if (activeTab === 'email') {
       loadEmailProjects()
     }
-  }, [activeTab])
+  }, [activeTab, guest.authReady, guest.isGuest])
 
   // Load document when project changes
   useEffect(() => {
@@ -295,6 +361,8 @@ export default function ProofreadingPage() {
       setIssues([])
       setPageIssues({})
       setClearedPages({})
+      setReviewReport(null)
+      setAppliedHistory([])
       lastDocumentIdRef.current = null
     }
   }, [activeProjectId])
@@ -355,7 +423,10 @@ export default function ProofreadingPage() {
     setClearedPages(prev => ({ ...prev, [activePageId]: true }))
     setPageIssues(prev => ({ ...prev, [activePageId]: [] }))
     setIssues([])
-    setIssueFilter('all')
+    setReviewReport(null)
+    setAppliedHistory([])
+    setSelectedIssueId(null)
+    setIssueFilter('open')
   }, [pages, activePageIndex])
 
   // Watch active page content: if it becomes empty, clear analysis + UI for that page
@@ -370,22 +441,29 @@ export default function ProofreadingPage() {
     try {
       setIsLoading(true)
       setError(null)
-      const res = await fetch('/api/proofreading/projects')
-      const data = await res.json()
-      if (data.ok) {
-        setProjects(data.projects)
-        if (data.projects.length > 0 && !activeProjectId) {
+      const { ok, data, error: fetchError } = await fetchProofreadingJson<{
+        ok?: boolean
+        projects?: ProofreadingProject[]
+        error?: string
+      }>('/api/proofreading/projects')
+
+      if (ok) {
+        const nextProjects = Array.isArray(data?.projects) ? data.projects : []
+        setProjects(nextProjects)
+        if (nextProjects.length > 0 && !activeProjectId) {
           const firstVisible = ENABLE_PHD_MODE
-            ? data.projects[0]
-            : data.projects.find((p: ProofreadingProject) => !(p.category === 'academic_research_phd' || p.category === 'Academic Research'))
+            ? nextProjects[0]
+            : nextProjects.find((p: ProofreadingProject) => !(p.category === 'academic_research_phd' || p.category === 'Academic Research'))
           if (firstVisible) setActiveProjectId(firstVisible.id)
         }
       } else {
-        setError(data.error || 'Failed to load projects')
+        setProjects([])
+        if (fetchError) setError(fetchError)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load projects:', err)
-      setError(err.message || 'Failed to load projects')
+      setProjects([])
+      setError(err instanceof Error ? err.message : 'Failed to load projects')
     } finally {
       setIsLoading(false)
     }
@@ -525,6 +603,15 @@ export default function ProofreadingPage() {
   }, [activeProjectId, activeDocumentId, pages, ensureDocumentExists])
 
   const saveDocument = async (docId?: string, contentOverride?: string) => {
+    if (guest.isGuest) {
+      writeGuestDraft('writingReview', {
+        pages,
+        activePageIndex,
+        savedAt: Date.now(),
+      })
+      return
+    }
+
     const documentId = docId || activeDocumentId
     if (!documentId || !activeProjectId) return
 
@@ -696,6 +783,7 @@ export default function ProofreadingPage() {
   }
 
   const handleExportDocx = async () => {
+    if (guest.promptForAuth('download')) return
     if (!activeProjectId || pages.length === 0) {
       return
     }
@@ -713,6 +801,19 @@ export default function ProofreadingPage() {
 
       const projectTitle = projects.find(p => p.id === activeProjectId)?.title || 'untitled'
       await exportProofreadingToDocx(pages, projectTitle)
+      void import('@/lib/jobaz-ai/emitSignal').then(({ emitAiSignal }) =>
+        emitAiSignal({
+          type: 'professional_writing_improved',
+          source: 'writing-review',
+          impact: { readiness: 5, engagement: 4, englishConfidence: 8 },
+          metadata: {
+            dedupeId: `${activeProjectId}-export-${new Date().toISOString().slice(0, 10)}`,
+            document_id: activeProjectId,
+            action: 'exported',
+            fixesApplied: true,
+          },
+        })
+      )
     } catch (err: any) {
       console.error('Failed to export DOCX:', err)
       setError(err.message || 'Failed to export document. Please try again.')
@@ -764,7 +865,12 @@ export default function ProofreadingPage() {
 
     try {
       const categoryToUse = (newProjectCategory === 'academic_research_phd' && !ENABLE_PHD_MODE) ? 'general' : newProjectCategory
-      const res = await fetch('/api/proofreading/projects', {
+      const { ok, data, error: fetchError } = await fetchProofreadingJson<{
+        ok?: boolean
+        project?: ProofreadingProject
+        error?: string
+        message?: string
+      }>('/api/proofreading/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -772,10 +878,8 @@ export default function ProofreadingPage() {
           category: categoryToUse,
         }),
       })
-      
-      const data = await res.json()
-      
-      if (data.ok) {
+
+      if (ok && data?.project) {
         setProjects([...projects, data.project])
         setActiveProjectId(data.project.id)
         setNewProjectTitle('')
@@ -783,26 +887,27 @@ export default function ProofreadingPage() {
         setShowNewProjectForm(false)
         setError(null)
       } else {
-        // Show error message from API
-        const errorMsg = data.message || data.error || 'Failed to create project'
+        const errorMsg = data?.message || data?.error || fetchError || 'Failed to create project'
         setError(errorMsg)
-        console.error('Create project failed:', data)
+        console.error('Create project failed:', data ?? fetchError)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to create project:', err)
-      setError(err?.message || 'Failed to create project. Please try again.')
+      setError(err instanceof Error ? err.message : 'Failed to create project. Please try again.')
     }
   }
 
   const deleteProject = async (projectId: string) => {
     try {
-      const res = await fetch(`/api/proofreading/projects/${projectId}`, {
+      const { ok, data, error: fetchError, status } = await fetchProofreadingJson<{
+        ok?: boolean
+        error?: string
+        message?: string
+      }>(`/api/proofreading/projects/${projectId}`, {
         method: 'DELETE',
       })
-      
-      const data = await res.json()
-      
-      if (res.ok && data.ok) {
+
+      if (ok && data?.ok !== false) {
         setProjects(projects.filter(p => p.id !== projectId))
         if (activeProjectId === projectId) {
           setActiveProjectId(null)
@@ -810,19 +915,21 @@ export default function ProofreadingPage() {
         setIsDeleteDialogOpen(false)
         setSelectedProjectId(null)
       } else {
-        // Show error toast
-        const errorMsg = data.error || data.message || 'Failed to delete project'
+        const errorMsg = data?.error || data?.message || fetchError || 'Failed to delete project'
         addToast({
           title: 'Delete failed',
           description: errorMsg,
           variant: 'error',
         })
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Delete project failed:', status, data ?? fetchError)
+        }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete project:', err)
       addToast({
         title: 'Delete failed',
-        description: err?.message || 'Failed to delete project. Please try again.',
+        description: err instanceof Error ? err.message : 'Failed to delete project',
         variant: 'error',
       })
     }
@@ -1091,7 +1198,19 @@ export default function ProofreadingPage() {
     try {
       await navigator.clipboard.writeText(fullEmail)
       setError(null)
-      // Could show a toast here
+      void import('@/lib/jobaz-ai/emitSignal').then(({ emitAiSignal }) =>
+        emitAiSignal({
+          type: 'professional_writing_improved',
+          source: 'writing-review',
+          impact: { readiness: 5, engagement: 4, englishConfidence: 8 },
+          metadata: {
+            dedupeId: `${activeDocumentId ?? 'email'}-copy-${new Date().toISOString().slice(0, 10)}`,
+            document_id: activeDocumentId,
+            action: 'copied',
+            fixesApplied: true,
+          },
+        })
+      )
     } catch (err) {
       console.error('Failed to copy email:', err)
       setError('Failed to copy email to clipboard')
@@ -1101,7 +1220,38 @@ export default function ProofreadingPage() {
   const runAnalysis = async () => {
     let textToAnalyze = latestEditorContentRef.current ?? pages[activePageIndex]?.content ?? ''
     const activePageId = pages[activePageIndex]?.id
-    if (!activeProjectId || !textToAnalyze.trim() || isAnalyzing) return
+    if (isAnalyzing) return
+
+    if (guest.isGuest) {
+      const usage = readGuestUsage('writingReview')
+      if ((usage.analyses ?? 0) >= GUEST_LIMITS.writingReviewAnalyses) {
+        guest.promptForAuth('fullAccess')
+        return
+      }
+      const wordCount = textToAnalyze.trim().split(/\s+/).filter(Boolean).length
+      if (wordCount > 400) {
+        setError('Guest preview is limited to 400 words. Sign in for full reviews.')
+        guest.promptForAuth('fullAccess')
+        return
+      }
+    }
+
+    if (!activeProjectId) {
+      setError('Select a project before running analysis.')
+      return
+    }
+
+    if (!textToAnalyze.trim()) {
+      setError('Add text before running analysis.')
+      setAnalysisFailed(false)
+      return
+    }
+
+    if (textToAnalyze.trim().length < 5) {
+      setError('Add at least 5 characters before running analysis.')
+      setAnalysisFailed(false)
+      return
+    }
 
     // Normalize trailing dots and fix broken capitalization spacing before analysis
     let cleaned = normalizeTrailingDots(textToAnalyze)
@@ -1122,6 +1272,41 @@ export default function ProofreadingPage() {
     try {
       setIsAnalyzing(true)
       setError(null)
+      setAnalysisFailed(false)
+      setAppliedHistory([])
+
+      if (guest.isGuest) {
+        const result = await postProofreadingAnalyze({
+          documentId: GUEST_WRITING_PROJECT_ID,
+          content: textToAnalyze,
+          mode: 'general',
+          options: {
+            spelling: true,
+            grammar: true,
+            style: true,
+            clarity: true,
+          },
+        })
+
+        if (!result.ok) {
+          setAnalysisFailed(true)
+          setReviewReport(null)
+          setError(result.error)
+          return
+        }
+
+        incrementGuestUsage('writingReview', 'analyses')
+        writeGuestDraft('writingReview', { pages, activePageIndex, savedAt: Date.now() })
+
+        const nextIssues = result.issues as ProofreadingIssue[]
+        if (activePageId) {
+          setClearedPages((prev) => ({ ...prev, [activePageId]: false }))
+          setPageIssues((prev) => ({ ...prev, [activePageId]: nextIssues }))
+        }
+        setIssues(nextIssues)
+        syncReviewReport(textToAnalyze, nextIssues, result.review ?? null)
+        return
+      }
 
       let docId = activeDocumentId
       if (!docId && activeProjectId) {
@@ -1129,6 +1314,7 @@ export default function ProofreadingPage() {
         docId = await ensureDocumentExists(activeProjectId, combinedContent)
         if (!docId) {
           setError('Could not create document. Please retry.')
+          setAnalysisFailed(true)
           setIsAnalyzing(false)
           return
         }
@@ -1136,86 +1322,105 @@ export default function ProofreadingPage() {
 
       if (!docId) {
         setError('Document is required for analysis')
+        setAnalysisFailed(true)
         setIsAnalyzing(false)
         return
       }
 
-      // Determine mode based on project category (use slugs)
       const activeProject = projects.find(p => p.id === activeProjectId)
-      let mode = 'general'
       const categorySlug = activeProject?.category || ''
-      
-      // Map category slugs to analysis modes
+      let mode: 'general' | 'academic' | 'academic_research' = 'general'
       if (categorySlug === 'academic_research_phd' || categorySlug === 'Academic Research') {
         mode = 'academic_research'
       } else if (categorySlug === 'academic_standard' || categorySlug === 'Academic') {
         mode = 'academic'
-      } else {
-        mode = 'general'
       }
 
-      // Analyze current editor text only (single source of truth)
-      const res = await fetch('/api/proofreading/analyze', {
+      const result = await postProofreadingAnalyze({
+        documentId: docId,
+        content: textToAnalyze,
+        mode,
+        options: {
+          spelling: true,
+          grammar: true,
+          style: true,
+          clarity: true,
+        },
+        projectCategory: activeProject?.category,
+      })
+
+      if (!result.ok) {
+        setAnalysisFailed(true)
+        setReviewReport(null)
+        setError(result.error)
+        return
+      }
+
+      const issueCount = result.issues.length
+      const { emitAiSignal } = await import('@/lib/jobaz-ai/emitSignal')
+      void emitAiSignal({
+        type: 'writing_review_completed',
+        source: 'writing-review',
+        impact: { readiness: 6, engagement: 4, englishConfidence: 5 },
+        metadata: {
+          dedupeId: `${docId}-${new Date().toISOString().slice(0, 10)}`,
+          document_id: docId,
+          issue_count: issueCount,
+          reviewCompleted: true,
+          fixesApplied: false,
+        },
+      })
+
+      const issuesRes = await fetch('/api/proofreading/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          documentId: docId,
-          content: textToAnalyze,
-          mode,
-          options: {
-            spelling: true,
-            grammar: true,
-            style: true,
-            clarity: true,
-          },
+          document_id: docId,
+          issues: result.issues,
         }),
       })
 
-      const data = await res.json()
-      if (data.ok) {
-        // Upsert issues into database
-        const issuesRes = await fetch('/api/proofreading/issues', {
-          method: 'POST',
+      const issuesData = await issuesRes.json()
+      if (issuesData.ok) {
+        const nextIssues = issuesData.issues || []
+        if (activePageId) {
+          setClearedPages(prev => ({ ...prev, [activePageId]: false }))
+          setPageIssues(prev => ({ ...prev, [activePageId]: nextIssues }))
+        }
+        setIssues(nextIssues)
+        syncReviewReport(textToAnalyze, nextIssues, result.review ?? null)
+
+        await fetch(`/api/proofreading/documents/${docId}`, {
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            document_id: docId,
-            issues: data.issues,
+            analysis: {
+              summary: {
+                totalIssues: result.issues.length,
+                byType: (result.issues as Array<{ type?: string }>).reduce(
+                  (acc: Record<string, number>, issue) => {
+                    const t = issue.type ?? 'unknown'
+                    acc[t] = (acc[t] || 0) + 1
+                    return acc
+                  },
+                  {} as Record<string, number>
+                ),
+              },
+            },
           }),
         })
-
-        const issuesData = await issuesRes.json()
-        if (issuesData.ok) {
-          const nextIssues = issuesData.issues || []
-          // Mark this page as "not cleared" since user explicitly ran analysis.
-          if (activePageId) {
-            setClearedPages(prev => ({ ...prev, [activePageId]: false }))
-            setPageIssues(prev => ({ ...prev, [activePageId]: nextIssues }))
-          }
-          setIssues(nextIssues)
-          
-          // Update document analysis
-          await fetch(`/api/proofreading/documents/${docId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              analysis: {
-                summary: {
-                  totalIssues: data.issues.length,
-                  byType: data.issues.reduce((acc: any, issue: any) => {
-                    acc[issue.type] = (acc[issue.type] || 0) + 1
-                    return acc
-                  }, {}),
-                },
-              },
-            }),
-          })
-        }
       } else {
-        setError(data.error || 'Failed to analyze text')
+        setAnalysisFailed(true)
+        setReviewReport(null)
+        setError(issuesData.error || 'Analysis failed. Please try again.')
       }
-    } catch (err: any) {
-      console.error('Failed to run analysis:', err)
-      setError(err.message || 'Failed to run analysis')
+    } catch (err: unknown) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to run analysis:', err)
+      }
+      setAnalysisFailed(true)
+      setReviewReport(null)
+      setError('Analysis failed. Please try again.')
     } finally {
       setIsAnalyzing(false)
     }
@@ -1227,10 +1432,13 @@ export default function ProofreadingPage() {
    * Returns the number of issues returned by the analyzer (for safety checks).
    */
   const runAnalysisWithContent = useCallback(
-    async (pageContent: string, mode?: 'general' | 'academic' | 'academic_research'): Promise<number> => {
+    async (
+      pageContent: string,
+      mode?: 'general' | 'academic' | 'academic_research'
+    ): Promise<{ count: number; report: WritingReviewReport | null }> => {
       const docId = activeDocumentId
       const activePageId = pages[activePageIndex]?.id
-      if (!docId || !activePageId) return 0
+      if (!docId || !activePageId) return { count: 0, report: null }
 
       const analysisMode = mode ?? getAnalysisMode()
       const options =
@@ -1243,88 +1451,97 @@ export default function ProofreadingPage() {
       try {
         setIsAnalyzing(true)
         setError(null)
-        const res = await fetch('/api/proofreading/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            documentId: docId,
-            content: pageContent,
-            mode: analysisMode,
-            options,
-          }),
+        setAnalysisFailed(false)
+
+        const result = await postProofreadingAnalyze({
+          documentId: docId,
+          content: pageContent,
+          mode: analysisMode,
+          options,
+          projectCategory: projects.find((p) => p.id === activeProjectId)?.category,
         })
-        const data = await res.json()
-        if (!data.ok) {
-          setError(data.error || data.message || 'Re-analysis failed')
-          return 0
+
+        if (!result.ok) {
+          setAnalysisFailed(true)
+          setReviewReport(null)
+          setError(result.error)
+          return { count: 0, report: null }
         }
-        const issueCount = Array.isArray(data.issues) ? data.issues.length : 0
+
+        const issueCount = result.issues.length
+        let savedIssues: ProofreadingIssue[] = []
         const issuesRes = await fetch('/api/proofreading/issues', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ document_id: docId, issues: data.issues }),
+          body: JSON.stringify({ document_id: docId, issues: result.issues }),
         })
         const issuesData = await issuesRes.json()
         if (issuesData.ok) {
           const nextIssues = issuesData.issues || []
+          savedIssues = nextIssues
           setClearedPages(prev => ({ ...prev, [activePageId]: false }))
           setPageIssues(prev => ({ ...prev, [activePageId]: nextIssues }))
           setIssues(nextIssues)
+          syncReviewReport(pageContent, nextIssues, result.review ?? null)
         }
-        return issueCount
-      } catch (err: any) {
-        console.error('Re-analysis after apply failed:', err)
-        setError(err.message || 'Re-analysis failed')
-        return 0
+        const report =
+          result.review ??
+          buildWritingReviewReport(
+            pageContent,
+            savedIssues,
+            analysisMode,
+            projects.find((p) => p.id === activeProjectId)?.category
+          )
+        return { count: issueCount, report }
+      } catch (err: unknown) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Re-analysis after apply failed:', err)
+        }
+        setAnalysisFailed(true)
+        setReviewReport(null)
+        setError('Analysis failed. Please try again.')
+        return { count: 0, report: null }
       } finally {
         setIsAnalyzing(false)
       }
     },
-    [activeDocumentId, activePageIndex, pages, getAnalysisMode]
+    [activeDocumentId, activePageIndex, pages, getAnalysisMode, projects, activeProjectId, syncReviewReport]
   )
 
   const applyIssue = async (issue: ProofreadingIssue) => {
-    if (!activeDocumentId || !currentDocument) return
+    if (!activeProjectId) {
+      addToast?.({ title: 'Cannot apply', description: 'Select a project first.', variant: 'default' })
+      return
+    }
 
     const originalText = issue.original_text ?? ''
     const suggestion = (issue.suggestion_text ?? '').trim()
     const isDelete = issue.action === 'delete' || issue.type === 'repetition'
-    // Tip-only (e.g. clarity with no replacement): no-op; Apply is already disabled in UI
     if (!isDelete && !suggestion) return
 
     const activePageContent = pages[activePageIndex]?.content ?? ''
     const activePageId = pages[activePageIndex]?.id
-    const start = issue.start_index ?? (issue as any).startIndex ?? 0
-    const end = issue.end_index ?? (issue as any).endIndex ?? start
     const mode = getAnalysisMode()
 
-    try {
-      const textLen = activePageContent.length
-      const startClamp = Math.max(0, Math.min(start, textLen))
-      const endClamp = Math.max(startClamp, Math.min(end, textLen))
-      const currentSlice = activePageContent.substring(startClamp, endClamp)
+    let docId = activeDocumentId
+    if (!docId) {
+      docId = await ensureDocumentExists(activeProjectId, activePageContent)
+      if (!docId) {
+        addToast?.({ title: 'Cannot apply', description: 'Could not save document. Run analysis first.', variant: 'error' })
+        return
+      }
+    }
 
-      if (currentSlice !== originalText) {
-        addToast?.({ title: 'Text changed', description: 'Re-analyzing to refresh offsets.', variant: 'default' })
+    try {
+      const fixResult = applyTextFix(activePageContent, issue)
+      if (!fixResult.ok) {
+        addToast?.({ title: 'Text changed', description: 'Re-analyzing to refresh positions.', variant: 'default' })
         await runAnalysisWithContent(activePageContent, mode)
         return
       }
 
       setApplyingIssueId(issue.id)
-      // Same apply engine for General and Academic: slice-only, word-boundary preservation
-      let replacement = isDelete ? '' : (issue.suggestion_text ?? '').trim()
-      if (replacement) {
-        const charBefore = startClamp > 0 ? activePageContent[startClamp - 1] : ' '
-        const charAfter = endClamp < activePageContent.length ? activePageContent[endClamp] : ' '
-        if (/[a-zA-Z]/.test(charBefore) && /[a-zA-Z]/.test(replacement[0])) replacement = ' ' + replacement
-        if (/[a-zA-Z]/.test(replacement[replacement.length - 1]) && /[a-zA-Z]/.test(charAfter)) replacement = replacement + ' '
-      }
-      const before = activePageContent.substring(0, startClamp)
-      const after = activePageContent.substring(endClamp)
-      let newContent = before + replacement + after
-      newContent = collapseDoubleSpaces(newContent)
-      newContent = normalizeTrailingDots(newContent)
-      newContent = fixBrokenCapitalizationSpacing(newContent)
+      const newContent = fixResult.content
 
       setPages(prev => {
         const updated = [...prev]
@@ -1338,7 +1555,7 @@ export default function ProofreadingPage() {
       const combinedContent = pages
         .map((p, i) => (i === activePageIndex ? newContent : p.content))
         .join('\n\n--- Page Break ---\n\n')
-      await saveDocument(activeDocumentId, combinedContent)
+      await saveDocument(docId, combinedContent)
 
       const res = await fetch(`/api/proofreading/issues/${issue.id}`, {
         method: 'PATCH',
@@ -1357,7 +1574,9 @@ export default function ProofreadingPage() {
           [activePageId]: (prev[activePageId] || []).filter(i => i.id !== issue.id),
         }))
       }
-      addToast?.({ title: 'Applied', description: 'Re-analyzing…', variant: 'success' })
+      setAppliedHistory(prev => [...prev, { ...issue, status: 'applied' }])
+      setSelectedIssueId(null)
+      addToast?.({ title: 'Fix applied', description: 'Updating score…', variant: 'success' })
       await runAnalysisWithContent(newContent, mode)
     } catch (err: any) {
       console.error('Failed to apply issue:', err)
@@ -1379,7 +1598,7 @@ export default function ProofreadingPage() {
    * 5) After each pass, update editor state; after all passes, re-run analysis in same mode. If General and 0 issues but merged tokens, re-analyze.
    */
   const applyAllIssues = async () => {
-    if (!activeDocumentId || !currentDocument) return
+    if (!activeProjectId) return
     const activePageId = pages[activePageIndex]?.id
     if (!activePageId) return
 
@@ -1392,6 +1611,8 @@ export default function ProofreadingPage() {
           : { grammar: true, style: true, clarity: true }
 
     let content = pages[activePageIndex]?.content ?? ''
+    let totalAppliedCount = 0
+    const appliedBatch: ProofreadingIssue[] = []
     if (!content.trim()) {
       addToast?.({ title: 'No content', description: 'Add text to proofread.', variant: 'default' })
       return
@@ -1400,34 +1621,39 @@ export default function ProofreadingPage() {
     try {
       setIsApplyingAll(true)
       setError(null)
+      const scoreBefore = reviewReport?.score ?? null
+
+      let docId = activeDocumentId
+      if (!docId) {
+        docId = await ensureDocumentExists(activeProjectId, content)
+        if (!docId) {
+          addToast?.({ title: 'Cannot apply', description: 'Could not save document.', variant: 'error' })
+          return
+        }
+      }
 
       for (let pass = 1; pass <= MAX_APPLY_ALL_PASSES; pass++) {
-        const res = await fetch('/api/proofreading/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            documentId: activeDocumentId,
-            content,
-            mode,
-            options,
-          }),
+        const result = await postProofreadingAnalyze({
+          documentId: docId!,
+          content,
+          mode,
+          options,
         })
-        const data = await res.json()
-        if (!data.ok) {
-          setError(data.error || data.message || 'Analysis failed')
+        if (!result.ok) {
+          setAnalysisFailed(true)
+          setError(result.error)
           break
         }
-        const issuesList: Array<{ id?: string; startIndex?: number; endIndex?: number; start_index?: number; end_index?: number; original_text?: string; suggestion_text?: string; type?: string; action?: string }> = data.issues || []
+        const issuesList: Array<{ id?: string; startIndex?: number; endIndex?: number; start_index?: number; end_index?: number; original_text?: string; suggestion_text?: string; type?: string; action?: string }> = result.issues as typeof issuesList
 
         if (issuesList.length === 0) {
           addToast?.({ title: 'Apply All complete', description: 'No issues remaining.', variant: 'success' })
           break
         }
 
-        const sorted = [...issuesList].sort((a, b) => (b.startIndex ?? b.start_index ?? 0) - (a.startIndex ?? a.start_index ?? 0))
+        const sorted = sortIssuesForApply(issuesList as FixableIssue[])
         let currentText = content
         let appliedCount = 0
-        const SEARCH_WINDOW = 80
 
         for (const issue of sorted) {
           const originalText = issue.original_text ?? ''
@@ -1435,55 +1661,36 @@ export default function ProofreadingPage() {
           const isDelete = issue.action === 'delete' || issue.type === 'repetition'
           const hasReplacement = isDelete || (issue.suggestion_text ?? '').trim()
           if (!hasReplacement) continue
-          const expectedStart = issue.startIndex ?? issue.start_index ?? 0
-          const expectedEnd = issue.endIndex ?? issue.end_index ?? expectedStart
-          const textLen = currentText.length
-          let start = Math.max(0, Math.min(expectedStart, textLen))
-          let end = Math.max(start, Math.min(expectedEnd, textLen))
-          let slice = currentText.substring(start, end)
 
-          if (slice !== originalText) {
-            const windowStart = Math.max(0, expectedStart - SEARCH_WINDOW)
-            const windowEnd = Math.min(textLen, expectedStart + SEARCH_WINDOW + originalText.length)
-            const candidates: number[] = []
-            let pos = currentText.indexOf(originalText, windowStart)
-            while (pos !== -1 && pos + originalText.length <= windowEnd) {
-              candidates.push(pos)
-              pos = currentText.indexOf(originalText, pos + 1)
-            }
-            if (candidates.length === 0) continue
-            const closest = candidates.reduce((best, idx) =>
-              Math.abs(idx - expectedStart) < Math.abs(best - expectedStart) ? idx : best
-            )
-            const tie = candidates.filter(idx => Math.abs(idx - expectedStart) === Math.abs(closest - expectedStart))
-            if (tie.length > 1) continue
-            start = closest
-            end = closest + originalText.length
-            slice = currentText.substring(start, end)
-            if (slice !== originalText) continue
-          }
+          const fixResult = applyTextFix(currentText, issue)
+          if (!fixResult.ok) continue
 
-          let replacement = isDelete ? '' : (issue.suggestion_text ?? '')
-          if (replacement) {
-            const charBefore = start > 0 ? currentText[start - 1] : ' '
-            const charAfter = end < textLen ? currentText[end] : ' '
-            const needSpaceBefore = /[a-zA-Z]/.test(charBefore) && /[a-zA-Z]/.test(replacement[0])
-            const needSpaceAfter = /[a-zA-Z]/.test(replacement[replacement.length - 1]) && /[a-zA-Z]/.test(charAfter)
-            if (needSpaceBefore) replacement = ' ' + replacement
-            if (needSpaceAfter) replacement = replacement + ' '
-          }
-          currentText = currentText.substring(0, start) + replacement + currentText.substring(end)
+          currentText = fixResult.content
           appliedCount++
+          totalAppliedCount++
+          appliedBatch.push({
+            id: `apply-all-${pass}-${totalAppliedCount}-${Date.now()}`,
+            document_id: docId!,
+            type: (issue.type ?? 'grammar') as ProofreadingIssue['type'],
+            severity: 'moderate',
+            message: `Applied: ${issue.original_text ?? ''} → ${isDelete ? '(removed)' : (issue.suggestion_text ?? '')}`,
+            original_text: issue.original_text ?? '',
+            suggestion_text: issue.suggestion_text ?? '',
+            start_index: fixResult.start,
+            end_index: fixResult.end,
+            action: isDelete ? 'delete' : 'replace',
+            status: 'applied',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
         }
 
         if (appliedCount === 0) {
-          addToast?.({ title: 'Apply All', description: 'No more fixes could be applied (positions may be stale). Run analysis again if needed.', variant: 'default' })
+          addToast?.({ title: 'Apply all fixes', description: 'No more fixes could be applied (positions may be stale). Run analysis again if needed.', variant: 'default' })
           break
         }
 
-        content = collapseDoubleSpaces(currentText)
-        content = normalizeTrailingDots(content)
-        content = fixBrokenCapitalizationSpacing(content)
+        content = currentText
         setPages((prev) => {
           const updated = [...prev]
           if (updated[activePageIndex]) {
@@ -1496,13 +1703,45 @@ export default function ProofreadingPage() {
         const combinedContent = pages
           .map((p, i) => (i === activePageIndex ? content : p.content))
           .join('\n\n--- Page Break ---\n\n')
-        await saveDocument(activeDocumentId, combinedContent)
+        await saveDocument(docId!, combinedContent)
       }
 
-      const issueCount = await runAnalysisWithContent(content, mode)
+      const { count: issueCount, report: afterReport } = await runAnalysisWithContent(content, mode)
+      if (totalAppliedCount > 0 && appliedBatch.length > 0) {
+        setAppliedHistory(prev => [...prev, ...appliedBatch])
+      }
+      if (totalAppliedCount > 0 && scoreBefore != null && afterReport) {
+        addToast?.({
+          title: `Applied ${totalAppliedCount} improvement${totalAppliedCount === 1 ? '' : 's'}`,
+          description: `Writing score increased from ${scoreBefore} → ${afterReport.score}`,
+          variant: 'success',
+        })
+        setIssueFilter('applied')
+      }
       if (mode === 'general' && issueCount === 0 && content.trim().length > 0 && hasMergedTokens(content)) {
         setError('Possible merged words detected (e.g. missing spaces). Run Analysis again to refresh issues.')
         await runAnalysisWithContent(content, mode)
+      }
+
+      const { emitAiSignal } = await import('@/lib/jobaz-ai/emitSignal')
+      if (totalAppliedCount > 0) {
+        const applyDay = new Date().toISOString().slice(0, 10)
+        void emitAiSignal({
+          type: 'grammar_improved',
+          source: 'writing-review',
+          impact: {
+            readiness: totalAppliedCount >= 3 ? 6 : 4,
+            engagement: 3,
+            englishConfidence: totalAppliedCount >= 3 ? 10 : 6,
+          },
+          metadata: {
+            dedupeId: `${activeDocumentId}-apply-${applyDay}`,
+            document_id: activeDocumentId,
+            applied_count: totalAppliedCount,
+            fixesApplied: true,
+            reviewCompleted: false,
+          },
+        })
       }
     } catch (err: any) {
       console.error('Apply All failed:', err)
@@ -1535,22 +1774,18 @@ export default function ProofreadingPage() {
     try {
       for (let pass = 1; pass <= MAX_AUTO_FIX_PASSES; pass++) {
         setAutoFixPass(pass)
-        const res = await fetch('/api/proofreading/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            documentId: activeDocumentId,
-            content,
-            mode: 'general',
-            options: { spelling: true, grammar: true, style: true, clarity: true },
-          }),
+        const result = await postProofreadingAnalyze({
+          documentId: activeDocumentId,
+          content,
+          mode: 'general',
+          options: { spelling: true, grammar: true, style: true, clarity: true },
         })
-        const data = await res.json()
-        if (!data.ok) {
-          setError(data.error || data.message || 'Analysis failed')
+        if (!result.ok) {
+          setAnalysisFailed(true)
+          setError(result.error)
           break
         }
-        const issuesList: Array<{ startIndex: number; endIndex: number; original_text?: string; suggestion_text?: string; type?: string; action?: string }> = data.issues || []
+        const issuesList: Array<{ startIndex: number; endIndex: number; original_text?: string; suggestion_text?: string; type?: string; action?: string }> = result.issues as typeof issuesList
         setAutoFixRemaining(issuesList.length)
 
         if (issuesList.length === 0) {
@@ -1721,9 +1956,40 @@ export default function ProofreadingPage() {
   }
 
   const filteredIssues = useMemo(() => {
-    if (issueFilter === 'all') return issues
-    return issues.filter(issue => issue.status === issueFilter)
-  }, [issues, issueFilter])
+    if (issueFilter === 'applied') {
+      const fromDb = issues.filter((issue) => issue.status === 'applied')
+      return [...fromDb, ...appliedHistory]
+    }
+    if (issueFilter === 'all') return [...issues, ...appliedHistory]
+    return issues.filter((issue) => issue.status === issueFilter)
+  }, [issues, issueFilter, appliedHistory])
+
+  const issueCounts = useMemo(() => {
+    const dbApplied = issues.filter((i) => i.status === 'applied').length
+    return {
+      all: issues.length + appliedHistory.length,
+      open: issues.filter((i) => i.status === 'open').length,
+      applied: dbApplied + appliedHistory.length,
+      rejected: issues.filter((i) => i.status === 'rejected').length,
+    }
+  }, [issues, appliedHistory])
+
+  const openIssues = useMemo(
+    () => issues.filter((issue) => issue.status === 'open'),
+    [issues]
+  )
+
+  const focusIssueInEditor = useCallback((issueId: string) => {
+    setSelectedIssueId(issueId)
+    requestAnimationFrame(() => {
+      const wrapper = overlayRef.current
+      if (!wrapper) return
+      const mark = wrapper.querySelector(`#pf-issue-${CSS.escape(issueId)}`)
+      if (mark) {
+        mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    })
+  }, [])
 
   // Build highlighted markup from text and issues
   // Validates and clamps ranges to prevent text corruption
@@ -1849,18 +2115,19 @@ export default function ProofreadingPage() {
 
         if (segment.issue) {
           const typeClass = `pf-mark--${segment.issue.type}`
-          return `<mark class="pf-mark ${typeClass}">${escaped}</mark>`
+          const selectedClass = segment.issue.id === selectedIssueId ? ' pf-mark--selected' : ''
+          return `<mark id="pf-issue-${segment.issue.id}" class="pf-mark ${typeClass}${selectedClass}">${escaped}</mark>`
         }
         return escaped
       })
       .join('')
-  }, [])
+  }, [selectedIssueId])
 
-  // Show highlights for filtered issues (respects filter tab) - only for active page
+  // Show highlights for open issues only — matches the actionable issue list
   const highlightedMarkup = useMemo(() => {
     const activePageContent = pages[activePageIndex]?.content || ''
-    return buildHighlightedMarkup(activePageContent, filteredIssues)
-  }, [pages, activePageIndex, filteredIssues, buildHighlightedMarkup])
+    return buildHighlightedMarkup(activePageContent, openIssues)
+  }, [pages, activePageIndex, openIssues, buildHighlightedMarkup])
 
   // Sync scroll: wrapper (overlayRef) is the ONLY scroll container
   // Both overlay and textarea are absolute inside wrapper, so they move together
@@ -1895,15 +2162,6 @@ export default function ProofreadingPage() {
       }
     }
   }, [activePageContent, highlightedMarkup, pages, activePageIndex])
-
-  const issueCounts = useMemo(() => {
-    return {
-      all: issues.length,
-      open: issues.filter(i => i.status === 'open').length,
-      applied: issues.filter(i => i.status === 'applied').length,
-      rejected: issues.filter(i => i.status === 'rejected').length,
-    }
-  }, [issues])
 
   const canRunAnalysis = activeProjectId && (activeDocumentId || activePageContent.trim().length > 0) && activePageContent.trim().length > 0 && !isAnalyzing
 
@@ -1970,53 +2228,42 @@ export default function ProofreadingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] flex items-center justify-center">
+      <div className="min-h-screen jobaz-page-bg flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-violet-400" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 relative overflow-hidden">
-      {/* Background glows - match CV Builder */}
-      <div className="pointer-events-none absolute -top-40 -left-24 h-72 w-72 rounded-full bg-violet-600/30 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-fuchsia-500/25 blur-3xl" />
-
-      <main className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10">
-        {/* Header: vertical order to match CV Builder (Back → Title → BETA → Note top-right) */}
-        <header className="mb-2 pb-2 border-b border-slate-800/60" data-no-translate>
-          <div className="flex flex-col gap-1">
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard')}
-              className="inline-flex items-center gap-1.5 text-xs md:text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors w-fit"
-            >
-              <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
-              Back to Dashboard
-            </button>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <h1 className="text-2xl md:text-3xl font-semibold text-slate-50 m-0 leading-tight">
-                {activeTab === 'proofreading' ? 'Writing Review Workspace' : 'Email Builder'}
-              </h1>
-              {activeTab === 'proofreading' && (
-                <p className="text-xs text-slate-400/90 leading-tight m-0 sm:text-right max-w-md">
-                  This tool supports writing improvement and review, not final authorship. Follow your guidelines and seek human review when required.
-                </p>
-              )}
-            </div>
-            {activeTab === 'proofreading' && (
-              <div className="flex justify-center pt-1">
-                <span className="inline-block text-[11px] md:text-xs text-red-400/80 leading-tight py-1 px-2 rounded border border-red-500/25 bg-red-950/10" title="Writing Review is currently in BETA. This feature is under active development.">
-                  Writing Review is currently in BETA
-                </span>
-              </div>
-            )}
-          </div>
-        </header>
-
-        {/* Tab Navigation */}
-        <div className="mt-4">
-          <div className="flex gap-2 mb-4">
+    <PublicToolLayout
+      title={activeTab === 'proofreading' ? 'Writing Review' : 'Email Builder'}
+      subtitle={
+        activeTab === 'proofreading'
+          ? 'Improve clarity, tone, and structure with AI-powered writing review'
+          : 'Draft professional emails with AI assistance'
+      }
+      guest={guest}
+      notice={
+        activeTab === 'proofreading' ? (
+          <span
+            className="inline-block text-[11px] md:text-xs text-red-400/80 leading-tight py-1 px-2 rounded border border-red-500/25 bg-red-950/10"
+            title="Writing Review is currently in BETA. This feature is under active development."
+          >
+            Writing Review is currently in BETA
+          </span>
+        ) : undefined
+      }
+      headerAside={
+        activeTab === 'proofreading' ? (
+          <p className="text-xs text-slate-400/90 leading-tight m-0">
+            This tool supports writing improvement and review, not final authorship. Follow your
+            guidelines and seek human review when required.
+          </p>
+        ) : undefined
+      }
+    >
+      <div className="mt-4">
+        <div className="flex gap-2 mb-4">
             <button
               onClick={() => setActiveTab('proofreading')}
               className={cn(
@@ -2517,16 +2764,14 @@ export default function ProofreadingPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-slate-400 text-sm min-h-[200px]">
-                Select a project to start editing
-              </div>
+              <AnalysisEmptyState variant="no_project" />
             )}
           </div>
 
           {/* RIGHT COLUMN: Analysis Panel */}
-          <div className="col-span-3 flex flex-col rounded-2xl border border-slate-700/60 bg-slate-950/70 overflow-hidden">
-            <div className="p-4 border-b border-slate-800/60 flex-shrink-0">
-              <h3 className="text-lg font-semibold text-slate-50 mb-3">Analysis</h3>
+          <div className="col-span-3 flex flex-col rounded-2xl border border-slate-700/60 bg-slate-950/70 overflow-hidden shadow-[0_0_40px_rgba(139,92,246,0.08)]">
+            <div className="p-4 border-b border-slate-800/60 flex-shrink-0 space-y-3">
+              <h3 className="text-lg font-semibold text-slate-50">Writing Review</h3>
               
               {/* Run Analysis Button */}
               <div className="mb-3">
@@ -2559,9 +2804,21 @@ export default function ProofreadingPage() {
                 </p>
               </div>
 
-              {/* Auto-Fix (Iterative) — General only; Apply All — General + Academic (Strict for PhD) */}
+              {reviewReport && !analysisFailed && (
+                <div className="space-y-3 animate-in fade-in duration-300 max-h-[32vh] overflow-y-auto pr-1">
+                  <WritingReviewSummary report={reviewReport} />
+                  <ReviewStrengthsPanel report={reviewReport} />
+                  <DocumentInsightsPanel insights={reviewReport.documentInsights} />
+                  <JobAZNextStepsPanel
+                    nextStep={reviewReport.nextJobAZStep}
+                    actions={reviewReport.recommendedActions}
+                  />
+                </div>
+              )}
+
+              {/* Apply all fixes — General + Academic */}
               {(isGeneralMode() || isAcademicProject(activeProjectId)) && (
-                <div className="mb-3 space-y-2">
+                <div className="mb-1 space-y-2">
                   {isGeneralMode() && (
                     <button
                       onClick={runAutoFixLoop}
@@ -2607,7 +2864,7 @@ export default function ProofreadingPage() {
                       ) : (
                         <>
                           <Check className="w-4 h-4" />
-                          {getAnalysisMode() === 'academic_research' ? `Apply All (Strict) (${issueCounts.open})` : `Apply All (${issueCounts.open})`}
+                          {getAnalysisMode() === 'academic_research' ? `Apply all fixes (Strict) (${issueCounts.open})` : `Apply all fixes (${issueCounts.open})`}
                         </>
                       )}
                     </button>
@@ -2660,140 +2917,36 @@ export default function ProofreadingPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {filteredIssues.length === 0 ? (
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+              {analysisFailed ? (
+                <div className="text-center py-8 text-rose-300 text-sm rounded-xl border border-rose-500/20 bg-rose-950/10">
+                  Analysis failed. Please try again.
+                </div>
+              ) : !reviewReport && filteredIssues.length === 0 ? (
+                <AnalysisEmptyState variant="no_analysis" />
+              ) : filteredIssues.length === 0 ? (
                 <div className="text-center py-8 text-slate-400 text-sm">
-                  {issueFilter === 'all' ? 'No issues found' : `No ${issueFilter} issues`}
+                  {issueFilter === 'open' ? 'No open issues — run analysis or switch filter' : `No ${issueFilter} issues`}
                 </div>
               ) : (
-                filteredIssues.map((issue) => (
-                  <div
-                    key={issue.id}
-                    className={cn(
-                      "p-3 rounded-lg border",
-                      issue.status === 'applied'
-                        ? "bg-green-900/20 border-green-700/50"
-                        : issue.status === 'rejected'
-                        ? "bg-slate-800/60 border-slate-700/50"
-                        : "bg-slate-800/60 border-slate-700/60"
-                    )}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span
-                            className={cn(
-                              "inline-block w-2 h-2 rounded-full flex-shrink-0",
-                              issue.type === 'spelling' && "bg-red-400",
-                              issue.type === 'grammar' && "bg-blue-400",
-                              issue.type === 'research_grammar' && "bg-blue-400",
-                              issue.type === 'style' && "bg-amber-400",
-                              issue.type === 'clarity' && "bg-emerald-400",
-                              issue.type === 'word_form' && "bg-cyan-400",
-                              issue.type === 'tense' && "bg-orange-400",
-                              issue.type === 'tense_consistency' && "bg-violet-400",
-                              issue.type === 'repetition' && "bg-rose-400",
-                              issue.type === 'structure' && "bg-pink-400",
-                              issue.type === 'methodology' && "bg-pink-400",
-                              issue.type === 'preposition' && "bg-teal-400",
-                              issue.type === 'agreement' && "bg-emerald-500",
-                              issue.type === 'article' && "bg-amber-400",
-                              issue.type === 'uncountable' && "bg-cyan-400",
-                              issue.type === 'academic_hedging' && "bg-orange-400",
-                              issue.type === 'academic_citation' && "bg-yellow-400",
-                              issue.type === 'academic_tone' && "bg-violet-400",
-                              issue.type === 'academic_objectivity' && "bg-violet-400",
-                              issue.type === 'academic_style' && "bg-amber-400",
-                              issue.type === 'academic_logic' && "bg-pink-400",
-                              issue.type === 'punctuation' && "bg-teal-400",
-                              !['spelling','grammar','research_grammar','style','clarity','word_form','tense','tense_consistency','repetition','structure','methodology','preposition','agreement','article','uncountable','academic_hedging','academic_citation','academic_tone','academic_objectivity','academic_style','academic_logic','punctuation'].includes(issue.type) && "bg-violet-400"
-                            )}
-                            title={issue.type}
-                          />
-                          <span className="text-xs font-semibold text-violet-300 capitalize">{issue.type.replace(/_/g, ' ')}</span>
-                          <span className={cn(
-                            "text-xs px-1.5 py-0.5 rounded",
-                            issue.severity === 'high' ? "bg-red-900/50 text-red-300" :
-                            issue.severity === 'moderate' ? "bg-yellow-900/50 text-yellow-300" :
-                            "bg-blue-900/50 text-blue-300"
-                          )}>
-                            {issue.severity}
-                          </span>
-                          {(!issue.suggestion_text || !issue.suggestion_text.trim()) && issue.type !== 'repetition' && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300">Tip</span>
-                          )}
-                          {issue.type === 'repetition' && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-rose-900/50 text-rose-300">Delete</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-300 mb-1">{issue.message}</div>
-                        <div className="text-xs text-slate-400 font-mono bg-slate-900/50 p-1 rounded mb-1">
-                          {issue.original_text || activePageContent.substring(issue.start_index, issue.end_index)}
-                        </div>
-                        {issue.suggestion_text ? (
-                          <div className="text-xs text-green-400 font-mono bg-slate-900/50 p-1 rounded">
-                            → {issue.suggestion_text}
-                          </div>
-                        ) : issue.type === 'repetition' ? (
-                          <div className="text-xs text-slate-400 italic">Apply to remove duplicate sentence.</div>
-                        ) : null}
-                      </div>
-                    </div>
-                    
-                    {issue.status === 'open' && (
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          onClick={() => applyIssue(issue)}
-                          disabled={
-                            isApplyingAll ||
-                            isAutoFixRunning ||
-                            applyingIssueId !== null ||
-                            !(issue.suggestion_text?.trim() || issue.type === 'repetition' || issue.action === 'delete')
-                          }
-                          className={cn(
-                            "flex-1 px-2 py-1 rounded text-xs font-medium transition flex items-center justify-center gap-1",
-                            (issue.suggestion_text?.trim() || issue.type === 'repetition' || issue.action === 'delete') && !applyingIssueId && !isApplyingAll && !isAutoFixRunning
-                              ? "bg-green-600 hover:bg-green-700"
-                              : "bg-slate-600 cursor-not-allowed opacity-60"
-                          )}
-                        >
-                          {applyingIssueId === issue.id ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Applying…
-                            </>
-                          ) : (
-                            <>
-                              <Check className="w-3 h-3" />
-                              Apply
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => rejectIssue(issue)}
-                          className="flex-1 px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-xs font-medium transition flex items-center justify-center gap-1"
-                        >
-                          <XCircle className="w-3 h-3" />
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                    
-                    {issue.status === 'applied' && (
-                      <div className="text-xs text-green-400 flex items-center gap-1 mt-2">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Applied
-                      </div>
-                    )}
-                    
-                    {issue.status === 'rejected' && (
-                      <div className="text-xs text-slate-400 flex items-center gap-1 mt-2">
-                        <XCircle className="w-3 h-3" />
-                        Rejected
-                      </div>
-                    )}
-                  </div>
-                ))
+                <>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 px-1">
+                    {issueCounts.open} fix{issueCounts.open === 1 ? '' : 'es'} available — click an issue to jump to highlighted text
+                  </p>
+                  {filteredIssues.map((issue) => (
+                    <IssueCard
+                      key={issue.id}
+                      issue={issue}
+                      fallbackOriginal={activePageContent}
+                      onApply={() => applyIssue(issue)}
+                      onReject={() => rejectIssue(issue)}
+                      onFocus={() => focusIssueInEditor(issue.id)}
+                      applying={applyingIssueId === issue.id}
+                      applyDisabled={isApplyingAll || isAutoFixRunning}
+                      selected={selectedIssueId === issue.id}
+                    />
+                  ))}
+                </>
               )}
             </div>
           </div>
@@ -2854,8 +3007,7 @@ export default function ProofreadingPage() {
         variant="danger"
         confirmText="Delete"
       />
-      </main>
-    </div>
+    </PublicToolLayout>
   )
 }
 
@@ -3474,6 +3626,7 @@ function EmailBuilderContent({
           </div>
         </div>
       </div>
+
     </div>
   )
 }

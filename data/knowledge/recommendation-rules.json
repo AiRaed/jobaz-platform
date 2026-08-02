@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "description": "Global JobAZ recommendation rules for Career Assistant, Courses, and Admin AI. Public/business knowledge only.",
+  "rules": [
+    "Published course with live referral URL should be recommended first when relevant.",
+    "Published course without referral URL can show View Details, but Apply Now must be safe.",
+    "Recommendation-only courses must not show Apply Now.",
+    "If no published course exists, recommend the course type only.",
+    "Do not invent providers.",
+    "Do not invent course prices.",
+    "Do not guarantee jobs, income or visas.",
+    "My Plan is the centre of the user journey.",
+    "Career Assistant should give short, practical, action-based plans.",
+    "Admin AI suggests actions; the human founder decides."
+  ]
+}

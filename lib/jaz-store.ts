@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 export type JazMode = 'ask' | 'guide' | 'translate' | 'apply'
+/** @deprecated Tab modes removed — UI is unified. Internal API still uses ask/guide/translate intents. */
 
 export interface JobData {
   title: string

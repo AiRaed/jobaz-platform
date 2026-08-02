@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 import { Check, Sparkles, Zap, Shield, Globe } from 'lucide-react'
 import { Button } from '@/components/button'
-import { ThemeToggle } from '@/components/theme-toggle'
+import JobazThemeToggle from '@/components/JobazThemeToggle'
 import Link from 'next/link'
 
 const features = [
@@ -58,7 +58,7 @@ export default function UpgradePage() {
             <Sparkles className="w-8 h-8 text-violet-accent" />
             <span className="text-2xl font-heading font-bold">AI CV Generator Pro</span>
           </Link>
-          <ThemeToggle />
+          <JobazThemeToggle />
         </div>
       </header>
 

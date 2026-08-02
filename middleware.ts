@@ -1,3 +1,4 @@
+import { buildAuthLoginUrl } from '@/lib/auth/redirect'
 import { NextResponse, type NextRequest } from 'next/server'
 
 /**
@@ -36,24 +37,65 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Public routes that don't require authentication
-  const publicRoutes = ['/', '/auth', '/privacy', '/terms', '/about']
-  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
+  // Public routes — guest-first landing, tools, and browse pages
+  const publicRoutes = [
+    '/',
+    '/auth',
+    '/login',
+    '/signup',
+    '/privacy',
+    '/terms',
+    '/about',
+    '/ai-career-path',
+    '/uk-career-assistant',
+    '/career-assistant',
+    '/career-engine',
+    // Tool pages (canonical + legacy)
+    '/cv-builder',
+    '/cv-builder-v2',
+    '/cover-letter',
+    '/cover',
+    '/writing-review',
+    '/proofreading',
+    '/interview-coach',
+    // Explore (canonical + legacy)
+    '/jobs',
+    '/job-finder',
+    '/courses',
+    '/career-hub',
+    '/opportunities',
+    '/job-details',
+  ]
+  const isPublicRoute = publicRoutes.some(
+    (route) => pathname === route || pathname.startsWith(route + '/')
+  )
+
+  const pathWithSearch = `${pathname}${request.nextUrl.search}`
+
+  // Admin routes: require auth cookie; admin email allowlist is enforced server-side
+  if (pathname.startsWith('/admin')) {
+    if (!user) {
+      return NextResponse.redirect(new URL(buildAuthLoginUrl(pathWithSearch), request.url))
+    }
+    return response
+  }
   
   // Protected routes that require authentication
   const protectedRoutes = [
     '/dashboard',
-    '/job-details',
-    '/cv-builder-v2',
-    '/cover',
-    '/interview-coach',
-    '/interviewSimulation',
-    '/job-finder',
     '/job-setup',
     '/preview',
     '/upgrade',
     '/build-your-path',
-    '/proofreading'
+    '/profile',
+    '/pulse',
+    '/feed',
+    '/hubs',
+    '/messages',
+    '/interviewSimulation',
+    '/email-preferences',
+    '/settings/email-preferences',
+    '/relay',
   ]
   const isProtectedRoute = protectedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
 
@@ -85,7 +127,7 @@ export async function middleware(request: NextRequest) {
   // Handle protected routes
   if (isProtectedRoute) {
     if (!user) {
-      return NextResponse.redirect(new URL('/', request.url))
+      return NextResponse.redirect(new URL(buildAuthLoginUrl(pathWithSearch), request.url))
     }
     // Email confirmation is enforced in auth callback and dashboard (Node); not checked in Edge middleware
   }

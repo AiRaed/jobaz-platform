@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +11,7 @@ export async function POST(req: Request) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY - returning mock improvement')
       // Return a mock improvement
       return NextResponse.json({
@@ -51,8 +47,7 @@ Original bullet:
 Return ONLY the improved bullet point text.
 Do NOT include explanations, headings, or extra formatting.`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -63,11 +58,13 @@ Do NOT include explanations, headings, or extra formatting.`
           content: prompt,
         },
       ],
+      modelTier: 'default',
       temperature: 0.5,
-      max_tokens: 150,
+      maxTokens: 150,
+      feature: 'cv/improve-bullet',
     })
 
-    const improved = completion.choices[0]?.message?.content?.trim()
+    const improved = completion.text?.trim()
 
     if (!improved) {
       throw new Error('No improvement generated')

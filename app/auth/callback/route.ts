@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { sanitizeRedirectPath } from '@/lib/auth/redirect'
 import { logEvent } from '@/lib/analytics/logEvent'
 
 export const dynamic = 'force-dynamic'
@@ -72,7 +73,54 @@ export async function GET(request: NextRequest) {
   // Session exists -> dashboard (recovery already handled above)
   if (data.session) {
     logEvent('login', {}, supabase).catch(() => {})
-    return NextResponse.redirect(new URL('/dashboard?verified=1', baseUrl))
+
+    // Apply signup marketing opt-in once (unchecked by default on signup form)
+    const meta = data.session.user.user_metadata as Record<string, unknown> | undefined
+    if (meta?.marketing_opt_in === true && data.session.user.email) {
+      try {
+        const { createServerSupabaseClient } = await import('@/lib/supabase')
+        const {
+          tableExists,
+          syncLegacyMarketingFlag,
+        } = await import('@/lib/email-campaigns')
+        const admin = createServerSupabaseClient()
+        if (await tableExists(admin, 'user_email_preferences')) {
+          const { data: existing } = await admin
+            .from('user_email_preferences')
+            .select('id')
+            .eq('user_id', data.session.user.id)
+            .maybeSingle()
+          if (!existing) {
+            await admin.from('user_email_preferences').insert({
+              user_id: data.session.user.id,
+              email: data.session.user.email.toLowerCase(),
+              marketing_consent: true,
+              job_alerts: true,
+              course_alerts: true,
+              local_opportunity_alerts: true,
+              career_tips: true,
+              product_updates: true,
+              plan_reminders: true,
+              unsubscribed_all: false,
+              consent_source: 'signup',
+              consented_at: new Date().toISOString(),
+            })
+            await syncLegacyMarketingFlag(
+              admin,
+              data.session.user.email,
+              true,
+              data.session.user.id
+            )
+          }
+        }
+      } catch {
+        // Non-blocking — prefs can be set later
+      }
+    }
+
+    const redirectTo = sanitizeRedirectPath(searchParams.get('redirectTo'))
+    const dest = redirectTo ? `${redirectTo}${redirectTo.includes('?') ? '&' : '?'}verified=1` : '/dashboard?verified=1'
+    return NextResponse.redirect(new URL(dest, baseUrl))
   }
 
   const authUrl = new URL('/auth', baseUrl)

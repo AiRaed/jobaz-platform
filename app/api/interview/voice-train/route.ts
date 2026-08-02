@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       return NextResponse.json({
         ok: true,
@@ -51,12 +47,10 @@ export async function POST(req: NextRequest) {
 
     // Transcribe audio using OpenAI Whisper
     // The OpenAI SDK accepts File objects from FormData directly
-    let transcriptionResponse
+    let transcript: string
     try {
-      transcriptionResponse = await openai.audio.transcriptions.create({
-        file: audioFile,
-        model: 'whisper-1',
-        language: 'en',
+      transcript = await aiProvider.transcribeAudio(audioFile, {
+        feature: 'interview/voice-train',
       })
     } catch (openaiError: any) {
       console.error('VOICE_EVAL_OPENAI_ERROR', openaiError)
@@ -65,8 +59,6 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       )
     }
-
-    const transcript = transcriptionResponse.text
 
     // Check if transcript is empty or too short
     if (!transcript || transcript.trim().length < 10) {
@@ -96,8 +88,7 @@ export async function POST(req: NextRequest) {
     // CHANGE: Made prompt even more explicit about JSON-only output and fallback behavior
     let evaluationCompletion
     try {
-      evaluationCompletion = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+      evaluationCompletion = await aiProvider.generateText({
         messages: [
           {
             role: 'system',
@@ -148,9 +139,11 @@ Remember: Your response must be parseable as valid JSON. No exceptions.`,
             }),
           },
         ],
+        modelTier: 'quality',
         temperature: 0.7,
-        max_tokens: 1500,
-        response_format: { type: 'json_object' },
+        maxTokens: 1500,
+        responseFormat: 'json_object',
+        feature: 'interview/voice-train',
       })
     } catch (openaiError: any) {
       console.error('VOICE_EVAL_OPENAI_ERROR', openaiError)
@@ -160,7 +153,7 @@ Remember: Your response must be parseable as valid JSON. No exceptions.`,
       )
     }
 
-    const evaluationContent = evaluationCompletion.choices[0]?.message?.content
+    const evaluationContent = evaluationCompletion.text
     
     // REFACTOR: Safe fallback evaluation object with default values
     // CHANGE: Created centralized fallback function to ensure consistent structure

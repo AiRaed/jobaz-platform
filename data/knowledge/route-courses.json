@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "description": "Maps career routes to course types. provider_status reflects catalogue state, not invented partnerships.",
+  "mappings": [
+    {
+      "route_id": "extra_income_security",
+      "course_type": "SIA Door Supervisor",
+      "relationship": "next_upgrade",
+      "reason": "Primary licence upgrade after work-now steward/event roles for security progression.",
+      "priority": "high",
+      "provider_status": "opportunity"
+    },
+    {
+      "route_id": "extra_income_security",
+      "course_type": "First Aid at Work",
+      "relationship": "optional",
+      "reason": "Useful add-on for event and steward roles; not required for a good Extra Income plan.",
+      "priority": "medium",
+      "provider_status": "opportunity"
+    },
+    {
+      "route_id": "extra_income_security",
+      "course_type": "SIA CCTV Operator",
+      "relationship": "optional",
+      "reason": "Optional security upgrade after or alongside Door Supervisor interest.",
+      "priority": "medium",
+      "provider_status": "opportunity"
+    },
+    {
+      "route_id": "care_entry_route",
+      "course_type": "Level 2 Diploma in Care",
+      "relationship": "recommended",
+      "reason": "Common formal training step for care entry and progression in the UK.",
+      "priority": "high",
+      "provider_status": "opportunity"
+    },
+    {
+      "route_id": "construction_cscs_route",
+      "course_type": "CSCS Card / Health and Safety in Construction",
+      "relationship": "next_upgrade",
+      "reason": "Core next step for site access and construction entry progression.",
+      "priority": "high",
+      "provider_status": "missing_provider"
+    },
+    {
+      "route_id": "forklift_warehouse_route",
+      "course_type": "Forklift Training",
+      "relationship": "next_upgrade",
+      "reason": "Main upgrade from general warehouse roles toward forklift-capable positions.",
+      "priority": "high",
+      "provider_status": "missing_provider"
+    },
+    {
+      "route_id": "teaching_assistant_tefl_route",
+      "course_type": "Teaching Assistant qualification",
+      "relationship": "recommended",
+      "reason": "Supports Teaching Assistant and classroom support routes.",
+      "priority": "medium",
+      "provider_status": "recommendation_only"
+    },
+    {
+      "route_id": "teaching_assistant_tefl_route",
+      "course_type": "TEFL",
+      "relationship": "recommended",
+      "reason": "Optional or recommended depending on ESOL / language teaching goals; treat as training type until a published provider exists.",
+      "priority": "medium",
+      "provider_status": "recommendation_only"
+    },
+    {
+      "route_id": "engineering_education_route",
+      "course_type": "Professional membership / practical certification",
+      "relationship": "recommended",
+      "reason": "UK professional membership or practical certification depending on the specific engineering path — do not invent a single provider.",
+      "priority": "medium",
+      "provider_status": "recommendation_only"
+    }
+  ]
+}

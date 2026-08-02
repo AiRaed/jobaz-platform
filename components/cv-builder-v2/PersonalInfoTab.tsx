@@ -16,7 +16,7 @@ export default function PersonalInfoTab({ personalInfo, onUpdate }: PersonalInfo
           type="text"
           value={safePersonalInfo.fullName}
           onChange={(e) => onUpdate({ fullName: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+          className="jobaz-input w-full"
           placeholder="John Doe"
         />
       </div>
@@ -27,7 +27,7 @@ export default function PersonalInfoTab({ personalInfo, onUpdate }: PersonalInfo
           type="email"
           value={safePersonalInfo.email}
           onChange={(e) => onUpdate({ email: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+          className="jobaz-input w-full"
           placeholder="john.doe@example.com"
         />
       </div>
@@ -38,7 +38,7 @@ export default function PersonalInfoTab({ personalInfo, onUpdate }: PersonalInfo
           type="tel"
           value={safePersonalInfo.phone || ''}
           onChange={(e) => onUpdate({ phone: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+          className="jobaz-input w-full"
           placeholder="+1 (555) 123-4567"
         />
       </div>
@@ -49,7 +49,7 @@ export default function PersonalInfoTab({ personalInfo, onUpdate }: PersonalInfo
           type="text"
           value={safePersonalInfo.location || ''}
           onChange={(e) => onUpdate({ location: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+          className="jobaz-input w-full"
           placeholder="City, Country"
         />
       </div>
@@ -60,7 +60,7 @@ export default function PersonalInfoTab({ personalInfo, onUpdate }: PersonalInfo
           type="url"
           value={safePersonalInfo.linkedin || ''}
           onChange={(e) => onUpdate({ linkedin: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+          className="jobaz-input w-full"
           placeholder="linkedin.com/in/yourprofile"
         />
       </div>
@@ -71,7 +71,7 @@ export default function PersonalInfoTab({ personalInfo, onUpdate }: PersonalInfo
           type="url"
           value={safePersonalInfo.website || ''}
           onChange={(e) => onUpdate({ website: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+          className="jobaz-input w-full"
           placeholder="yourwebsite.com"
         />
       </div>

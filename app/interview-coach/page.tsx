@@ -5,11 +5,30 @@ import { useSearchParams } from 'next/navigation'
 import { Mic, Play, Square, Save, Edit, Send, Headphones, ChevronDown, ChevronUp, Loader2, EyeOff, CheckCircle2, X, Sparkles } from 'lucide-react'
 import { getJobInfo, getJobContextForAPI } from '@/lib/job-store'
 import InterviewSimulationTab from './InterviewSimulationTab'
-import AppShell from '@/components/layout/AppShell'
-import { playQuestionWithTts, stopQuestionAudio } from '@/lib/tts-helper'
-import PageHeader from '@/components/PageHeader'
+import PublicToolLayout from '@/components/guest-tools/PublicToolLayout'
+import { playQuestionWithTts, playQuestionWithReadyPrompt, stopQuestionAudio } from '@/lib/tts-helper'
 import { cn } from '@/lib/utils'
 import TranslatableText from '@/components/TranslatableText'
+import {
+  InterviewJourneyProgress,
+  InterviewSourceBanner,
+  VoiceRecordingPanel,
+  VoiceMetricsPanel,
+  InterviewCoachNotesPanel,
+  InterviewFinalReport,
+} from '@/components/interview-coach/premium'
+import {
+  computeInterviewReadiness,
+  detectInterviewSource,
+} from '@/lib/interview-coach/briefConfig'
+import { useToolGuestMode } from '@/lib/guest-tools/useToolGuestMode'
+import { GUEST_LIMITS } from '@/lib/guest-tools/constants'
+import {
+  incrementGuestUsage,
+  readGuestDraft,
+  readGuestUsage,
+  writeGuestDraft,
+} from '@/lib/guest-tools/storage'
 
 type TrainingLevel = 'writing' | 'voice' | 'hard' | 'memory' | 'interviewSimulation'
 
@@ -346,6 +365,9 @@ export default function InterviewCoachPage() {
   const jobTitleFromURL = searchParams.get('title') || ''
   const companyFromURL = searchParams.get('company') || ''
   const jobIdFromURL = searchParams.get('jobId') || ''
+  const fromParam = searchParams.get('from')
+  const interviewSource = detectInterviewSource(fromParam, jobIdFromURL)
+  const guest = useToolGuestMode('interview')
   
   // Shared job context state - used across all modes
   const [jobContext, setJobContext] = useState({
@@ -495,6 +517,21 @@ export default function InterviewCoachPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  useEffect(() => {
+    if (!guest.authReady || !guest.isGuest) return
+    const draft = readGuestDraft<{
+      userAnswer?: string
+      currentQuestionIndex?: number
+      writingEvaluations?: typeof writingEvaluations
+      savedWritingAnswers?: string[]
+    }>('interview')
+    if (!draft) return
+    if (draft.userAnswer) setUserAnswer(draft.userAnswer)
+    if (draft.currentQuestionIndex != null) setCurrentQuestionIndex(draft.currentQuestionIndex)
+    if (draft.writingEvaluations) setWritingEvaluations(draft.writingEvaluations)
+    if (draft.savedWritingAnswers) setSavedWritingAnswers(draft.savedWritingAnswers)
+  }, [guest.authReady, guest.isGuest])
+
   // Update hasEvaluatedCurrent when question index changes
   // Check if there's an evaluation result for the current question
   useEffect(() => {
@@ -550,6 +587,9 @@ export default function InterviewCoachPage() {
   const [voiceErrorMessage, setVoiceErrorMessage] = useState<string | null>(null)
   const [voiceResultsHistory, setVoiceResultsHistory] = useState<VoiceResult[]>([])
   const [voiceTrainingCompleted, setVoiceTrainingCompleted] = useState(false)
+  const [voiceIsSpeakingQuestion, setVoiceIsSpeakingQuestion] = useState(false)
+  const [voiceReadyMessage, setVoiceReadyMessage] = useState<string | null>(null)
+  const voiceTtsIndexRef = useRef<number>(-1)
   
   // Hard Mode State
   const [hardModeQuestions, setHardModeQuestions] = useState<HardModeQuestion[]>([])
@@ -610,6 +650,8 @@ export default function InterviewCoachPage() {
   const [interviewSimulationFinished, setInterviewSimulationFinished] = useState(false)
   const [interviewSimulationCoachNotes, setInterviewSimulationCoachNotes] = useState<string[] | null>(null)
   const [interviewSimulationRestartKey, setInterviewSimulationRestartKey] = useState(0)
+  const mockInterviewSignalRef = useRef(false)
+  const interviewStartedModesRef = useRef<Set<string>>(new Set())
   
   // Simulation refs
   const simulationMediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -620,12 +662,46 @@ export default function InterviewCoachPage() {
   const simulationSilenceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const simulationAudioElementRef = useRef<HTMLAudioElement | null>(null)
 
-  const tabs: { id: TrainingLevel; label: string }[] = [
-    { id: 'writing', label: 'Writing Training' },
-    { id: 'voice', label: 'Voice Training' },
-    { id: 'hard', label: 'Hard Mode' },
-    { id: 'interviewSimulation', label: 'Interview Simulation' },
-  ]
+  const overallInterviewReadiness = useMemo(
+    () => computeInterviewReadiness(progress),
+    [progress]
+  )
+
+  useEffect(() => {
+    if (activeTab !== 'voice' || voiceQuestions.length === 0 || voiceTrainingCompleted) return
+    if (isRecording || audioBlob || voiceResult) return
+    if (voiceTtsIndexRef.current === currentVoiceIndex) return
+
+    const question = voiceQuestions[currentVoiceIndex]?.question
+    if (!question) return
+
+    voiceTtsIndexRef.current = currentVoiceIndex
+    setVoiceReadyMessage(null)
+    setVoiceIsSpeakingQuestion(true)
+
+    void playQuestionWithReadyPrompt(
+      formatVoiceQuestionWithContext(question, getFinalJobTitle(), getFinalCompany()),
+      'voice',
+      () => {
+        setVoiceIsSpeakingQuestion(false)
+        setVoiceReadyMessage("I'm ready whenever you are.")
+      },
+      () => {
+        setVoiceIsSpeakingQuestion(false)
+        setVoiceReadyMessage("I'm ready whenever you are.")
+      }
+    )
+
+    return () => stopQuestionAudio()
+  }, [
+    activeTab,
+    currentVoiceIndex,
+    voiceQuestions,
+    voiceTrainingCompleted,
+    isRecording,
+    audioBlob,
+    voiceResult,
+  ])
 
   // Calculate average writing score from evaluations
   const averageWritingScore = useMemo(() => {
@@ -1002,12 +1078,42 @@ export default function InterviewCoachPage() {
       return
     }
 
+    if (guest.isGuest) {
+      const usage = readGuestUsage('interview')
+      if ((usage.questionsAnswered ?? 0) >= GUEST_LIMITS.interviewPracticeQuestions) {
+        guest.promptForAuth('fullAccess')
+        return
+      }
+
+      setSavedWritingAnswers((prev) => [...prev, userAnswer])
+      setWritingEvaluations((prev) => {
+        const existingEval = prev[currentQuestionIndex] || {}
+        return {
+          ...prev,
+          [currentQuestionIndex]: {
+            ...existingEval,
+            savedAnswer: userAnswer,
+          },
+        }
+      })
+      incrementGuestUsage('interview', 'questionsAnswered')
+      writeGuestDraft('interview', {
+        userAnswer,
+        currentQuestionIndex,
+        writingEvaluations,
+        savedWritingAnswers: [...savedWritingAnswers, userAnswer],
+        savedAt: Date.now(),
+      })
+      guest.promptForAuth('fullAccess')
+      return
+    }
+
     setIsSaving(true)
     try {
       // Save to Supabase
       const currentQuestion = interviewQuestions[currentQuestionIndex]
       const questionText = typeof currentQuestion === 'string' ? currentQuestion : String(currentQuestion || '')
-      await fetch('/api/interview/save', {
+      const saveRes = await fetch('/api/interview/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1020,6 +1126,26 @@ export default function InterviewCoachPage() {
           improved_answer: evaluationData?.improvedSampleAnswer || evaluationData?.improved_answer || '',
         }),
       })
+      if (saveRes.ok) {
+        const score = evaluationData?.overallScore || evaluationData?.score || null
+        const isLastQuestion = currentQuestionIndex === interviewQuestions.length - 1
+        void import('@/lib/jobaz-ai/interviewCoachSignals').then(
+          ({ emitInterviewQuestionAnswered, emitInterviewCompleted }) => {
+            emitInterviewQuestionAnswered({
+              mode: 'writing',
+              questionIndex: currentQuestionIndex,
+              score,
+            })
+            if (isLastQuestion) {
+              emitInterviewCompleted({
+                mode: 'writing',
+                score,
+                questionsCompleted: interviewQuestions.length,
+              })
+            }
+          }
+        )
+      }
 
       // Track saved answer for unlock logic
       setSavedWritingAnswers(prev => [...prev, userAnswer])
@@ -1201,6 +1327,22 @@ export default function InterviewCoachPage() {
       loadVoiceQuestions()
     }
   }, [activeTab])
+
+  useEffect(() => {
+    if (interviewStartedModesRef.current.has(activeTab)) return
+    interviewStartedModesRef.current.add(activeTab)
+    void import('@/lib/jobaz-ai/interviewCoachSignals').then(({ emitInterviewStarted }) =>
+      emitInterviewStarted(activeTab)
+    )
+  }, [activeTab])
+
+  useEffect(() => {
+    if (!interviewSimulationFinished || mockInterviewSignalRef.current) return
+    mockInterviewSignalRef.current = true
+    void import('@/lib/jobaz-ai/interviewCoachSignals').then(({ emitMockInterviewCompleted }) =>
+      emitMockInterviewCompleted({ score: interviewSimulationScore })
+    )
+  }, [interviewSimulationFinished, interviewSimulationScore])
 
   // Update voice questions' answers when writingEvaluations changes (if voice tab is active and questions are loaded)
   useEffect(() => {
@@ -1429,6 +1571,14 @@ export default function InterviewCoachPage() {
       }
       
       setVoiceResult(newVoiceResult)
+
+      void import('@/lib/jobaz-ai/interviewCoachSignals').then(({ emitInterviewQuestionAnswered }) =>
+        emitInterviewQuestionAnswered({
+          mode: 'voice',
+          questionIndex: currentVoiceIndex,
+          score: newVoiceResult.scores?.confidence ?? null,
+        })
+      )
       
       // Track voice results history and calculate progress
       setVoiceResultsHistory(prev => {
@@ -1441,6 +1591,12 @@ export default function InterviewCoachPage() {
         const requiredQuestions = 8 // Voice Training always has 8 questions
         if (updatedHistory.length >= requiredQuestions) {
           setVoiceTrainingCompleted(true)
+          void import('@/lib/jobaz-ai/interviewCoachSignals').then(({ emitVoiceTrainingCompleted }) =>
+            emitVoiceTrainingCompleted({
+              questionsCompleted: requiredQuestions,
+              score: newVoiceResult.scores?.confidence ?? null,
+            })
+          )
         }
         
         // Update progress
@@ -1461,6 +1617,8 @@ export default function InterviewCoachPage() {
 
   const handleNextVoiceQuestion = () => {
     if (currentVoiceIndex < voiceQuestions.length - 1) {
+      voiceTtsIndexRef.current = -1
+      setVoiceReadyMessage(null)
       setCurrentVoiceIndex(currentVoiceIndex + 1)
       setVoiceResult(null)
       setAudioBlob(null)
@@ -1866,6 +2024,14 @@ export default function InterviewCoachPage() {
           weaknesses: data.weaknesses || [],
           missedPoints: data.missedPoints || [],
         })
+        void import('@/lib/jobaz-ai/interviewCoachSignals').then(({ emitInterviewCompleted }) =>
+          emitInterviewCompleted({
+            mode: 'memory',
+            score: data.confidenceScore ?? null,
+            questionsCompleted: allAnswers.length,
+            dedupeId: `memory-${new Date().toISOString().slice(0, 10)}`,
+          })
+        )
       } else {
         throw new Error(data.error || 'Evaluation failed')
       }
@@ -2231,13 +2397,16 @@ export default function InterviewCoachPage() {
 
   // Handle tab change
   const handleTabChange = (tab: TrainingLevel) => {
+    if (guest.isGuest && tab !== 'writing') {
+      guest.promptForAuth('fullAccess')
+      return
+    }
     setActiveTab(tab)
   }
 
   // Handle Writing Training completion actions
   const handleStartVoiceTraining = () => {
-    // Voice unlocks automatically after Writing Training is completed
-    setActiveTab('voice')
+    handleTabChange('voice')
   }
 
   const handleRepeatWritingTraining = () => {
@@ -2260,8 +2429,7 @@ export default function InterviewCoachPage() {
   }
   
   const handleContinueToVoiceTraining = () => {
-    // Voice unlocks automatically after Writing Training is completed
-    setActiveTab('voice')
+    handleTabChange('voice')
   }
 
   const handleRepeatVoiceTraining = () => {
@@ -2275,15 +2443,15 @@ export default function InterviewCoachPage() {
   }
 
   const handleContinueToHardMode = () => {
-    setActiveTab('hard')
+    handleTabChange('hard')
   }
 
   const handleContinueToSimulation = () => {
-    setActiveTab('interviewSimulation')
+    handleTabChange('interviewSimulation')
   }
 
   const handleGoToSimulationAnyway = () => {
-    setActiveTab('interviewSimulation')
+    handleTabChange('interviewSimulation')
   }
 
   const handleRepeatHardMode = () => {
@@ -2414,38 +2582,49 @@ export default function InterviewCoachPage() {
   }
 
   return (
-    <AppShell>
-      <PageHeader
-        title="Interview Coach"
-        subtitle="Your 4-step professional training system"
-      />
-
-      {/* Tabs */}
-      <div className="border-b border-gray-800 bg-slate-950/90 backdrop-blur-sm sticky top-0 z-40">
-        <div className="container mx-auto px-3">
-          <div className="flex gap-4">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                data-jaz-action={
-                  tab.id === 'writing' ? 'ic_tab_writing' :
-                  tab.id === 'voice' ? 'ic_tab_voice' :
-                  tab.id === 'hard' ? 'ic_tab_hard' :
-                  tab.id === 'interviewSimulation' ? 'ic_tab_simulation' : undefined
-                }
-                className={`px-2 py-1.5 text-xs font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? 'text-purple-400 border-b-2 border-purple-400'
-                    : 'text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+    <PublicToolLayout
+      title="Interview Coach"
+      subtitle="Your 4-step professional training system"
+      guest={guest}
+      maxWidthClass="max-w-[1440px]"
+      continueGuestLabel="Continue practicing as guest"
+      footer={
+        toast ? (
+          <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
+            <div
+              className={cn(
+                'rounded-lg px-4 py-3 shadow-lg flex items-center gap-2',
+                toast.type === 'success'
+                  ? 'bg-green-600/90 text-white'
+                  : 'bg-red-600/90 text-white'
+              )}
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5" />
+              ) : (
+                <X className="w-5 h-5" />
+              )}
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
           </div>
-        </div>
-      </div>
+        ) : null
+      }
+    >
+
+      <InterviewSourceBanner source={interviewSource} />
+
+      <InterviewJourneyProgress
+        activeTab={
+          (activeTab === 'memory' ? 'hard' : activeTab) as
+            | 'writing'
+            | 'voice'
+            | 'hard'
+            | 'interviewSimulation'
+        }
+        progress={progress}
+        overallReadiness={overallInterviewReadiness}
+        onTabChange={(tab) => handleTabChange(tab as TrainingLevel)}
+      />
 
       {/* Main Content */}
       <div className="container mx-auto px-3 py-4">
@@ -2897,54 +3076,20 @@ export default function InterviewCoachPage() {
                             </div>
 
                             <div className="space-y-3">
-                              {!isRecording && !audioBlob ? (
-                                <button
-                                  onClick={startRecording}
-                                  data-jaz-action="ic_voice_record"
-                                  className="w-full bg-[#9b5cff] hover:bg-[#8a4ae8] text-white px-6 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-lg"
-                                >
-                                  <Mic className="w-5 h-5" />
-                                  Start Recording
-                                </button>
-                              ) : isRecording ? (
-                                <button
-                                  onClick={stopRecording}
-                                  data-jaz-action="ic_voice_stop"
-                                  className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-lg"
-                                >
-                                  <Square className="w-5 h-5" />
-                                  Stop Recording ({formatTime(recordingTime)})
-                                </button>
-                              ) : (
-                                <div className="space-y-2">
-                                  <button
-                                    onClick={startRecording}
-                                    data-jaz-action="ic_voice_record"
-                                    className="w-full bg-gray-700 hover:bg-gray-600 text-white px-6 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-lg"
-                                  >
-                                    <Mic className="w-5 h-5" />
-                                    Record Again
-                                  </button>
-                                  <button
-                                    onClick={handleVoiceSubmit}
-                                    disabled={isAnalyzing}
-                                    data-jaz-action="ic_voice_submit"
-                                    className="w-full bg-[#9b5cff] hover:bg-[#8a4ae8] disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-lg"
-                                  >
-                                    {isAnalyzing ? (
-                                      <>
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                        Analyzing your answer...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Send className="w-5 h-5" />
-                                        Submit Voice Answer
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              )}
+                              <VoiceRecordingPanel
+                                isRecording={isRecording}
+                                hasRecording={Boolean(audioBlob)}
+                                recordingTime={recordingTime}
+                                currentQuestion={currentVoiceIndex + 1}
+                                totalQuestions={voiceQuestions.length}
+                                formatTime={formatTime}
+                                readyMessage={voiceReadyMessage}
+                                isSpeakingQuestion={voiceIsSpeakingQuestion}
+                                onStartRecording={startRecording}
+                                onStopRecording={stopRecording}
+                                onSubmit={handleVoiceSubmit}
+                                isAnalyzing={isAnalyzing}
+                              />
                             </div>
 
                             {/* Error Message */}
@@ -2988,7 +3133,12 @@ export default function InterviewCoachPage() {
               {activeTab === 'hard' && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-2xl font-heading font-semibold mb-4">Hard Mode – Memory Interview</h2>
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-amber-500/40 bg-amber-500/10 text-amber-200">
+                        Memory Challenge
+                      </span>
+                      <h2 className="text-xl font-semibold text-slate-100">Hard Mode – Memory Interview</h2>
+                    </div>
                     
                     {/* Unlock Warning */}
                     {!hardModeUnlocked && (
@@ -3083,6 +3233,12 @@ export default function InterviewCoachPage() {
                       <>
                         {/* Main Card */}
                         <div className="bg-[#0D0D0D] rounded-xl p-6 mb-6 border-2 border-[#9b5cff]/30">
+                          <div className="flex items-start gap-2 mb-4 rounded-lg border border-amber-500/20 bg-amber-950/20 px-3 py-2.5">
+                            <EyeOff className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-100/90">
+                              Answer naturally without looking at previous notes.
+                            </p>
+                          </div>
                           <p className="text-lg text-[#9b5cff] mb-2 font-medium">
                             Question {hardModeIndex + 1} of {hardModeQuestions.length}
                           </p>
@@ -3481,6 +3637,9 @@ export default function InterviewCoachPage() {
                   ) : (
                     <InterviewSimulationTab 
                       key={interviewSimulationRestartKey}
+                      jobTitle={getFinalJobTitle()}
+                      company={getFinalCompany()}
+                      jobId={jobIdFromURL}
                       onScoreUpdate={(score: number | null, finished: boolean) => {
                         setInterviewSimulationScore(score)
                         setInterviewSimulationFinished(finished)
@@ -3489,6 +3648,7 @@ export default function InterviewCoachPage() {
                         setInterviewSimulationCoachNotes(coachNotes)
                       }}
                       onRestart={() => {
+                        mockInterviewSignalRef.current = false
                         setInterviewSimulationRestartKey(k => k + 1)
                       }}
                       coreQuestions={coreQuestions}
@@ -3502,339 +3662,76 @@ export default function InterviewCoachPage() {
 
           {/* Right Column - 30% */}
           <div className="lg:w-[30%] space-y-4">
-            {/* AI Coach Notes Card */}
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-400/60 hover:shadow-[0_18px_50px_rgba(76,29,149,0.7)] transition p-4">
-              <h3 className="text-base font-heading font-semibold mb-3">AI Coach Notes</h3>
-              <div className="text-xs">
-                {activeTab === 'writing' ? (
-                  writingEvaluations[currentQuestionIndex] ? (
-                    <div className="space-y-3">
-                      {/* Strengths */}
-                      {writingEvaluations[currentQuestionIndex].strengths && writingEvaluations[currentQuestionIndex].strengths.length > 0 && (
-                        <div>
-                          <div className="text-sm text-green-400 font-medium mb-2">
-                            <span>Strengths</span>
-                          </div>
-                          <ul className="space-y-1">
-                            {writingEvaluations[currentQuestionIndex].strengths.map((strength, idx) => (
-                              <li key={idx} className="text-xs text-gray-300 flex items-start gap-2">
-                                <span className="text-green-400 mt-1">•</span>
-                                <span>{strength}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+            <InterviewCoachNotesPanel
+              strengths={
+                activeTab === 'writing' && writingEvaluations[currentQuestionIndex]
+                  ? writingEvaluations[currentQuestionIndex].strengths
+                  : activeTab === 'interviewSimulation' && interviewSimulationCoachNotes
+                    ? interviewSimulationCoachNotes.slice(0, 2)
+                    : []
+              }
+              areasToImprove={
+                activeTab === 'writing' && writingEvaluations[currentQuestionIndex]
+                  ? writingEvaluations[currentQuestionIndex].weaknesses
+                  : activeTab === 'interviewSimulation' && interviewSimulationCoachNotes
+                    ? interviewSimulationCoachNotes.slice(2, 4)
+                    : hardModeResult?.improvementTips?.slice(0, 2) ?? []
+              }
+              topPriority={
+                activeTab === 'voice' && voiceResult?.summary_feedback
+                  ? voiceResult.summary_feedback
+                  : hardModeResult?.summaryFeedback
+              }
+              quickTips={
+                activeTab === 'writing' && writingEvaluations[currentQuestionIndex]
+                  ? writingEvaluations[currentQuestionIndex].tips
+                  : voiceResult?.improvement_tips ?? hardModeResult?.improvementTips ?? []
+              }
+              nextGoal={
+                activeTab === 'writing' && writingCompleted
+                  ? 'Move to Voice Training to practice speaking your answers.'
+                  : activeTab === 'voice' && voiceTrainingCompleted
+                    ? 'Continue to Hard Mode to test memory recall.'
+                    : activeTab === 'hard' && hardModeShowCompletion
+                      ? 'Complete the full Interview Simulation.'
+                      : undefined
+              }
+              recommendedPractice={
+                activeTab === 'interviewSimulation' && interviewSimulationFinished
+                  ? 'Repeat simulation or tailor your CV for the target role.'
+                  : 'Evaluate each answer before moving to the next question.'
+              }
+              emptyMessage={
+                activeTab === 'writing'
+                  ? 'Evaluate your answer to see writing tips here.'
+                  : activeTab === 'voice'
+                    ? 'Submit a voice answer to see coaching notes.'
+                    : activeTab === 'hard'
+                      ? 'Record and submit a Hard Mode answer to see tips here.'
+                      : 'Complete a step to see coaching notes.'
+              }
+            />
 
-                      {/* Weaknesses */}
-                      {writingEvaluations[currentQuestionIndex].weaknesses && writingEvaluations[currentQuestionIndex].weaknesses.length > 0 && (
-                        <div>
-                          <div className="text-sm text-orange-400 font-medium mb-2">
-                            <span>Areas to Improve</span>
-                          </div>
-                          <ul className="space-y-1">
-                            {writingEvaluations[currentQuestionIndex].weaknesses.map((weakness, idx) => (
-                              <li key={idx} className="text-xs text-gray-300 flex items-start gap-2">
-                                <span className="text-orange-400 mt-1">•</span>
-                                <span>{weakness}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Tips */}
-                      {writingEvaluations[currentQuestionIndex].tips && writingEvaluations[currentQuestionIndex].tips.length > 0 && (
-                        <div>
-                          <div className="text-sm text-blue-400 font-medium mb-2">
-                            <span>Tips</span>
-                          </div>
-                          <ul className="space-y-1">
-                            {writingEvaluations[currentQuestionIndex].tips.map((tip, idx) => (
-                              <li key={idx} className="text-xs text-gray-300 flex items-start gap-2">
-                                <span className="text-blue-400 mt-1">•</span>
-                                <span>{tip}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-gray-400">Evaluate your answer to see writing tips here.</p>
-                  )
-                ) : activeTab === 'voice' ? (
-                  voiceResult && voiceResult.summary_feedback ? (
-                    <div className="space-y-3">
-                      {/* Summary */}
-                      <div>
-                        <div className="text-sm text-gray-400 font-medium mb-2">
-                          <span>Summary</span>
-                        </div>
-                        <p className="text-xs text-gray-300 whitespace-pre-wrap">
-                          {voiceResult.summary_feedback}
-                        </p>
-                      </div>
-
-                      {/* Tips */}
-                      {voiceResult.improvement_tips && voiceResult.improvement_tips.length > 0 && (
-                        <div>
-                          <div className="text-sm text-blue-400 font-medium mb-2">
-                            <span>Tips</span>
-                          </div>
-                          <ul className="space-y-1">
-                            {voiceResult.improvement_tips.map((tip, idx) => (
-                              <li key={idx} className="text-xs text-gray-300 flex items-start gap-2">
-                                <span className="text-blue-400 mt-1">•</span>
-                                <span>{tip}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-gray-400">Evaluate your answer to see tips here.</p>
-                  )
-                ) : activeTab === 'hard' ? (
-                  hardModeResult ? (
-                    <div className="space-y-3">
-                      {/* Summary Feedback */}
-                      {hardModeResult.summaryFeedback && (
-                        <div>
-                          <div className="text-sm text-gray-400 font-medium mb-2">
-                            <span>Summary Feedback</span>
-                          </div>
-                          <p className="text-xs text-gray-300 whitespace-pre-wrap">
-                            {hardModeResult.summaryFeedback}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Tips */}
-                      {hardModeResult.improvementTips && hardModeResult.improvementTips.length > 0 && (
-                        <div>
-                          <div className="text-sm text-blue-400 font-medium mb-2">
-                            <span>Tips</span>
-                          </div>
-                          <ul className="space-y-1">
-                            {hardModeResult.improvementTips.map((tip, idx) => (
-                              <li key={idx} className="text-xs text-gray-300 flex items-start gap-2">
-                                <span className="text-blue-400 mt-1">•</span>
-                                <span>{tip}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-gray-400">Record and submit a Hard Mode answer to see tips here.</p>
-                  )
-                ) : activeTab === 'interviewSimulation' && interviewSimulationCoachNotes ? (
-                  <ul className="space-y-1">
-                    {interviewSimulationCoachNotes.map((note, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-[#9b5cff] mt-0.5">•</span>
-                        <span className="text-gray-300">{note}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-400">Evaluate your answer to see tips here.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Interview Evaluation Card - Only show for Interview Simulation tab */}
-            {activeTab === 'interviewSimulation' && (
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-400/60 hover:shadow-[0_18px_50px_rgba(76,29,149,0.7)] transition p-4">
-                <h3 className="text-base font-heading font-semibold mb-3">Interview Evaluation</h3>
-                <div className="bg-[#0D0D0D] rounded-xl p-4 border border-gray-800">
-                  {interviewSimulationFinished && interviewSimulationScore !== null ? (
-                    <div className="space-y-4">
-                      {/* Overall Score */}
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-gray-400 font-medium">Overall Interview Score</span>
-                          <span className="text-xl font-bold text-[#9b5cff]">
-                            {interviewSimulationScore.toFixed(1)} / 10
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                          <div
-                            className="h-2 bg-gradient-to-r from-[#9b5cff] to-[#7c3aed] rounded-full transition-all"
-                            style={{ width: `${(interviewSimulationScore / 10) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Category Breakdown */}
-                      <div className="space-y-2 pt-2 border-t border-gray-700">
-                        <div className="text-xs text-gray-400 font-medium mb-2">Category Breakdown</div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Clarity</span>
-                            <span className="text-xs text-[#9b5cff] font-medium">{interviewSimulationScore.toFixed(1)}/10</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Confidence</span>
-                            <span className="text-xs text-[#9b5cff] font-medium">{interviewSimulationScore.toFixed(1)}/10</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Speed</span>
-                            <span className="text-xs text-[#9b5cff] font-medium">{interviewSimulationScore.toFixed(1)}/10</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Tone</span>
-                            <span className="text-xs text-[#9b5cff] font-medium">{interviewSimulationScore.toFixed(1)}/10</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Structure</span>
-                            <span className="text-xs text-[#9b5cff] font-medium">{interviewSimulationScore.toFixed(1)}/10</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Completeness</span>
-                            <span className="text-xs text-[#9b5cff] font-medium">{interviewSimulationScore.toFixed(1)}/10</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Examples</span>
-                            <span className="text-xs text-[#9b5cff] font-medium">{interviewSimulationScore.toFixed(1)}/10</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-400">Complete all questions to see your interview evaluation.</p>
-                  )}
-                </div>
-              </div>
+            {activeTab === 'voice' && voiceResult?.scores && (
+              <VoiceMetricsPanel scores={voiceResult.scores} />
             )}
 
-            {/* Voice Evaluation Panel */}
-            {activeTab === 'voice' && (
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-400/60 hover:shadow-[0_18px_50px_rgba(76,29,149,0.7)] transition p-4">
-                <div className="bg-[#0D0D0D] rounded-xl p-4 border border-[#9b5cff]/30">
-                  <h3 className="text-base font-heading font-semibold mb-3 text-[#9b5cff]">Voice Evaluation</h3>
-                  
-                  {voiceResult && voiceResult.scores ? (
-                    <>
-                      {/* Overall Score - Calculate average of all scores */}
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-gray-400 font-medium">Overall Score</span>
-                          <span className="text-xl font-bold text-[#9b5cff]">
-                            {Math.round(
-                              (voiceResult.scores.clarity +
-                              voiceResult.scores.confidence +
-                              voiceResult.scores.speed +
-                              voiceResult.scores.filler_words +
-                              voiceResult.scores.professional_tone +
-                              voiceResult.scores.structure) / 6
-                            )} / 10
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                          <div
-                            className="h-2 bg-gradient-to-r from-[#9b5cff] to-[#7c3aed] rounded-full transition-all"
-                            style={{ 
-                              width: `${((voiceResult.scores.clarity +
-                              voiceResult.scores.confidence +
-                              voiceResult.scores.speed +
-                              voiceResult.scores.filler_words +
-                              voiceResult.scores.professional_tone +
-                              voiceResult.scores.structure) / 6 / 10) * 100}%` 
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Category Breakdown - Always Expanded */}
-                      <div className="mb-3">
-                        <div className="text-sm text-gray-400 font-medium mb-2">
-                          <span>Category Breakdown</span>
-                        </div>
-                        <div className="space-y-2 pt-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Clarity</span>
-                            <div className="flex items-center gap-2 flex-1 mx-3">
-                              <div className="flex-1 bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="h-1.5 bg-[#9b5cff] rounded-full transition-all"
-                                  style={{ width: `${(voiceResult.scores.clarity / 10) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-[#9b5cff] font-medium w-8 text-right">{voiceResult.scores.clarity}/10</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Confidence</span>
-                            <div className="flex items-center gap-2 flex-1 mx-3">
-                              <div className="flex-1 bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="h-1.5 bg-[#9b5cff] rounded-full transition-all"
-                                  style={{ width: `${(voiceResult.scores.confidence / 10) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-[#9b5cff] font-medium w-8 text-right">{voiceResult.scores.confidence}/10</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Speed</span>
-                            <div className="flex items-center gap-2 flex-1 mx-3">
-                              <div className="flex-1 bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="h-1.5 bg-[#9b5cff] rounded-full transition-all"
-                                  style={{ width: `${(voiceResult.scores.speed / 10) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-[#9b5cff] font-medium w-8 text-right">{voiceResult.scores.speed}/10</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Filler Words</span>
-                            <div className="flex items-center gap-2 flex-1 mx-3">
-                              <div className="flex-1 bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="h-1.5 bg-[#9b5cff] rounded-full transition-all"
-                                  style={{ width: `${(voiceResult.scores.filler_words / 10) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-[#9b5cff] font-medium w-8 text-right">{voiceResult.scores.filler_words}/10</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Professional Tone</span>
-                            <div className="flex items-center gap-2 flex-1 mx-3">
-                              <div className="flex-1 bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="h-1.5 bg-[#9b5cff] rounded-full transition-all"
-                                  style={{ width: `${(voiceResult.scores.professional_tone / 10) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-[#9b5cff] font-medium w-8 text-right">{voiceResult.scores.professional_tone}/10</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Structure</span>
-                            <div className="flex items-center gap-2 flex-1 mx-3">
-                              <div className="flex-1 bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="h-1.5 bg-[#9b5cff] rounded-full transition-all"
-                                  style={{ width: `${(voiceResult.scores.structure / 10) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-[#9b5cff] font-medium w-8 text-right">{voiceResult.scores.structure}/10</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-gray-400">Record and submit your answer to see your voice score and feedback.</p>
-                  )}
-                </div>
-              </div>
+            {activeTab === 'interviewSimulation' && interviewSimulationFinished && interviewSimulationScore !== null && (
+              <InterviewFinalReport
+                scores={{
+                  overall: interviewSimulationScore,
+                  readiness: Math.round((interviewSimulationScore / 10) * 100),
+                  communication: interviewSimulationScore,
+                  confidence: interviewSimulationScore,
+                  professionalTone: interviewSimulationScore,
+                  examples: interviewSimulationScore,
+                  starMethod: interviewSimulationScore,
+                  voiceQuality: interviewSimulationScore,
+                  memory: interviewSimulationScore,
+                  employerImpression: interviewSimulationScore,
+                }}
+                title="Simulation Score"
+              />
             )}
 
             {/* Hard Mode Evaluation Panel */}
@@ -4167,27 +4064,7 @@ export default function InterviewCoachPage() {
         </div>
       </div>
 
-      {/* Toast notification */}
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
-          <div
-            className={cn(
-              'rounded-lg px-4 py-3 shadow-lg flex items-center gap-2',
-              toast.type === 'success'
-                ? 'bg-green-600/90 text-white'
-                : 'bg-red-600/90 text-white'
-            )}
-          >
-            {toast.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5" />
-            ) : (
-              <X className="w-5 h-5" />
-            )}
-            <span className="text-sm font-medium">{toast.message}</span>
-          </div>
-        </div>
-      )}
-    </AppShell>
+    </PublicToolLayout>
   )
 }
 

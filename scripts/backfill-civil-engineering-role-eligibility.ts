@@ -1,0 +1,790 @@
+/**
+ * Backfill eligibility metadata for the 30 Civil Engineering career roles.
+ *
+ * Education stage = academic relevance only — not automatic seniority.
+ * Keeps status = draft. Does not create/delete roles.
+ *
+ *   npx tsx scripts/backfill-civil-engineering-role-eligibility.ts
+ */
+
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+import { createClient } from '@supabase/supabase-js'
+import { normalizeSlug } from '../lib/admin/career-library/guards'
+
+function loadEnvLocal() {
+  const envPath = resolve(process.cwd(), '.env.local')
+  if (!existsSync(envPath)) return
+  const text = readFileSync(envPath, 'utf8')
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim()
+    let val = trimmed.slice(eq + 1).trim()
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
+
+type RoleCategory =
+  | 'graduate_entry'
+  | 'professional_practice'
+  | 'design'
+  | 'site_delivery'
+  | 'project_management'
+  | 'technical_specialist'
+  | 'research'
+  | 'academic'
+  | 'consultancy'
+  | 'leadership'
+
+type SeniorityLevel =
+  | 'entry'
+  | 'early_career'
+  | 'mid_level'
+  | 'senior'
+  | 'principal'
+  | 'leadership'
+  | 'academic_research'
+
+type RegistrationReq = 'none' | 'desirable' | 'commonly_expected' | 'required'
+type AcademicReq =
+  | 'none'
+  | 'degree_relevant'
+  | 'masters_relevant'
+  | 'phd_relevant'
+  | 'accredited_degree_preferred'
+type FitClassification =
+  | 'immediate'
+  | 'realistic_next'
+  | 'future_progression'
+  | 'academic_or_research'
+
+type EligibilitySeed = {
+  stageKey: 'degree' | 'masters' | 'phd'
+  name: string
+  roleCategory: RoleCategory
+  seniorityLevel: SeniorityLevel
+  minimumExperienceYears: number
+  experienceRequirementLabel: string
+  professionalRegistrationRequirement: RegistrationReq
+  professionalMembershipRequirement: RegistrationReq
+  academicRequirement: AcademicReq
+  isResearchRole: boolean
+  isAcademicRole: boolean
+  isRegulatedOrRestricted: boolean
+  eligibilityNote: string
+  fitClassification: FitClassification
+  priority: number
+}
+
+const ELIGIBILITY: EligibilitySeed[] = [
+  // ---- Degree / Bachelor's ----
+  {
+    stageKey: 'degree',
+    name: 'Graduate Civil Engineer',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior industry experience required',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'accredited_degree_preferred',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Suitable as an immediate graduate-entry role. ICE graduate membership is helpful but not required to start.',
+    fitClassification: 'immediate',
+    priority: 10,
+  },
+  {
+    stageKey: 'degree',
+    name: 'Assistant Civil Engineer',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior industry experience required; supervised practice expected',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate entry under supervision. Academic relevance does not imply unsupervised design responsibility.',
+    fitClassification: 'immediate',
+    priority: 20,
+  },
+  {
+    stageKey: 'degree',
+    name: 'Civil Design Engineer',
+    roleCategory: 'design',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years design experience or strong placement background',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Degree makes this academically relevant; employers usually expect some design exposure beyond the degree alone.',
+    fitClassification: 'realistic_next',
+    priority: 30,
+  },
+  {
+    stageKey: 'degree',
+    name: 'Site Engineer',
+    roleCategory: 'site_delivery',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry possible with placement/site experience; otherwise early-career',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Often realistic soon after graduation where site placement experience exists; still an early-career responsibility level.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    stageKey: 'degree',
+    name: 'Highways Engineer',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years highways or infrastructure experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Academically relevant to a civil degree; specialist highways competence develops through project experience.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    stageKey: 'degree',
+    name: 'Drainage Engineer',
+    roleCategory: 'design',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years drainage / SuDS design experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Degree relevance is not the same as drainage design competence; software and standards experience usually required.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    stageKey: 'degree',
+    name: 'Water / Wastewater Engineer (Graduate)',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior industry experience required on graduate schemes',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate graduate pathway into UK water sector schemes; chartership comes later through experience.',
+    fitClassification: 'immediate',
+    priority: 70,
+  },
+  {
+    stageKey: 'degree',
+    name: 'Structural Design Assistant (Civil)',
+    roleCategory: 'design',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry / assistant level under a chartered or senior engineer',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Assistant-level design support. Structural checking/signing is not implied by academic stage alone.',
+    fitClassification: 'immediate',
+    priority: 80,
+  },
+  {
+    stageKey: 'degree',
+    name: 'Infrastructure Engineer',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years multidisciplinary infrastructure experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Realistic next step after graduate entry; project delivery experience matters more than degree title alone.',
+    fitClassification: 'realistic_next',
+    priority: 90,
+  },
+  {
+    stageKey: 'degree',
+    name: 'Civil Engineering Technician / Technician Engineer pathway',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior experience required; EngTech/IEng pathway available',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate technical pathway. Professional registration (EngTech/IEng) is a later goal, not an entry gate.',
+    fitClassification: 'immediate',
+    priority: 100,
+  },
+
+  // ---- Master's ----
+  {
+    stageKey: 'masters',
+    name: 'Civil Design Engineer (Advanced)',
+    roleCategory: 'design',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years progressive design experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'A Master’s strengthens academic fit for complex design; mid-level responsibility still depends on project experience.',
+    fitClassification: 'realistic_next',
+    priority: 10,
+  },
+  {
+    stageKey: 'masters',
+    name: 'Project Engineer (Civil)',
+    roleCategory: 'project_management',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years design/delivery experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s relevance does not replace package ownership experience, programme control, or stakeholder delivery.',
+    fitClassification: 'realistic_next',
+    priority: 20,
+  },
+  {
+    stageKey: 'masters',
+    name: 'Senior Site Engineer',
+    roleCategory: 'site_delivery',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 5,
+    experienceRequirementLabel: 'Typically 5–8 years site engineering experience with team supervision',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'May appear for Master’s graduates as a future progression role. A Master’s alone does not qualify someone for senior site supervision.',
+    fitClassification: 'future_progression',
+    priority: 30,
+  },
+  {
+    stageKey: 'masters',
+    name: 'Geotechnical Engineer',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–4 years geotechnical project experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s in geotechnics is strongly relevant; competent practice still requires site investigation and design experience.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    stageKey: 'masters',
+    name: 'Structural Engineer (Civil Infrastructure)',
+    roleCategory: 'design',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years structural design experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Academic fit is strong at Master’s level; checking/approving structural work depends on experience and often chartership trajectory.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    stageKey: 'masters',
+    name: 'Flood Risk / Hydraulic Engineer',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–4 years hydraulic modelling / FRA experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s study supports academic relevance; UK planning/EA practice competence comes from project delivery.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    stageKey: 'masters',
+    name: 'Transportation / Highways Design Engineer',
+    roleCategory: 'design',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years highways design experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s strengthens fit for advanced highways design; DMRB/geometry delivery experience remains essential.',
+    fitClassification: 'realistic_next',
+    priority: 70,
+  },
+  {
+    stageKey: 'masters',
+    name: 'Bridge Engineer',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 4,
+    experienceRequirementLabel: 'Typically 4–6 years bridge design or assessment experience',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Specialist bridge work is Master’s-relevant but not immediate for new graduates; substantial project experience is expected.',
+    fitClassification: 'future_progression',
+    priority: 80,
+  },
+  {
+    stageKey: 'masters',
+    name: 'Asset Management Engineer (Civil)',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years infrastructure asset or maintenance experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Academic stage indicates relevance; asset strategy roles usually need operational and whole-life cost exposure.',
+    fitClassification: 'realistic_next',
+    priority: 90,
+  },
+  {
+    stageKey: 'masters',
+    name: 'BIM / Digital Engineering Lead (Civil)',
+    roleCategory: 'leadership',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 5,
+    experienceRequirementLabel: 'Typically 5–8 years digital delivery experience, including leadership',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Lead-level title requires delivery leadership. A Master’s does not by itself make this an immediate role.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+
+  // ---- PhD ----
+  {
+    stageKey: 'phd',
+    name: 'Research Associate / Postdoctoral Researcher (Civil Engineering)',
+    roleCategory: 'research',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD (or near completion) is the primary gate; postdoc contracts vary',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: true,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate or near-term academic/research fit after PhD. Not a senior industry practice role.',
+    fitClassification: 'immediate',
+    priority: 10,
+  },
+  {
+    stageKey: 'phd',
+    name: 'University Lecturer / Assistant Professor (Civil Engineering)',
+    roleCategory: 'academic',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel:
+      'Typically postdoctoral research record plus teaching evidence; PhD alone is rarely sufficient',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: true,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'PhD makes the role academically relevant, but appointments usually need publications, teaching experience, and often postdoctoral experience.',
+    fitClassification: 'academic_or_research',
+    priority: 20,
+  },
+  {
+    stageKey: 'phd',
+    name: 'Principal / Specialist Geotechnical Consultant',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'principal',
+    minimumExperienceYears: 12,
+    experienceRequirementLabel: 'Typically 12+ years specialist geotechnical consulting experience',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    eligibilityNote:
+      'PhD may support specialist credibility, but principal consulting requires substantial industry experience and usually chartered status. Not an immediate PhD role.',
+    fitClassification: 'future_progression',
+    priority: 30,
+  },
+  {
+    stageKey: 'phd',
+    name: 'Computational / Numerical Modelling Specialist (Civil)',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–5 years modelling research or applied specialist experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Strong PhD relevance for specialist modelling. Senior client-facing authority still depends on applied delivery experience.',
+    fitClassification: 'academic_or_research',
+    priority: 40,
+  },
+  {
+    stageKey: 'phd',
+    name: 'Innovation / R&D Engineer (Infrastructure)',
+    roleCategory: 'research',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–5 years research or industry R&D experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Realistic for PhD holders with research delivery skills; not equivalent to principal consultancy or expert witness authority.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    stageKey: 'phd',
+    name: 'Climate Resilience / Adaptation Specialist (Civil Infrastructure)',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years climate-risk / resilience project experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'PhD supports academic relevance; advisory specialist roles usually need applied project and stakeholder experience.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    stageKey: 'phd',
+    name: 'Senior Flood Risk Scientist / Hydraulic Modelling Specialist',
+    roleCategory: 'research',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 6,
+    experienceRequirementLabel: 'Typically 6–10 years advanced modelling and specialist delivery experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Senior specialist title. PhD is relevant but does not replace a substantial modelling and project leadership record.',
+    fitClassification: 'future_progression',
+    priority: 70,
+  },
+  {
+    stageKey: 'phd',
+    name: 'Materials / Concrete Technology Specialist',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years materials research or specialist consulting experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'PhD is often valuable for materials specialism; industry authority still grows through applied testing and project advice.',
+    fitClassification: 'realistic_next',
+    priority: 80,
+  },
+  {
+    stageKey: 'phd',
+    name: 'Technical Authority / Expert Witness (Civil Engineering)',
+    roleCategory: 'leadership',
+    seniorityLevel: 'principal',
+    minimumExperienceYears: 15,
+    experienceRequirementLabel:
+      'Typically 15+ years recognised specialist practice; expert witness work is reputation-based',
+    professionalRegistrationRequirement: 'required',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    eligibilityNote:
+      'Must not be presented as an immediate PhD role. Requires substantial specialist career history; PhD alone is insufficient.',
+    fitClassification: 'future_progression',
+    priority: 90,
+  },
+  {
+    stageKey: 'phd',
+    name: 'Research & Innovation Manager (Civil / Infrastructure)',
+    roleCategory: 'leadership',
+    seniorityLevel: 'leadership',
+    minimumExperienceYears: 6,
+    experienceRequirementLabel: 'Typically 6–10 years research leadership or programme management experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Management of research programmes needs leadership experience beyond the PhD award itself.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+]
+
+async function main() {
+  loadEnvLocal()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  }
+
+  const supabase = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const { data: specialism, error: specErr } = await supabase
+    .from('career_library_specialisms')
+    .select('id, name, slug')
+    .eq('slug', 'civil-engineering')
+    .maybeSingle()
+
+  if (specErr || !specialism) {
+    throw new Error(
+      `Civil Engineering specialism not found: ${specErr?.message ?? 'missing row'}`
+    )
+  }
+
+  const { data: model, error: modelErr } = await supabase
+    .from('career_library_stage_models')
+    .select('id')
+    .eq('model_key', 'academic_level')
+    .maybeSingle()
+
+  if (modelErr || !model) {
+    throw new Error(`academic_level stage model not found: ${modelErr?.message ?? 'missing'}`)
+  }
+
+  const { data: stages, error: stagesErr } = await supabase
+    .from('career_library_stages')
+    .select('id, stage_key, label')
+    .eq('stage_model_id', model.id)
+    .in('stage_key', ['degree', 'masters', 'phd'])
+
+  if (stagesErr || !stages?.length) {
+    throw new Error(`Academic stages not found: ${stagesErr?.message ?? 'empty'}`)
+  }
+
+  const stageByKey = new Map(stages.map((s) => [s.stage_key, s]))
+
+  const { data: roles, error: rolesErr } = await supabase
+    .from('career_library_roles')
+    .select('id, name, slug, status, metadata')
+    .eq('specialism_id', specialism.id)
+
+  if (rolesErr) throw new Error(rolesErr.message)
+  if (!roles?.length) throw new Error('No Civil Engineering roles found to backfill.')
+
+  const bySlug = new Map(roles.map((r) => [r.slug, r]))
+  let updated = 0
+  const missing: string[] = []
+  const errors: string[] = []
+
+  for (const seed of ELIGIBILITY) {
+    const baseSlug = normalizeSlug(undefined, seed.name)
+    if (!baseSlug) {
+      missing.push(seed.name)
+      continue
+    }
+    const slug = `${seed.stageKey}-${baseSlug}`
+    const row = bySlug.get(slug)
+    if (!row) {
+      missing.push(`${seed.name} (${slug})`)
+      continue
+    }
+
+    const stage = stageByKey.get(seed.stageKey)
+    if (!stage) {
+      errors.push(`Missing stage ${seed.stageKey} for ${seed.name}`)
+      continue
+    }
+
+    const prevMeta =
+      row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+        ? (row.metadata as Record<string, unknown>)
+        : {}
+
+    const { error } = await supabase
+      .from('career_library_roles')
+      .update({
+        stage_id: stage.id,
+        role_category: seed.roleCategory,
+        seniority_level: seed.seniorityLevel,
+        minimum_experience_years: seed.minimumExperienceYears,
+        experience_requirement_label: seed.experienceRequirementLabel,
+        professional_registration_requirement: seed.professionalRegistrationRequirement,
+        professional_membership_requirement: seed.professionalMembershipRequirement,
+        academic_requirement: seed.academicRequirement,
+        is_research_role: seed.isResearchRole,
+        is_academic_role: seed.isAcademicRole,
+        is_regulated_or_restricted: seed.isRegulatedOrRestricted,
+        eligibility_note: seed.eligibilityNote,
+        priority: seed.priority,
+        sort_order: seed.priority,
+        fit_classification: seed.fitClassification,
+        status: 'draft',
+        active: true,
+        metadata: {
+          ...prevMeta,
+          stage_id: stage.id,
+          stage_key: seed.stageKey,
+          stage_label: stage.label,
+          academic_level: seed.stageKey,
+          specialism_slug: 'civil-engineering',
+          country_focus: 'uk',
+          eligibility_model_version: 1,
+        },
+      })
+      .eq('id', row.id)
+
+    if (error) {
+      errors.push(`${seed.name}: ${error.message}`)
+      continue
+    }
+    updated += 1
+  }
+
+  console.log('\n=== Civil Engineering eligibility backfill ===')
+  console.log(`Specialism: ${specialism.name}`)
+  console.log(`Roles in DB: ${roles.length}`)
+  console.log(`Eligibility seeds: ${ELIGIBILITY.length}`)
+  console.log(`Updated: ${updated}`)
+  console.log(`Missing role rows: ${missing.length}`)
+  if (missing.length) {
+    for (const m of missing) console.log(`  - ${m}`)
+  }
+  if (errors.length) {
+    console.log(`Errors: ${errors.length}`)
+    for (const e of errors) console.log(`  - ${e}`)
+    process.exit(1)
+  }
+
+  if (roles.length !== 30) {
+    console.warn(`Warning: expected 30 Civil roles, found ${roles.length}`)
+  }
+  if (updated !== 30) {
+    console.warn(`Warning: expected 30 updates, completed ${updated}`)
+    process.exit(1)
+  }
+
+  console.log('All 30 Civil Engineering roles remain Draft with eligibility metadata.')
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

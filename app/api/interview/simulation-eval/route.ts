@@ -7,11 +7,7 @@
 // Uses defensive JSON parsing pattern with safe fallbacks similar to memory-eval.
 
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       return NextResponse.json({
         ok: true,
@@ -70,8 +66,7 @@ export async function POST(req: NextRequest) {
 
     let evaluationCompletion
     try {
-      evaluationCompletion = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+      evaluationCompletion = await aiProvider.generateText({
         messages: [
           {
             role: 'system',
@@ -119,9 +114,11 @@ ${answersText}
 Evaluate their overall performance, communication skills, confidence, and problem-solving abilities across all answers. Consider consistency, clarity, completeness, relevance to the job context provided, and overall interview readiness.`,
           },
         ],
+        modelTier: 'quality',
         temperature: 0.7,
-        max_tokens: 2000,
-        response_format: { type: 'json_object' },
+        maxTokens: 2000,
+        responseFormat: 'json_object',
+        feature: 'interview/simulation-eval',
       })
     } catch (openaiError: any) {
       console.error('SIMULATION_EVAL_OPENAI_ERROR', openaiError)
@@ -131,7 +128,7 @@ Evaluate their overall performance, communication skills, confidence, and proble
       )
     }
 
-    const evaluationContent = evaluationCompletion.choices[0]?.message?.content
+    const evaluationContent = evaluationCompletion.text
 
     // Safe fallback evaluation object with default values
     // This ensures we always return a valid response even if parsing/validation fails

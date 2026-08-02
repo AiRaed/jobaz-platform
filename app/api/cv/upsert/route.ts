@@ -74,7 +74,8 @@ export async function POST(req: NextRequest) {
     console.log('[CV Upsert] Authenticated user id:', user.id)
 
     // Extract title and data from request body
-    const title = body.title ?? 'My CV'
+    const title =
+      !body.title || body.title === 'My CV' ? 'Main CV' : String(body.title)
     const data = body.data
 
     if (!data) {

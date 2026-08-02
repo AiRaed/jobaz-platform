@@ -48,7 +48,7 @@ export default function EducationTab({ education, onUpdate }: EducationTabProps)
                 type="text"
                 value={edu.degree}
                 onChange={(e) => updateEducation(index, { degree: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                className="jobaz-input w-full text-sm"
                 placeholder="Bachelor of Science in Computer Science"
               />
             </div>
@@ -59,7 +59,7 @@ export default function EducationTab({ education, onUpdate }: EducationTabProps)
                 type="text"
                 value={edu.school}
                 onChange={(e) => updateEducation(index, { school: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                className="jobaz-input w-full text-sm"
                 placeholder="University Name"
               />
             </div>
@@ -71,7 +71,7 @@ export default function EducationTab({ education, onUpdate }: EducationTabProps)
                   type="text"
                   value={edu.year || ''}
                   onChange={(e) => updateEducation(index, { year: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                  className="jobaz-input w-full text-sm"
                   placeholder="2020"
                 />
               </div>
@@ -83,7 +83,7 @@ export default function EducationTab({ education, onUpdate }: EducationTabProps)
                 value={edu.details || ''}
                 onChange={(e) => updateEducation(index, { details: e.target.value })}
                 rows={2}
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm resize-y"
+                className="jobaz-input w-full text-sm resize-y"
                 placeholder="Honors, GPA, relevant coursework, etc."
               />
             </div>

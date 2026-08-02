@@ -52,6 +52,12 @@ export default function BuildYourPathPage() {
     }
   }, [searchParams])
 
+  useEffect(() => {
+    void import('@/lib/jobaz-ai/skillPathSignals').then(({ emitSkillPathViewed }) =>
+      emitSkillPathViewed()
+    )
+  }, [])
+
   // Handle tag prefilter and highlight matching card
   useEffect(() => {
     const tag = searchParams.get('tag')
@@ -131,6 +137,15 @@ export default function BuildYourPathPage() {
               key={path.id}
               ref={isHighlighted ? highlightedCardRef : null}
               href={pathHref}
+              onClick={() => {
+                void import('@/lib/jobaz-ai/skillPathSignals').then(({ emitSkillGoalSelected }) =>
+                  emitSkillGoalSelected({
+                    pathId: path.id,
+                    pathName: path.title,
+                    goalType: 'path',
+                  })
+                )
+              }}
               className={cn(
                 "group relative overflow-hidden rounded-2xl border bg-slate-950/50",
                 "p-6 hover:border-violet-500/50 hover:shadow-[0_0_40px_rgba(139,92,246,0.3)]",

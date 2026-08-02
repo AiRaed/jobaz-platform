@@ -9,21 +9,38 @@ import { supabase } from './supabase'
 let cachedUserId: string | null = null
 
 /**
- * Initialize user ID cache by listening to auth state changes
- * Call this once in your app (e.g., in a root component or layout)
+ * Initialize user ID cache from Supabase auth.getUser() — never from stale session alone.
  */
 export function initUserStorageCache() {
   if (typeof window === 'undefined') return
-  
-  // Get initial user ID
-  supabase.auth.getUser().then(({ data: { user } }) => {
-    cachedUserId = user?.id || null
+
+  void supabase.auth.getUser().then(({ data: { user } }) => {
+    cachedUserId = user?.id ?? null
   })
-  
-  // Listen for auth state changes
-  supabase.auth.onAuthStateChange((_event, session) => {
-    cachedUserId = session?.user?.id || null
+
+  supabase.auth.onAuthStateChange((_event, _session) => {
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      const nextId = user?.id ?? null
+      if (cachedUserId && nextId && cachedUserId !== nextId) {
+        console.warn('[auth] user storage cache account switch', {
+          previous: cachedUserId,
+          next: nextId,
+        })
+      }
+      cachedUserId = nextId
+    })
   })
+}
+
+/** Sync in-memory cache to verified auth.users.id (call after getUser()). */
+export function syncCachedUserIdFromAuth(authUserId: string | null): void {
+  if (cachedUserId && authUserId && cachedUserId !== authUserId) {
+    console.warn('[auth] syncCachedUserIdFromAuth correcting stale cache', {
+      stale: cachedUserId,
+      authUserId,
+    })
+  }
+  cachedUserId = authUserId
 }
 
 /**
@@ -40,8 +57,10 @@ export function getCurrentUserIdSync(): string | null {
  */
 export async function getCurrentUserId(): Promise<string | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    cachedUserId = user?.id || null
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    cachedUserId = user?.id ?? null
     return cachedUserId
   } catch (error) {
     console.error('Error getting current user ID:', error)

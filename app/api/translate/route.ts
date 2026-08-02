@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { getOpenAiModel } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: getOpenAiModel(),
       messages: [
         { role: 'system', content: 'You are a professional translator.' },
         { role: 'user', content: `Translate the following text into natural, professional English. Preserve the meaning and tone:\n\n${text}` }

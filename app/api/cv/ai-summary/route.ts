@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 type CareerDomain = 'tech' | 'design' | '3d_animation' | 'hospitality' | 'production' | 'customer_service' | 'supervisor' | 'general'
 
@@ -96,7 +92,7 @@ export async function POST(req: Request) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       return NextResponse.json({
         ok: true,
@@ -265,8 +261,7 @@ ${summary}${domainHint}
 Return only the improved summary text.`
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -277,11 +272,13 @@ Return only the improved summary text.`
           content: userPrompt,
         },
       ],
+      modelTier: 'quality',
       temperature: 0.7,
-      max_tokens: 300,
+      maxTokens: 300,
+      feature: 'cv/ai-summary',
     })
 
-    const improvedSummary = completion.choices[0]?.message?.content || (isKeywordGeneration ? '' : summary)
+    const improvedSummary = completion.text || (isKeywordGeneration ? '' : summary)
 
     return NextResponse.json({
       ok: true,

@@ -4,8 +4,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { ChevronDown, LogOut, LayoutDashboard, User } from 'lucide-react'
+import { Activity, ChevronDown, LayoutDashboard, LogOut, MessageSquare, User } from 'lucide-react'
 import { clearCurrentUserStorage, initUserStorageCache } from '@/lib/user-storage'
+import { clearCachesOnLogout } from '@/lib/career-engine/clearSharedCareerCache'
+import { resetAssessmentLoaderUserCache } from '@/lib/dashboard/careerOs/assessmentLoader'
+import AdminNavLink from '@/components/admin/AdminNavLink'
 
 export default function UserMenu() {
   const router = useRouter()
@@ -78,24 +81,23 @@ export default function UserMenu() {
 
   const handleLogout = async () => {
     try {
-      // Get user ID before signing out (needed to clear user-scoped storage)
       const { data: { user } } = await supabase.auth.getUser()
       const userId = user?.id || null
-      
-      // Sign out from Supabase
+
       await supabase.auth.signOut()
-      
-      // Clear all user-scoped localStorage data
-      if (typeof window !== 'undefined' && userId) {
-        await clearCurrentUserStorage()
+
+      if (typeof window !== 'undefined') {
+        clearCachesOnLogout()
+        resetAssessmentLoaderUserCache()
+        if (userId) {
+          await clearCurrentUserStorage()
+        }
       }
-      
-      // Redirect to landing page
+
       router.push('/')
-      router.refresh() // Force refresh to clear any cached state
+      router.refresh()
     } catch (error) {
       console.error('Error signing out:', error)
-      // Still redirect on error to ensure user is logged out
       router.push('/')
     }
   }
@@ -141,15 +143,45 @@ export default function UserMenu() {
               )}
             </div>
 
-            {/* Dashboard link */}
             <Link
               href="/dashboard"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/50 transition-colors"
             >
               <LayoutDashboard className="w-4 h-4 text-slate-400" />
-              Dashboard
+              My Workspace
             </Link>
+
+            <Link
+              href="/profile"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/50 transition-colors"
+            >
+              <User className="w-4 h-4 text-slate-400" />
+              Career Identity
+            </Link>
+
+            <Link
+              href="/messages"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/50 transition-colors"
+            >
+              <MessageSquare className="w-4 h-4 text-slate-400" />
+              Relay
+            </Link>
+
+            <Link
+              href="/feed"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/50 transition-colors"
+            >
+              <Activity className="w-4 h-4 text-slate-400" />
+              Pulse Activity
+            </Link>
+
+            <div onClick={() => setIsOpen(false)}>
+              <AdminNavLink variant="menu" />
+            </div>
 
             {/* Log out */}
             <button

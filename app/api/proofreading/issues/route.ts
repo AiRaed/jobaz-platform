@@ -149,8 +149,8 @@ export async function POST(req: NextRequest) {
         message: issue.message,
         original_text: issue.original_text || issue.originalText || '',
         suggestion_text: issue.suggestion_text ?? issue.suggestionText ?? issue.suggestion ?? '',
-        start_index: issue.start ?? issue.startIndex,
-        end_index: issue.end ?? issue.endIndex,
+        start_index: issue.start_index ?? issue.start ?? issue.startIndex,
+        end_index: issue.end_index ?? issue.end ?? issue.endIndex,
         status: 'open',
       }))
 

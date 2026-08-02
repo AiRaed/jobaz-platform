@@ -1,0 +1,977 @@
+/**
+ * Populate Career Knowledge Library roles for Architecture only.
+ *
+ * Focus: Part 1/Part 2 architectural assistants, architectural design (non-protected
+ * titles), ARB-registered Architect pathways, BIM, architectural technology (CIAT),
+ * urban design within practice, sustainability, conservation/heritage, visualisation,
+ * digital/computational design, research/academia, practice management & consultancy.
+ *
+ * Critical: “Architect” is a UK protected title — only used where ARB registration
+ * is required. Degree/Master’s/PhD alone never imply registration or seniority.
+ *
+ * Leave under other specialisms: Structural Engineering, Quantity Surveying,
+ * Urban Planning (policy), Interior Design, Construction Management, Civil Engineering.
+ *
+ * Sources: National Careers Service, Prospects, ARB, RIBA, CIAT, GOV.UK Regulated
+ * Professions Register.
+ *
+ *   npx tsx scripts/populate-career-library-architecture-roles.ts
+ */
+
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { normalizeSlug } from '../lib/admin/career-library/guards'
+import type {
+  CareerLibraryAcademicRequirement,
+  CareerLibraryFitClassification,
+  CareerLibraryRegistrationRequirement,
+  CareerLibraryRoleCategory,
+  CareerLibrarySeniorityLevel,
+} from '../lib/admin/career-library/types'
+
+function loadEnvLocal() {
+  const envPath = resolve(process.cwd(), '.env.local')
+  if (!existsSync(envPath)) return
+  const text = readFileSync(envPath, 'utf8')
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim()
+    let val = trimmed.slice(eq + 1).trim()
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
+
+type StageKey = 'degree' | 'masters' | 'phd'
+
+type RoleSeed = {
+  name: string
+  description: string
+  roleCategory: CareerLibraryRoleCategory
+  seniorityLevel: CareerLibrarySeniorityLevel
+  minimumExperienceYears: number
+  experienceRequirementLabel: string
+  professionalRegistrationRequirement: CareerLibraryRegistrationRequirement
+  professionalMembershipRequirement: CareerLibraryRegistrationRequirement
+  academicRequirement: CareerLibraryAcademicRequirement
+  isResearchRole: boolean
+  isAcademicRole: boolean
+  isRegulatedOrRestricted: boolean
+  /** UK protected title where applicable; stored in metadata (no dedicated column). */
+  protectedTitle: string | null
+  regulatedStatus: string | null
+  eligibilityNote: string
+  fitClassification: CareerLibraryFitClassification
+  priority: number
+}
+
+const DEGREE_ROLES: RoleSeed[] = [
+  {
+    name: 'Part 1 Architectural Assistant',
+    description:
+      'Supports design development, drawings, models and documentation in a UK architectural practice while completing or holding ARB/RIBA Part 1 (or equivalent Stage 1 training).',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Part 1 (or near completion); year-out roles common',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'accredited_degree_preferred',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'Not a registered Architect role; Part 1 assistant pathway',
+    eligibilityNote:
+      'Immediate after Part 1. Must not use the protected title Architect. RIBA student/associate membership desirable for PEDR support.',
+    fitClassification: 'immediate',
+    priority: 10,
+  },
+  {
+    name: 'Architectural Assistant (Graduate / Year-Out)',
+    description:
+      'Entry practice role supporting studios with CAD/BIM drawings, design options, presentations and site information under registered architects.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior practice experience required; portfolio expected',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'Not a registered Architect role',
+    eligibilityNote:
+      'Immediate graduate/year-out assistant role. Degree alone does not confer ARB registration or Architect title.',
+    fitClassification: 'immediate',
+    priority: 20,
+  },
+  {
+    name: 'Architectural Designer (Junior)',
+    description:
+      'Contributes to concept and developed design packages, visual communication and design development without using the protected title Architect.',
+    roleCategory: 'design',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry via Part 1 / architecture degree; portfolio essential',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'Non-protected design title; not ARB Architect',
+    eligibilityNote:
+      'Immediate design-support pathway using a non-protected title. Distinct from Interior Design-only roles.',
+    fitClassification: 'immediate',
+    priority: 30,
+  },
+  {
+    name: 'BIM Coordinator (Architecture)',
+    description:
+      'Coordinates architectural BIM models, clash/issue tracking and information exchanges with consultants under a BIM lead or project architect.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years architectural BIM experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Realistic next step once studio BIM fundamentals are in place. Not Construction Management site-delivery leadership.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    name: 'Architectural Visualisation Specialist (Junior)',
+    description:
+      'Produces architectural renders, animations and presentation graphics to communicate design proposals for practices and clients.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Portfolio of visualisation work; degree or strong self-taught pathway',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'none',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Immediate visualisation pathway. Does not imply ARB registration or Architect title.',
+    fitClassification: 'immediate',
+    priority: 50,
+  },
+  {
+    name: 'Junior Architectural Technologist (CIAT pathway)',
+    description:
+      'Supports technical design, detailing, specifications and regulatory compliance packages, aligned with CIAT architectural technology development.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Architecture/architectural technology degree or equivalent',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'CIAT membership pathway; not ARB Architect title',
+    eligibilityNote:
+      'Immediate CIAT-relevant technology pathway within Architecture. Not Structural Engineering design ownership.',
+    fitClassification: 'immediate',
+    priority: 60,
+  },
+  {
+    name: 'Digital Design Assistant (Architecture)',
+    description:
+      'Supports digital modelling, parametric studies and design communication tools within architectural studios.',
+    roleCategory: 'design',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior industry experience required; strong digital portfolio helpful',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Immediate digital design support role. Not a pure software/AI engineering pathway.',
+    fitClassification: 'immediate',
+    priority: 70,
+  },
+  {
+    name: 'Sustainable Design Support (Architecture Graduate)',
+    description:
+      'Supports environmental design analysis, material choices and sustainability documentation within architectural project teams.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–2 years studio experience or strong sustainability modules',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Realistic next after Part 1 design foundations. Consultant-level sustainability advice usually needs further experience.',
+    fitClassification: 'realistic_next',
+    priority: 80,
+  },
+  {
+    name: 'Assistant Urban Designer (Architectural Practice)',
+    description:
+      'Supports masterplanning graphics, public-realm design studies and urban design packages within architecture or multidisciplinary design practices.',
+    roleCategory: 'design',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years design studio experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Architectural urban design support — not pure Urban Planning policy/plan-making roles.',
+    fitClassification: 'realistic_next',
+    priority: 90,
+  },
+  {
+    name: 'Architecture Studio Technician / Support',
+    description:
+      'Provides drawing production, model-making, document control and studio technical support in architectural practices.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior experience required; relevant diploma/degree helpful',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Immediate studio support pathway. Not Construction Management site delivery or Quantity Surveying cost roles.',
+    fitClassification: 'immediate',
+    priority: 100,
+  },
+]
+
+const MASTERS_ROLES: RoleSeed[] = [
+  {
+    name: 'Part 2 Architectural Assistant',
+    description:
+      'Takes greater design and technical responsibility in practice while holding or completing ARB/RIBA Part 2 (MArch/Diploma or equivalent), preparing toward Part 3.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Part 2 (or near completion) plus practice experience preferred',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'Not a registered Architect role; Part 2 assistant pathway',
+    eligibilityNote:
+      'Immediate for Part 2 holders. Master’s alone does not allow use of the protected title Architect; Part 3 + ARB registration still required.',
+    fitClassification: 'immediate',
+    priority: 10,
+  },
+  {
+    name: 'Architectural Technologist',
+    description:
+      'Delivers technical design, detailing, specifications and compliance packages; commonly progresses via Chartered Architectural Technologist (CIAT) pathways.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years architectural technology experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'CIAT chartered pathway; not ARB Architect title',
+    eligibilityNote:
+      'CIAT-relevant architecture technology role. Not Structural Engineering structural design ownership.',
+    fitClassification: 'realistic_next',
+    priority: 20,
+  },
+  {
+    name: 'BIM Manager (Architecture)',
+    description:
+      'Leads architectural BIM standards, information management and multidisciplinary model coordination for practice or project portfolios.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 4,
+    experienceRequirementLabel: 'Typically 4–8 years BIM/digital delivery experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Experience-led digital leadership. Master’s alone is not automatic BIM Manager seniority.',
+    fitClassification: 'future_progression',
+    priority: 30,
+  },
+  {
+    name: 'Computational Design Specialist',
+    description:
+      'Applies parametric, algorithmic and performance-driven design methods to architectural projects and research-led practice work.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years computational/digital design experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Specialist design-computation pathway. Does not imply ARB registration.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    name: 'Digital Design Specialist (Architecture)',
+    description:
+      'Leads advanced digital modelling, design technology workflows and studio digital capability for architectural delivery.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years architectural digital design experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Master’s-relevant specialist role. Not a pure software engineering title.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    name: 'Sustainable Design Consultant (Architecture)',
+    description:
+      'Advises architectural teams on low-carbon design, energy/comfort strategies, materials and sustainability certification pathways.',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–7 years sustainable architectural design experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Consultant-level sustainability advice needs demonstrated project experience beyond postgraduate study.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    name: 'Urban Designer (Architecture / Masterplanning)',
+    description:
+      'Develops masterplans, urban design frameworks and public-realm design within architecture or urban design practices.',
+    roleCategory: 'design',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years urban design or architectural masterplanning experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Design/masterplanning focus within Architecture — not pure Urban Planning policy or local-plan roles.',
+    fitClassification: 'realistic_next',
+    priority: 70,
+  },
+  {
+    name: 'Heritage Consultant (Built Environment)',
+    description:
+      'Advises on heritage significance, conservation principles and planning submissions for historic buildings and settings (non-protected title).',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–7 years heritage/conservation project experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'Non-protected consultant title; Conservation Architect roles require ARB if titled Architect',
+    eligibilityNote:
+      'Uses non-protected Heritage Consultant title. Conservation Architect (protected Architect title) is a separate ARB-registered pathway.',
+    fitClassification: 'realistic_next',
+    priority: 80,
+  },
+  {
+    name: 'Design Manager (Architecture)',
+    description:
+      'Coordinates design team outputs, consultant interfaces, programme and quality for architectural projects from concept through technical design.',
+    roleCategory: 'project_management',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 4,
+    experienceRequirementLabel: 'Typically 4–8 years architectural project delivery experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'Title does not itself confer Architect status; ARB required if practising as Architect',
+    eligibilityNote:
+      'Experience-led design management. Not Construction Management site delivery or Quantity Surveying commercial roles.',
+    fitClassification: 'future_progression',
+    priority: 90,
+  },
+  {
+    name: 'Architect (ARB Registered)',
+    description:
+      'Practises as a UK registered Architect after Part 1–3 (or successor ARB route), designing and leading building projects within statutory and professional standards.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel:
+      'Part 3 (or ARB practice qualification) + typically 24 months recorded practical experience; then ARB registration',
+    professionalRegistrationRequirement: 'required',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    protectedTitle: 'Architect',
+    regulatedStatus: 'ARB registration required to use protected title Architect',
+    eligibilityNote:
+      'NOT immediate from Master’s alone. Requires Part 3/practice qualification, practical experience and ARB registration. RIBA Chartered membership desirable but separate from statutory registration.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+]
+
+const PHD_ROLES: RoleSeed[] = [
+  {
+    name: 'Built Environment Researcher / Research Associate',
+    description:
+      'Conducts postdoctoral or contract research on architecture, cities, sustainability or digital design in UK universities or research centres.',
+    roleCategory: 'research',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD (or near completion) in architecture or closely related built-environment field',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'Research role; PhD does not confer ARB Architect status',
+    eligibilityNote:
+      'Academic/research fit. A PhD is not ARB registration and not automatic practice seniority.',
+    fitClassification: 'academic_or_research',
+    priority: 10,
+  },
+  {
+    name: 'Architecture Lecturer / Assistant Professor',
+    description:
+      'Delivers studio teaching, lectures and research in architecture schools within UK higher education.',
+    roleCategory: 'academic',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD and/or significant practice experience typically expected; teaching portfolio valued',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: true,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: 'Academic role; ARB only required if also practising/using Architect title',
+    eligibilityNote:
+      'Academic pathway. Teaching ability and publications/practice track record often matter as much as the PhD. Not automatic Architect status.',
+    fitClassification: 'academic_or_research',
+    priority: 20,
+  },
+  {
+    name: 'Architectural Research Fellow',
+    description:
+      'Holds a fellowship developing independent architectural research, often combining design research, publications and grant-funded projects.',
+    roleCategory: 'research',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD with strong research proposal/output; postdoctoral experience often preferred',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Competitive research fellowship pathway. Does not imply ARB registration or practice directorship.',
+    fitClassification: 'academic_or_research',
+    priority: 30,
+  },
+  {
+    name: 'Design Researcher (Architecture)',
+    description:
+      'Leads design-research agendas spanning practice-based research, prototyping, social impact or advanced design methods.',
+    roleCategory: 'research',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD or equivalent practice-based research track record',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus: null,
+    eligibilityNote:
+      'Research specialist fit. Practice leadership still requires professional experience beyond the doctorate.',
+    fitClassification: 'academic_or_research',
+    priority: 40,
+  },
+  {
+    name: 'Project Architect',
+    description:
+      'Leads day-to-day architectural delivery of projects, coordinating design, consultants, statutory submissions and site queries as an ARB-registered Architect.',
+    roleCategory: 'project_management',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 5,
+    experienceRequirementLabel: 'ARB registration + typically 5+ years post-qualification project experience',
+    professionalRegistrationRequirement: 'required',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    protectedTitle: 'Architect',
+    regulatedStatus: 'ARB registration required',
+    eligibilityNote:
+      'Requires ARB registration and substantial project experience. PhD does not substitute for Part 3/practice competence or seniority.',
+    fitClassification: 'future_progression',
+    priority: 50,
+  },
+  {
+    name: 'Design Architect',
+    description:
+      'Leads architectural design quality and concept-to-detail design direction on projects as an ARB-registered Architect.',
+    roleCategory: 'design',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 5,
+    experienceRequirementLabel: 'ARB registration + typically 5+ years design leadership experience',
+    professionalRegistrationRequirement: 'required',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    protectedTitle: 'Architect',
+    regulatedStatus: 'ARB registration required',
+    eligibilityNote:
+      'Protected Architect title — ARB required. Academic stage alone is not design-leadership seniority.',
+    fitClassification: 'future_progression',
+    priority: 60,
+  },
+  {
+    name: 'Technical Architect',
+    description:
+      'Leads technical design, detailing strategy, specifications and construction quality for architectural projects as an ARB-registered Architect.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 5,
+    experienceRequirementLabel: 'ARB registration + typically 5+ years technical delivery experience',
+    professionalRegistrationRequirement: 'required',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    protectedTitle: 'Architect',
+    regulatedStatus: 'ARB registration required',
+    eligibilityNote:
+      'ARB-registered technical leadership. Not Structural Engineering structural design authority.',
+    fitClassification: 'future_progression',
+    priority: 70,
+  },
+  {
+    name: 'Conservation Architect',
+    description:
+      'Specialises in conservation and adaptation of historic buildings as an ARB-registered Architect, often with additional conservation accreditation pathways.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 6,
+    experienceRequirementLabel:
+      'ARB registration + typically 6+ years conservation project experience; specialist accreditation often valued',
+    professionalRegistrationRequirement: 'required',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    protectedTitle: 'Architect',
+    regulatedStatus: 'ARB registration required; specialist conservation credentials often expected',
+    eligibilityNote:
+      'Protected Architect title — ARB required. PhD/heritage research helps but does not replace registration or conservation project experience.',
+    fitClassification: 'future_progression',
+    priority: 80,
+  },
+  {
+    name: 'Planning and Design Consultant (Architecture)',
+    description:
+      'Provides architectural design advice on planning submissions, design quality and development proposals for clients and practices.',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 6,
+    experienceRequirementLabel: 'Typically 6+ years architectural design/planning interface experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    protectedTitle: null,
+    regulatedStatus:
+      'If using Architect title in practice, ARB registration is required; otherwise non-protected consultancy title',
+    eligibilityNote:
+      'Architecture design/planning interface consultancy — not pure Urban Planning policy. Use of Architect title still requires ARB.',
+    fitClassification: 'future_progression',
+    priority: 90,
+  },
+  {
+    name: 'Principal / Practice Director (Architecture)',
+    description:
+      'Leads practice strategy, major projects, business development and professional standards; typically an experienced ARB-registered Architect and often RIBA Chartered.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'leadership',
+    minimumExperienceYears: 10,
+    experienceRequirementLabel: 'Typically 10+ years post-qualification practice leadership experience',
+    professionalRegistrationRequirement: 'required',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    protectedTitle: 'Architect',
+    regulatedStatus: 'ARB registration required where practising/using Architect title; practice management duties may be broader',
+    eligibilityNote:
+      'Senior practice leadership requires substantial experience. PhD alone does not create director-level eligibility or ARB status.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+]
+
+const SIBLING_SPECIALISM_SLUGS = [
+  'civil-engineering',
+  'structural-engineering',
+  'construction-management',
+  'quantity-surveying',
+  'urban-planning',
+  'interior-design',
+  'building-services-engineering',
+] as const
+
+async function insertRolesForStage(
+  supabase: SupabaseClient,
+  specialismId: string,
+  stage: { id: string; stage_key: string; label: string },
+  roles: RoleSeed[],
+  existingSlugs: Set<string>
+): Promise<{ created: string[]; skipped: string[]; arbRoles: string[] }> {
+  const created: string[] = []
+  const skipped: string[] = []
+  const arbRoles: string[] = []
+
+  for (const role of roles) {
+    const baseSlug = normalizeSlug(undefined, role.name)
+    if (!baseSlug) {
+      skipped.push(role.name)
+      continue
+    }
+    const slug = `${stage.stage_key}-${baseSlug}`
+
+    if (existingSlugs.has(slug)) {
+      skipped.push(role.name)
+      continue
+    }
+
+    const { error } = await supabase.from('career_library_roles').insert({
+      specialism_id: specialismId,
+      stage_id: stage.id,
+      name: role.name,
+      slug,
+      description: role.description,
+      status: 'draft',
+      active: true,
+      sort_order: role.priority,
+      priority: role.priority,
+      role_category: role.roleCategory,
+      seniority_level: role.seniorityLevel,
+      minimum_experience_years: role.minimumExperienceYears,
+      experience_requirement_label: role.experienceRequirementLabel,
+      professional_registration_requirement: role.professionalRegistrationRequirement,
+      professional_membership_requirement: role.professionalMembershipRequirement,
+      academic_requirement: role.academicRequirement,
+      is_research_role: role.isResearchRole,
+      is_academic_role: role.isAcademicRole,
+      is_regulated_or_restricted: role.isRegulatedOrRestricted,
+      eligibility_note: role.eligibilityNote,
+      fit_classification: role.fitClassification,
+      metadata: {
+        stage_id: stage.id,
+        stage_key: stage.stage_key as StageKey,
+        stage_label: stage.label,
+        academic_level: stage.stage_key,
+        specialism_slug: 'architecture',
+        country_focus: 'uk',
+        professional_body_focus: 'Architects Registration Board (ARB)',
+        related_bodies: [
+          'Royal Institute of British Architects (RIBA)',
+          'Chartered Institute of Architectural Technologists (CIAT)',
+        ],
+        protected_title: role.protectedTitle,
+        regulated_status: role.regulatedStatus,
+        arb_registration_required: role.professionalRegistrationRequirement === 'required',
+        eligibility_model_version: 1,
+        sources: [
+          'national_careers_service_architect',
+          'prospects_architect',
+          'arb_registration_route',
+          'riba_become_an_architect',
+          'govuk_regulated_professions_architect',
+          'ciat_architectural_technologist',
+        ],
+      },
+    })
+
+    if (error) {
+      if (error.code === '23505') {
+        skipped.push(role.name)
+        continue
+      }
+      throw new Error(`${role.name} [${stage.stage_key}]: ${error.message}`)
+    }
+
+    created.push(role.name)
+    existingSlugs.add(slug)
+    if (role.professionalRegistrationRequirement === 'required' || role.protectedTitle === 'Architect') {
+      arbRoles.push(role.name)
+    }
+  }
+
+  return { created, skipped, arbRoles }
+}
+
+async function main() {
+  loadEnvLocal()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  }
+
+  const supabase = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const { data: specialism, error: specErr } = await supabase
+    .from('career_library_specialisms')
+    .select('id, name, slug, professional_body, regulated_profession')
+    .eq('slug', 'architecture')
+    .maybeSingle()
+
+  if (specErr || !specialism) {
+    throw new Error(`Architecture specialism not found: ${specErr?.message ?? 'missing row'}`)
+  }
+
+  if (!specialism.professional_body || !specialism.regulated_profession) {
+    await supabase
+      .from('career_library_specialisms')
+      .update({
+        professional_body: 'Architects Registration Board (ARB)',
+        regulated_profession: true,
+      })
+      .eq('id', specialism.id)
+  }
+
+  const { data: siblings } = await supabase
+    .from('career_library_specialisms')
+    .select('id, slug')
+    .in('slug', [...SIBLING_SPECIALISM_SLUGS])
+
+  const siblingNames = new Set<string>()
+  for (const sib of siblings ?? []) {
+    const { data: roles } = await supabase
+      .from('career_library_roles')
+      .select('name')
+      .eq('specialism_id', sib.id)
+    for (const r of roles ?? []) siblingNames.add(r.name.trim().toLowerCase())
+  }
+
+  const allSeeds = [...DEGREE_ROLES, ...MASTERS_ROLES, ...PHD_ROLES]
+  const filteredByStage = {
+    degree: DEGREE_ROLES.filter((r) => !siblingNames.has(r.name.trim().toLowerCase())),
+    masters: MASTERS_ROLES.filter((r) => !siblingNames.has(r.name.trim().toLowerCase())),
+    phd: PHD_ROLES.filter((r) => !siblingNames.has(r.name.trim().toLowerCase())),
+  }
+  const crossSkipped = allSeeds
+    .filter((r) => siblingNames.has(r.name.trim().toLowerCase()))
+    .map((r) => r.name)
+
+  const { data: model, error: modelErr } = await supabase
+    .from('career_library_stage_models')
+    .select('id')
+    .eq('model_key', 'academic_level')
+    .maybeSingle()
+
+  if (modelErr || !model) {
+    throw new Error(`academic_level stage model not found: ${modelErr?.message ?? 'missing'}`)
+  }
+
+  const { data: stages, error: stagesErr } = await supabase
+    .from('career_library_stages')
+    .select('id, stage_key, label, sort_order')
+    .eq('stage_model_id', model.id)
+    .in('stage_key', ['degree', 'masters', 'phd'])
+    .order('sort_order', { ascending: true })
+
+  if (stagesErr || !stages?.length) {
+    throw new Error(`Academic stages not found: ${stagesErr?.message ?? 'empty'}`)
+  }
+
+  const stageByKey = new Map(stages.map((s) => [s.stage_key, s]))
+  for (const key of ['degree', 'masters', 'phd'] as const) {
+    if (!stageByKey.has(key)) throw new Error(`Missing academic stage: ${key}`)
+  }
+
+  const { data: existingRoles, error: rolesErr } = await supabase
+    .from('career_library_roles')
+    .select('slug')
+    .eq('specialism_id', specialism.id)
+
+  if (rolesErr) throw new Error(rolesErr.message)
+  const existingSlugs = new Set((existingRoles ?? []).map((r) => r.slug))
+
+  const degree = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('degree')!,
+    filteredByStage.degree,
+    existingSlugs
+  )
+  const masters = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('masters')!,
+    filteredByStage.masters,
+    existingSlugs
+  )
+  const phd = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('phd')!,
+    filteredByStage.phd,
+    existingSlugs
+  )
+
+  const { count } = await supabase
+    .from('career_library_roles')
+    .select('id', { count: 'exact', head: true })
+    .eq('specialism_id', specialism.id)
+    .eq('status', 'draft')
+
+  const totalCreated = degree.created.length + masters.created.length + phd.created.length
+  const sameSpecSkipped =
+    degree.skipped.length + masters.skipped.length + phd.skipped.length
+  const arbRoles = [...degree.arbRoles, ...masters.arbRoles, ...phd.arbRoles]
+
+  console.log('\n=== Architecture roles populate summary ===')
+  console.log(`Specialism: ${specialism.name} (${specialism.slug})`)
+  console.log(`Stage model: academic_level`)
+  console.log(`Status: draft`)
+  console.log(`Roles created this run: ${totalCreated}`)
+  console.log(`Duplicates skipped (same specialism): ${sameSpecSkipped}`)
+  console.log(
+    `Duplicates skipped (exact title overlap with Civil/Structural/CM/QS/Urban Planning/Interior): ${crossSkipped.length}`
+  )
+  if (crossSkipped.length) {
+    for (const n of crossSkipped) console.log(`  - ${n}`)
+  }
+  console.log(`Draft roles now in specialism: ${count ?? 'n/a'}`)
+
+  console.log('\nRoles requiring ARB registration (protected Architect title):')
+  for (const n of arbRoles) console.log(`  * ${n}`)
+  if (!arbRoles.length) console.log('  (none)')
+
+  console.log('\nDegree / Bachelor roles:')
+  for (const n of degree.created) console.log(`  + ${n}`)
+  if (!degree.created.length) console.log('  (none new)')
+
+  console.log("\nMaster's roles:")
+  for (const n of masters.created) console.log(`  + ${n}`)
+  if (!masters.created.length) console.log('  (none new)')
+
+  console.log('\nPhD roles:')
+  for (const n of phd.created) console.log(`  + ${n}`)
+  if (!phd.created.length) console.log('  (none new)')
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

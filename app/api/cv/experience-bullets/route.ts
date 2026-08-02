@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 type ExperienceAIMode = 'responsibilities' | 'achievements' | 'both'
 type CareerDomain = 'tech' | 'hospitality' | 'production' | 'customer_service' | 'supervisor' | 'general'
@@ -49,7 +45,7 @@ export async function POST(req: Request) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       // Return mock data based on mode
       const mockResponsibilities = [
@@ -164,8 +160,7 @@ ACHIEVEMENTS:
 ...`
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -176,11 +171,13 @@ ACHIEVEMENTS:
           content: userPrompt,
         },
       ],
+      modelTier: 'default',
       temperature: 0.7,
-      max_tokens: 1000,
+      maxTokens: 1000,
+      feature: 'cv/experience-bullets',
     })
 
-    const result = completion.choices[0]?.message?.content || ''
+    const result = completion.text || ''
 
     // Parse the response based on mode
     if (mode === 'responsibilities') {

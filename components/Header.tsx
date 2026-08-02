@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Sparkles } from "lucide-react"
 import Link from "next/link"
 import { useAiAccess } from "@/lib/use-ai-access"
-import { ThemeToggle } from "@/components/theme-toggle"
+import JobazThemeToggle from "@/components/JobazThemeToggle"
 
 export function Header() {
   const { valid, remainingFormatted } = useAiAccess()
@@ -44,7 +44,7 @@ export function Header() {
               Support JobAZ
             </a>
           )}
-          <ThemeToggle />
+          <JobazThemeToggle />
         </div>
       </div>
     </header>

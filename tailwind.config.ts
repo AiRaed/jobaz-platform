@@ -5,6 +5,7 @@ const config: Config = {
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
     './lib/**/*.{ts,tsx}',
   ],
   darkMode: 'class',
@@ -17,6 +18,19 @@ const config: Config = {
         surface: '#141414',
         text: '#EAEAEA',
         'text-muted': '#BEBEBE',
+        /* JobAZ brand tokens — resolve from CSS vars (day/dark aware) */
+        jaz: {
+          bg: 'var(--jaz-bg-day)',
+          surface: 'var(--jaz-surface)',
+          soft: 'var(--jaz-surface-soft)',
+          border: 'var(--jaz-border)',
+          primary: 'var(--jaz-primary)',
+          'primary-2': 'var(--jaz-primary-2)',
+          purple: 'var(--jaz-purple)',
+          lavender: 'var(--jaz-lavender)',
+          text: 'var(--jaz-text)',
+          muted: 'var(--jaz-muted)',
+        },
         violet: {
           accent: '#7C3AED',
           50: '#f5f3ff',

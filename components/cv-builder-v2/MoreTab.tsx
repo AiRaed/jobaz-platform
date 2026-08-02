@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Plus, Trash2, Sparkles, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Zap, Copy, Undo2, X } from 'lucide-react'
 import { CvData } from '@/app/cv-builder-v2/page'
+import { certificationLabel, certificationTitle, buildCareerPlanCertification } from '@/lib/cv/cvCertification'
+import CvPlanSuggestionChips from '@/components/cv-builder-v2/CvPlanSuggestionChips'
 
 interface MoreTabProps {
   projects: CvData['projects']
@@ -8,6 +10,11 @@ interface MoreTabProps {
   certifications: CvData['certifications']
   publications?: CvData['publications']
   onUpdate: (updates: Partial<Pick<CvData, 'projects' | 'languages' | 'certifications' | 'publications'>>) => void
+  planQualificationSuggestions?: Array<{
+    label: string
+    allowed: boolean
+    hint: string
+  }>
 }
 
 type Publication = NonNullable<CvData['publications']>[0]
@@ -20,7 +27,14 @@ interface PublicationSuggestion {
   issues: string[]
 }
 
-export default function MoreTab({ projects, languages, certifications, publications, onUpdate }: MoreTabProps) {
+export default function MoreTab({
+  projects,
+  languages,
+  certifications,
+  publications,
+  onUpdate,
+  planQualificationSuggestions,
+}: MoreTabProps) {
   const [newProject, setNewProject] = useState({ name: '', description: '', url: '' })
   const [newLanguage, setNewLanguage] = useState('')
   const [newCertification, setNewCertification] = useState('')
@@ -62,10 +76,14 @@ export default function MoreTab({ projects, languages, certifications, publicati
   }
 
   const addCertification = () => {
-    if (newCertification.trim() && !certifications?.includes(newCertification.trim())) {
-      onUpdate({ certifications: [...(certifications || []), newCertification.trim()] })
-      setNewCertification('')
-    }
+    const next = newCertification.trim()
+    if (!next) return
+    const existing = (certifications || []).some(
+      (c) => certificationTitle(c).toLowerCase() === next.toLowerCase()
+    )
+    if (existing) return
+    onUpdate({ certifications: [...(certifications || []), next] })
+    setNewCertification('')
   }
 
   const removeCertification = (index: number) => {
@@ -244,21 +262,21 @@ export default function MoreTab({ projects, languages, certifications, publicati
             value={newProject.name}
             onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
             placeholder="Project name"
-            className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+            className="jobaz-input w-full text-sm"
           />
           <input
             type="text"
             value={newProject.description}
             onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
             placeholder="Description"
-            className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+            className="jobaz-input w-full text-sm"
           />
           <input
             type="url"
             value={newProject.url}
             onChange={(e) => setNewProject({ ...newProject, url: e.target.value })}
             placeholder="URL (optional)"
-            className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+            className="jobaz-input w-full text-sm"
           />
           <button
             onClick={addProject}
@@ -280,7 +298,7 @@ export default function MoreTab({ projects, languages, certifications, publicati
             onChange={(e) => setNewLanguage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && addLanguage()}
             placeholder="e.g., English (Native), Spanish (Fluent)"
-            className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+            className="jobaz-input flex-1 text-sm"
           />
           <button
             onClick={addLanguage}
@@ -309,6 +327,36 @@ export default function MoreTab({ projects, languages, certifications, publicati
       {/* Certifications */}
       <div>
         <h3 className="text-sm font-semibold text-slate-300 mb-3">Certifications</h3>
+        {planQualificationSuggestions && planQualificationSuggestions.length > 0 && (
+          <div className="mb-3 space-y-2">
+            <CvPlanSuggestionChips
+              title="Plan qualification suggestions"
+              items={planQualificationSuggestions.filter((q) => q.allowed).map((q) => q.label)}
+              alreadyHas={(item) =>
+                (certifications || []).some((c) => {
+                  const t = typeof c === 'string' ? c : certificationTitle(c)
+                  return t.toLowerCase().includes(item.toLowerCase()) || item.toLowerCase().includes(t.toLowerCase())
+                })
+              }
+              onAdd={(item) => {
+                const entry = buildCareerPlanCertification({
+                  title: item,
+                  provider: /sia/i.test(item) ? 'Get Licensed' : undefined,
+                  status: /in progress/i.test(item) ? 'in_progress' : 'completed',
+                  source: 'career_plan',
+                })
+                onUpdate({ certifications: [...(certifications || []), entry] })
+              }}
+            />
+            {planQualificationSuggestions
+              .filter((q) => !q.allowed)
+              .map((q) => (
+                <p key={q.label} className="text-[11px] text-slate-500">
+                  {q.label}: {q.hint}
+                </p>
+              ))}
+          </div>
+        )}
         <div className="flex gap-2 mb-3">
           <input
             type="text"
@@ -316,7 +364,7 @@ export default function MoreTab({ projects, languages, certifications, publicati
             onChange={(e) => setNewCertification(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && addCertification()}
             placeholder="e.g., AWS Certified Solutions Architect"
-            className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+            className="jobaz-input flex-1 text-sm"
           />
           <button
             onClick={addCertification}
@@ -332,7 +380,7 @@ export default function MoreTab({ projects, languages, certifications, publicati
                 key={index}
                 className="flex items-center justify-between p-2 bg-slate-900/30 rounded border border-slate-700/50"
               >
-                <span className="text-sm text-slate-300">{cert}</span>
+                <span className="text-sm text-slate-300">{certificationLabel(cert)}</span>
                 <button onClick={() => removeCertification(index)} className="p-1 text-red-400 hover:text-red-300">
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -383,14 +431,14 @@ export default function MoreTab({ projects, languages, certifications, publicati
                           value={pub.authors || ''}
                           onChange={(e) => updatePublication(index, { authors: e.target.value })}
                           placeholder="Authors (optional)"
-                          className="px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+                          className="jobaz-input text-sm"
                         />
                         <input
                           type="text"
                           value={pub.year || ''}
                           onChange={(e) => updatePublication(index, { year: e.target.value })}
                           placeholder="Year (optional)"
-                          className="px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+                          className="jobaz-input text-sm"
                         />
                       </div>
                       <input
@@ -398,21 +446,21 @@ export default function MoreTab({ projects, languages, certifications, publicati
                         value={pub.venueOrJournal || ''}
                         onChange={(e) => updatePublication(index, { venueOrJournal: e.target.value })}
                         placeholder="Journal/Conference (optional)"
-                        className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+                        className="jobaz-input w-full text-sm"
                       />
                       <input
                         type="text"
                         value={pub.doiOrUrl || ''}
                         onChange={(e) => updatePublication(index, { doiOrUrl: e.target.value })}
                         placeholder="DOI/URL (optional)"
-                        className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+                        className="jobaz-input w-full text-sm"
                       />
                       <textarea
                         value={pub.notes || ''}
                         onChange={(e) => updatePublication(index, { notes: e.target.value })}
                         placeholder="Notes/Description (optional)"
                         rows={2}
-                        className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm resize-y"
+                        className="jobaz-input w-full text-sm resize-y"
                       />
                     </div>
 
@@ -576,7 +624,7 @@ export default function MoreTab({ projects, languages, certifications, publicati
             value={newPublication.title || ''}
             onChange={(e) => setNewPublication({ ...newPublication, title: e.target.value })}
             placeholder="Title (required)"
-            className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+            className="jobaz-input w-full text-sm"
           />
           <div className="grid grid-cols-2 gap-2">
             <input
@@ -584,14 +632,14 @@ export default function MoreTab({ projects, languages, certifications, publicati
               value={newPublication.authors || ''}
               onChange={(e) => setNewPublication({ ...newPublication, authors: e.target.value })}
               placeholder="Authors (optional)"
-              className="px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+              className="jobaz-input text-sm"
             />
             <input
               type="text"
               value={newPublication.year || ''}
               onChange={(e) => setNewPublication({ ...newPublication, year: e.target.value })}
               placeholder="Year (optional)"
-              className="px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+              className="jobaz-input text-sm"
             />
           </div>
           <input
@@ -599,21 +647,21 @@ export default function MoreTab({ projects, languages, certifications, publicati
             value={newPublication.venueOrJournal || ''}
             onChange={(e) => setNewPublication({ ...newPublication, venueOrJournal: e.target.value })}
             placeholder="Journal/Conference (optional)"
-            className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+            className="jobaz-input w-full text-sm"
           />
           <input
             type="text"
             value={newPublication.doiOrUrl || ''}
             onChange={(e) => setNewPublication({ ...newPublication, doiOrUrl: e.target.value })}
             placeholder="DOI/URL (optional)"
-            className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+            className="jobaz-input w-full text-sm"
           />
           <textarea
             value={newPublication.notes || ''}
             onChange={(e) => setNewPublication({ ...newPublication, notes: e.target.value })}
             placeholder="Notes/Description (optional)"
             rows={2}
-            className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm resize-y"
+            className="jobaz-input w-full text-sm resize-y"
           />
           <button
             onClick={addPublication}

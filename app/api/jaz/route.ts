@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { getOpenAiModel } from '@/lib/openai-model'
+import { mapPathnameToApiContext, type JazApiPageContext } from '@/lib/jaz/pageRegistry'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -48,14 +50,25 @@ function getLanguageInstruction(language: 'EN' | 'AR' | 'FA' | 'KU' | 'ES' | 'PL
 }
 
 // Page context instruction
-function getPageContextInstruction(pageContext: 'dashboard' | 'cv' | 'cover' | 'job-details' | 'interview' | 'other'): string {
-  const instructions: Record<string, string> = {
-    dashboard: 'The user is currently on the Dashboard page. Help with job search strategy, next steps, and interpreting the dashboard.',
-    cv: 'The user is currently on the CV Builder page. Help with CV content, summary, bullet points, and structure.',
-    cover: 'The user is currently on the Cover Letter Builder page. Help with cover letter opening, body, and closing.',
-    'job-details': 'The user is currently viewing a job details page. Help interpret the job description, required skills, and how to tailor the CV/cover.',
-    interview: 'The user is currently on the Interview Coach page. Help with answering interview questions and STAR method.',
-    other: 'The user is on a general page. Provide general career assistance.',
+function getPageContextInstruction(pageContext: JazApiPageContext): string {
+  const instructions: Record<JazApiPageContext, string> = {
+    landing:
+      'The user is on the JobAZ landing page. Explain the platform (AI career assessment, UK jobs, courses). Encourage starting the free Career Assessment. Keep answers short and action-oriented.',
+    dashboard:
+      'The user is on the Dashboard. Explain their career progress, readiness, and next steps from their plan. Reference Career Brain recommendations when relevant — never invent new recommendations.',
+    'career-plan':
+      'The user is viewing their Career Brain plan. Explain recommendations, readiness score, missing qualifications, courses, and progression. Career Brain decides; you explain why each step matters. Never invent recommendations.',
+    cv: 'The user is on the CV Builder. Guide section by section. Explain why each section matters to UK recruiters.',
+    cover: 'The user is on the Cover Letter Builder. Guide opening, body, and closing.',
+    'job-details':
+      'The user is viewing a job. Explain match reasons, salary, required skills, and CV improvements for this role.',
+    'job-finder':
+      'The user is searching UK jobs. Explain matches, salary, skills, and how jobs connect to their career plan.',
+    interview:
+      'The user is on Interview Coach. Coach before practice. Explain questions and STAR structure.',
+    courses:
+      'The user is browsing courses. Explain why courses are recommended, career impact, and roadmap fit. Do not invent course recommendations.',
+    other: 'Provide general UK career assistance. Be concise and action-oriented.',
   }
   return instructions[pageContext] || instructions.other
 }
@@ -75,17 +88,20 @@ function getModeInstruction(mode: 'ask' | 'guide' | 'translate', userMessage: st
 }
 
 // Get default user message for guide mode when userMessage is empty
-function getDefaultUserMessageForMode(mode: 'ask' | 'guide' | 'translate', pageContext: string): string {
+function getDefaultUserMessageForMode(mode: 'ask' | 'guide' | 'translate', pageContext: JazApiPageContext): string {
   if (mode === 'guide') {
-    const defaults: Record<string, string> = {
-      dashboard: 'Guide me through using the dashboard and what to do next.',
-      cv: 'Guide me through building my CV step by step.',
-      cover: 'Guide me through writing my cover letter step by step.',
-      'job-details': 'Guide me on how to tailor my application for this job.',
-      interview: 'Guide me on how to use the Interview Coach features.',
-      other: 'Guide me through my job search journey.',
+    const defaults: Partial<Record<JazApiPageContext, string>> = {
+      dashboard: 'What should I do next in my career plan?',
+      cv: 'Guide me through the CV section I am working on.',
+      cover: 'Guide me through my cover letter step by step.',
+      'job-details': 'Guide me on preparing my application for this job.',
+      interview: 'Coach me before I start practising interview answers.',
+      'job-finder': 'Help me find jobs that match my career plan.',
+      'career-plan': 'Explain my career plan and what I should do next.',
+      landing: 'Explain JobAZ and how to get started.',
+      courses: 'Explain why these courses matter for my career.',
     }
-    return defaults[pageContext] || defaults.other
+    return defaults[pageContext] ?? 'What should I do next in my UK career journey?'
   }
   
   if (mode === 'translate') {
@@ -97,7 +113,14 @@ function getDefaultUserMessageForMode(mode: 'ask' | 'guide' | 'translate', pageC
 
 // Build system prompt for JAZ persona
 function getJazSystemPrompt(): string {
-  return `You are JAZ, an AI Career Assistant inside JobAZ. You help users create and improve CVs and cover letters, understand job descriptions, find matching jobs, and prepare for interviews. You respond in the user's selected language. You adapt your guidance based on the current page (dashboard, CV builder, Cover builder, Job Details, Interview Coach). Be concise, friendly, and practical. When users struggle with English, explain things in simple terms and avoid jargon. Keep answers helpful and encouraging.`
+  return `You are JAZ, the user's personal AI career companion inside JobAZ — a UK career platform combining AI guidance, jobs, and training.
+
+Your role: EXPLAIN, GUIDE, RECOMMEND (only from Career Brain data), ANSWER questions, and help the user complete every step of their career plan.
+Career Brain always decides the plan. You never invent recommendations, courses, jobs, or readiness scores.
+
+Personality: friendly, professional, encouraging. Keep answers SHORT (2–4 sentences unless the user asks for detail). Always action-oriented.
+
+Adapt automatically to the current page. The user sees one unified assistant — never mention tabs or modes.`
 }
 
 export async function POST(request: NextRequest) {
@@ -138,23 +161,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Classify page context based on pathname
     const pathname = body.pathname || ''
-    let pageContext: 'dashboard' | 'cv' | 'cover' | 'job-details' | 'interview' | 'other'
-
-    if (pathname.startsWith('/dashboard')) {
-      pageContext = 'dashboard'
-    } else if (pathname.startsWith('/cv-builder-v2')) {
-      pageContext = 'cv'
-    } else if (pathname.startsWith('/cover')) {
-      pageContext = 'cover'
-    } else if (pathname.startsWith('/job-details')) {
-      pageContext = 'job-details'
-    } else if (pathname.startsWith('/interview-coach')) {
-      pageContext = 'interview'
-    } else {
-      pageContext = 'other'
-    }
+    const pageContext = mapPathnameToApiContext(pathname)
 
     // Check if API key is configured
     if (!process.env.OPENAI_API_KEY) {
@@ -219,7 +227,7 @@ export async function POST(request: NextRequest) {
 
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: getOpenAiModel(),
       messages,
       max_tokens: 800,
       temperature: 0.7,

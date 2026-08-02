@@ -2,12 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Mic, Square, Loader2 } from 'lucide-react'
-import { playQuestionWithTts, stopQuestionAudio } from '@/lib/tts-helper'
+import { Mic, Square, Loader2, Clock } from 'lucide-react'
+import { playQuestionWithTts, playThankYou, stopQuestionAudio } from '@/lib/tts-helper'
 import InterviewAvatar from '@/components/interview-coach/InterviewAvatar'
 import TranslatableText from '@/components/TranslatableText'
+import InterviewBriefCard from '@/components/interview-coach/premium/InterviewBriefCard'
+import InterviewFinalReport from '@/components/interview-coach/premium/InterviewFinalReport'
+import InterviewNextActions, { buildSimulationNextActions } from '@/components/interview-coach/premium/InterviewNextActions'
+import { PremiumCard, HorizontalProgressBar } from '@/components/interview-coach/premium/shared'
+import { buildInterviewBrief } from '@/lib/interview-coach/briefConfig'
 
-type Status = 'idle' | 'countdown' | 'asking' | 'recording' | 'processing' | 'finished'
+type Status = 'idle' | 'countdown' | 'asking' | 'ready' | 'recording' | 'processing' | 'thankyou' | 'finished'
 
 interface InterviewEvaluation {
   clarity: number
@@ -47,12 +52,24 @@ function normalizeQuestions(qs: any[]): string[] {
 interface InterviewSimulationTabProps {
   onScoreUpdate?: (score: number | null, finished: boolean) => void
   onCoachNotesUpdate?: (coachNotes: string[] | null) => void
-  onRestart?: () => void // Callback to trigger force remount
-  coreQuestions?: string[] // Primary source: questions from Writing Training
-  writingEvaluations?: { [questionIndex: number]: { savedAnswer?: string } } // Saved answers from Writing Training
+  onRestart?: () => void
+  coreQuestions?: string[]
+  writingEvaluations?: { [questionIndex: number]: { savedAnswer?: string } }
+  jobTitle?: string
+  company?: string
+  jobId?: string
 }
 
-export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpdate, onRestart, coreQuestions = [], writingEvaluations = {} }: InterviewSimulationTabProps = {}) {
+export default function InterviewSimulationTab({
+  onScoreUpdate,
+  onCoachNotesUpdate,
+  onRestart,
+  coreQuestions = [],
+  writingEvaluations = {},
+  jobTitle: jobTitleProp = '',
+  company: companyProp = '',
+  jobId = '',
+}: InterviewSimulationTabProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -69,6 +86,8 @@ export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpda
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [coachNotes, setCoachNotes] = useState<string[] | null>(null)
   const [interviewEval, setInterviewEval] = useState<InterviewEval | null>(null)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Keep ref in sync with state to avoid stale closures in callbacks
   useEffect(() => {
@@ -317,22 +336,27 @@ export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpda
     isPlayingQuestionRef.current = true
 
     try {
-      // Play question audio using TTS
-      // Create a fresh onended handler for each question
-      // The onended callback is the ONLY place that transitions asking -> recording
       await playQuestionWithTts(
         q,
         'simulation',
         () => {
-          // ONLY transition to recording when audio finishes (audio.onended)
-          // This ensures the asking animation shows until audio completes
-          // This is the ONLY valid path from asking -> recording
-          isPlayingQuestionRef.current = false
-          setStatus('recording')
-          startRecording()
+          setStatus('ready')
+          void playQuestionWithTts(
+            "I'm ready whenever you are.",
+            'simulation',
+            () => {
+              isPlayingQuestionRef.current = false
+              setStatus('recording')
+              startRecording()
+            },
+            () => {
+              isPlayingQuestionRef.current = false
+              setStatus('recording')
+              startRecording()
+            }
+          )
         },
         () => {
-          // Error playing audio, fallback to recording
           isPlayingQuestionRef.current = false
           setStatus('recording')
           startRecording()
@@ -440,11 +464,11 @@ export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpda
         return copy
       })
 
-      // Move to next question after a short delay
-      // Use functional state update in goToNextQuestion to avoid stale closures
-      setTimeout(() => {
+      // Thank you, then next question
+      setStatus('thankyou')
+      void playThankYou('simulation', () => {
         goToNextQuestion()
-      }, 1500)
+      })
     } catch (error) {
       console.error('Error transcribing audio:', error)
       setStatus('idle')
@@ -535,6 +559,10 @@ export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpda
   // Finish simulation and calculate score
   const finishSimulation = async () => {
     setStatus('finished')
+    if (elapsedIntervalRef.current) {
+      clearInterval(elapsedIntervalRef.current)
+      elapsedIntervalRef.current = null
+    }
 
     // Calculate score based on average word count
     const wordCounts = spokenAnswers.map((ans) => {
@@ -612,12 +640,15 @@ export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpda
       alert('Questions are still loading. Please wait.')
       return
     }
-    
-    // Reset ALL state/refs/timers using comprehensive reset function
+
     resetSimulationState()
-    
-    // Reset state to initial values
-    setStatus('countdown') // Start with countdown, then transition to asking via speakQuestionAndRecord
+    setElapsedSeconds(0)
+    if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current)
+    elapsedIntervalRef.current = setInterval(() => {
+      setElapsedSeconds((s) => s + 1)
+    }, 1000)
+
+    setStatus('countdown')
     setCountdown(3)
     setCurrentIndex(0)
     currentIndexRef.current = 0 // Reset ref to match state
@@ -642,11 +673,14 @@ export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpda
 
   // Restart simulation
   const restartSimulation = () => {
-    // Reset ALL state/refs/timers using comprehensive reset function
     resetSimulationState()
-    
-    // Reset state to initial values - MUST match handleStartInterview exactly
-    setStatus('countdown') // Start with countdown, then transition to asking via speakQuestionAndRecord
+    setElapsedSeconds(0)
+    if (elapsedIntervalRef.current) {
+      clearInterval(elapsedIntervalRef.current)
+      elapsedIntervalRef.current = null
+    }
+
+    setStatus('countdown')
     setCountdown(3) // Reset countdown to initial value
     setCurrentIndex(0)
     currentIndexRef.current = 0 // Reset ref to match state
@@ -674,7 +708,7 @@ export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpda
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Reset audio on unmount
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current)
       resetAudio()
       
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -694,12 +728,32 @@ export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpda
 
   const progressPercent = questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0
 
-  // Derive avatar state from simulation status
-  let avatarState: 'speaking' | 'listening' | 'idle' = 'idle'
+  const resolvedJobTitle = jobTitleProp || searchParams.get('title') || 'Interview Practice'
+  const resolvedCompany = companyProp || searchParams.get('company') || 'General Practice'
+  const brief = buildInterviewBrief(resolvedJobTitle, resolvedCompany, questions.length)
+
+  const formatElapsed = (s: number) => {
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
+  }
+
+  let avatarState: 'speaking' | 'listening' | 'idle' | 'thinking' = 'idle'
+  let avatarStatus: string | undefined
   if (status === 'asking') {
     avatarState = 'speaking'
+  } else if (status === 'ready') {
+    avatarState = 'thinking'
+    avatarStatus = "I'm ready whenever you are."
   } else if (status === 'recording') {
     avatarState = 'listening'
+    avatarStatus = 'Listening…'
+  } else if (status === 'processing' || status === 'thankyou') {
+    avatarState = 'thinking'
+    avatarStatus = status === 'thankyou' ? 'Thank you.' : 'Thinking…'
+  } else if (status === 'countdown') {
+    avatarState = 'idle'
+    avatarStatus = 'Preparing next question…'
   }
 
   // Show loading state while questions are being loaded
@@ -737,202 +791,150 @@ export default function InterviewSimulationTab({ onScoreUpdate, onCoachNotesUpda
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-heading font-semibold mb-6">Interview Simulation</h2>
-      
-      <div className="w-full flex justify-center">
-        <div className="max-w-7xl w-full">
-          {/* Main Center Content */}
+    <div className="space-y-5">
+      <div>
+        <p className="text-[10px] uppercase tracking-widest text-violet-400 font-semibold">
+          Step 4 · Interview Simulation
+        </p>
+        <h2 className="text-xl font-semibold text-slate-100 mt-1">Full Voice Interview</h2>
+      </div>
+
+      <div className="w-full">
+        <PremiumCard className="p-4 mb-4">
+          <InterviewAvatar state={avatarState} statusLabel={avatarStatus} />
+        </PremiumCard>
+
+        {status === 'idle' && (
+          <InterviewBriefCard brief={brief} onStart={handleStartInterview} />
+        )}
+
+        {status === 'countdown' && (
+          <PremiumCard className="p-10 flex flex-col items-center justify-center min-h-[280px]">
+            <div className="text-8xl font-bold text-violet-400 tabular-nums animate-pulse">{countdown}</div>
+            <p className="text-lg text-slate-300 mt-4">Get ready…</p>
+          </PremiumCard>
+        )}
+
+        {status !== 'idle' && status !== 'countdown' && status !== 'finished' && (
+          <PremiumCard glow className="p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+              <span>
+                Question {currentIndex + 1} of {questions.length}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                {formatElapsed(elapsedSeconds)}
+              </span>
+              <span>{Math.round(progressPercent)}% complete</span>
+            </div>
+            <HorizontalProgressBar value={progressPercent} />
+
+            <div className="rounded-lg border border-violet-500/20 bg-violet-950/15 px-4 py-3">
+              <p className="text-sm text-violet-200/90 font-medium mb-1">
+                Question {currentIndex + 1}
+              </p>
+              <p className="text-base text-slate-100 leading-relaxed">
+                <TranslatableText text={questions[currentIndex]}>
+                  {questions[currentIndex]}
+                </TranslatableText>
+              </p>
+            </div>
+
+            {status === 'ready' && (
+              <p className="text-sm text-emerald-300 font-medium text-center animate-pulse">
+                I&apos;m ready whenever you are.
+              </p>
+            )}
+
+            <div className="text-sm text-slate-400">
+              {status === 'asking' && (
+                <span className="flex items-center gap-2 text-violet-300">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  AI is reading the question…
+                </span>
+              )}
+              {status === 'recording' && (
+                <span className="flex items-center gap-2 text-emerald-400">
+                  <Mic className="w-4 h-4 animate-pulse" />
+                  Listening… answer in your own words.
+                </span>
+              )}
+              {(status === 'processing' || status === 'thankyou') && (
+                <span className="flex items-center gap-2 text-amber-300">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {status === 'thankyou' ? 'Thank you.' : 'Processing your answer…'}
+                </span>
+              )}
+            </div>
+
+            {(status === 'recording' || status === 'processing') && (
+              <button
+                onClick={stopRecording}
+                disabled={status === 'processing'}
+                data-jaz-action="ic_sim_stop"
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium border border-slate-600/70 bg-slate-900/80 text-slate-200 hover:border-violet-400/50 disabled:opacity-50"
+              >
+                <Square className="w-4 h-4" />
+                I&apos;m done
+              </button>
+            )}
+
+            {currentTranscript && (
+              <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-3">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Transcript</p>
+                <p className="text-sm text-slate-300">{currentTranscript}</p>
+              </div>
+            )}
+          </PremiumCard>
+        )}
+
+        {status === 'finished' && (
           <div className="space-y-4">
-            {/* Interview Avatar Card - Top of Main Column */}
-            <div className="bg-[#0D0D0D] rounded-2xl p-4 border border-gray-800">
-              <h3 className="text-base font-heading font-semibold mb-3 text-center">Interview Avatar</h3>
-              <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800 min-h-[300px] flex items-center justify-center">
-                <InterviewAvatar state={avatarState} />
-              </div>
+            <InterviewFinalReport
+              scores={{
+                overall: interviewEval?.overall ?? score ?? 0,
+                readiness: Math.round(((interviewEval?.overall ?? score ?? 0) / 10) * 100),
+                communication: interviewEval?.clarity ?? score ?? 0,
+                confidence: interviewEval?.confidence ?? score ?? 0,
+                professionalTone: interviewEval?.tone ?? score ?? 0,
+                examples: interviewEval?.examples ?? score ?? 0,
+                starMethod: interviewEval?.structure ?? score ?? 0,
+                voiceQuality: interviewEval?.speed ?? score ?? 0,
+                memory: interviewEval?.completeness ?? score ?? 0,
+                employerImpression: interviewEval?.overall ?? score ?? 0,
+              }}
+            />
+
+            <InterviewNextActions
+              actions={buildSimulationNextActions({
+                score: interviewEval?.overall ?? score ?? 0,
+                jobId,
+                onPracticeAgain: restartSimulation,
+                onImproveAnswers: () => router.push('/interview-coach?tab=writing'),
+              })}
+            />
+
+            <PremiumCard className="p-4 space-y-3 max-h-[360px] overflow-y-auto">
+              <h3 className="text-sm font-semibold text-slate-200">Session Review</h3>
+              {questions.map((question, idx) => (
+                <div key={idx} className="rounded-lg border border-slate-700/40 bg-slate-900/40 p-3 space-y-2">
+                  <p className="text-xs font-medium text-violet-300">Q{idx + 1}</p>
+                  <p className="text-xs text-slate-400">{question}</p>
+                  <p className="text-xs text-slate-300">{spokenAnswers[idx] || 'No answer recorded.'}</p>
+                </div>
+              ))}
+            </PremiumCard>
+
+            <div className="flex gap-2">
+              <button
+                onClick={restartSimulation}
+                className="flex-1 rounded-xl px-4 py-2.5 text-sm font-medium border border-slate-600/70 bg-slate-900/80 text-slate-200 hover:border-violet-400/50"
+              >
+                Practice again
+              </button>
             </div>
-
-            {/* Interview Simulation Card */}
-            <div className="bg-[#0D0D0D] rounded-xl border border-gray-800">
-            {/* Idle State */}
-            {status === 'idle' && (
-                <div className="p-8 min-h-[400px] flex flex-col items-center justify-center space-y-6">
-                <h3 className="text-xl font-semibold text-center">Interview Simulation</h3>
-                <p className="text-gray-400 text-center max-w-md">
-                  This is a full voice-only interview simulation. You will hear {questions.length} questions as audio,
-                  and answer each one by speaking. Your answers will be recorded and transcribed.
-                </p>
-                <button
-                  onClick={handleStartInterview}
-                  disabled={questions.length === 0}
-                  data-jaz-action="ic_sim_start"
-                  className="px-8 py-4 rounded-xl bg-gradient-to-r from-[#9b5cff] to-[#7c3aed] hover:from-[#8a4ae8] hover:to-[#6d28d9] text-white font-semibold text-lg transition-all shadow-lg shadow-[#9b5cff]/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Start Interview
-                </button>
-              </div>
-            )}
-
-            {/* Countdown State */}
-            {status === 'countdown' && (
-                <div className="p-8 min-h-[400px] flex flex-col items-center justify-center space-y-4">
-                <div className="text-9xl font-bold text-[#9b5cff]">{countdown}</div>
-                <p className="text-xl text-gray-300">Get ready…</p>
-              </div>
-            )}
-
-            {/* Active Interview State */}
-            {status !== 'idle' && status !== 'countdown' && status !== 'finished' && (
-                <div className="p-6 space-y-4">
-                {/* Progress Bar */}
-                <div>
-                  <div className="flex justify-between mb-2 text-sm text-gray-400">
-                    <span>
-                      Question {currentIndex + 1} of {questions.length}
-                    </span>
-                    <span>{Math.round(progressPercent)}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#9b5cff] to-[#7c3aed] transition-all duration-300"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                  {/* Question */}
-                  <div className="text-sm text-[#9b5cff] font-medium">
-                    Question {currentIndex + 1} of {questions.length}
-                  </div>
-                  <div className="text-lg text-white font-medium">
-                    <TranslatableText text={questions[currentIndex]}>
-                      {questions[currentIndex]}
-                    </TranslatableText>
-                  </div>
-
-                  {/* Status Line */}
-                  <div className="text-sm text-gray-400">
-                    {status === 'asking' && (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        AI interviewer is asking the question…
-                      </span>
-                    )}
-                    {status === 'recording' && (
-                      <span className="flex items-center gap-2 text-green-400">
-                        <Mic className="w-4 h-4 animate-pulse" />
-                        Listening… answer in your own words.
-                      </span>
-                    )}
-                    {status === 'processing' && (
-                      <span className="flex items-center gap-2 text-yellow-400">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Processing your answer…
-                      </span>
-                    )}
-                  </div>
-
-                  {/* I'm Done Button */}
-                  {(status === 'recording' || status === 'processing') && (
-                    <button
-                      onClick={stopRecording}
-                      disabled={status === 'processing'}
-                      data-jaz-action="ic_sim_stop"
-                      className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-                    >
-                      <Square className="w-4 h-4" />
-                      I&apos;m done
-                    </button>
-                  )}
-
-                  {/* Transcription Display */}
-                  {currentTranscript && (
-                    <div className="mt-4">
-                      <div className="text-xs text-gray-400 mb-2">Your spoken answer (transcribed):</div>
-                      <div className="text-sm bg-[#1a1a1a] rounded-xl p-4 border border-gray-800 text-gray-300">
-                        {currentTranscript || <span className="text-gray-500">No transcription yet.</span>}
-                      </div>
-                    </div>
-                  )}
-                </div>
-            )}
-            </div>
-
-            {/* Simulation Summary - Bottom of Main Column (when finished) */}
-            {status === 'finished' && (
-                <div className="bg-[#0D0D0D] rounded-xl border border-gray-800 p-6">
-                  <h3 className="text-xl font-semibold mb-4">Simulation Summary</h3>
-
-                  {/* Score Display */}
-                  {score !== null && (
-                    <div className="mb-6 p-4 bg-[#1a1a1a] rounded-xl border border-[#9b5cff]/30">
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-[#9b5cff] mb-2">
-                          {score}/10
-                        </div>
-                        <div className="text-sm text-gray-400">Provisional Simulation Score</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Questions and Answers Summary */}
-                  <div className="space-y-4">
-                    {questions.map((question, idx) => (
-                      <div
-                        key={idx}
-                      className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800 space-y-3"
-                      >
-                        <div className="text-sm font-medium text-[#9b5cff]">
-                          Question {idx + 1}
-                        </div>
-                        <div className="text-sm text-gray-300">
-                          <TranslatableText text={question}>
-                            {question}
-                          </TranslatableText>
-                        </div>
-                      
-                      {/* Written Answer */}
-                      {writtenAnswers[idx] && writtenAnswers[idx].trim().length > 0 && (
-                        <div className="space-y-2">
-                          <div className="text-xs text-gray-400 font-medium">Your Written Answer:</div>
-                          <div className="text-sm text-gray-300 bg-[#0D0D0D] rounded-lg p-3 border border-gray-800">
-                            {writtenAnswers[idx]}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Spoken Answer */}
-                      <div className="space-y-2">
-                        <div className="text-xs text-gray-400 font-medium">Your Interview Answer (transcribed):</div>
-                        <div className="text-sm text-gray-300 bg-[#0D0D0D] rounded-lg p-3 border border-gray-800">
-                          {spokenAnswers[idx] || (
-                            <span className="text-gray-500 italic">No answer recorded.</span>
-                          )}
-                        </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="mt-6 flex gap-3">
-                    <button
-                      onClick={restartSimulation}
-                      className="px-6 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm font-medium transition-colors"
-                    >
-                      Restart Simulation
-                    </button>
-                    <button
-                      onClick={() => router.push('/interview-coach')}
-                      className="px-6 py-3 rounded-lg bg-gradient-to-r from-[#9b5cff] to-[#7c3aed] hover:from-[#8a4ae8] hover:to-[#6d28d9] text-sm font-medium text-white transition-all"
-                    >
-                      Back to Training
-                    </button>
-                  </div>
-                </div>
-            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

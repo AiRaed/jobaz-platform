@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { aiProvider, type AiMessage } from '@/lib/jobaz-ai/providers'
 import { SYSTEM_PROMPT, PATH_MODULES } from '@/lib/uk-career-assistant/prompts'
 import { buildReasons } from '@/lib/uk-career-assistant/reasons'
 import { scoreAllDirections } from '@/lib/uk-career-assistant/scoring'
+import { enhanceUkCareerResponse, syncCareerAdvisorOnState } from '@/lib/jobaz-ai/engines/careerAdvisor'
+import { isCareerBrainEnabled, runCareerBrainTurn } from '@/lib/career-brain'
+import { isBackgroundDiscoveryComplete } from '@/lib/career-brain/backgroundDiscovery'
+import { formatCareerBrainApiResponse } from '@/lib/career-brain/formatApiResponse'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,10 +49,6 @@ export const dynamic = 'force-dynamic'
  * - Confidence score: 1-10 scale (computed from answered questions)
  * - Follow-up: Optional suggested question for engagement
  */
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
 
 interface AIResponse {
   path: string | null
@@ -3690,20 +3690,20 @@ ${JSON.stringify(state, null, 2)}
 IMPORTANT: Check state.answers before extracting. If a field is already in state.answers, it's LOCKED - skip it.`
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
           content: extractionPrompt
         }
       ],
+      modelTier: 'quality',
       temperature: 0.1,
-      max_tokens: 500,
-      response_format: { type: 'json_object' }
+      maxTokens: 500,
+      feature: 'uk-career-assistant',
     })
 
-    const rawContent = completion.choices[0]?.message?.content || ''
+    const rawContent = completion.text || ''
     if (!rawContent) {
       return { extracted: {}, confidence: 0 }
     }
@@ -3751,7 +3751,7 @@ IMPORTANT: Check state.answers before extracting. If a field is already in state
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { state, user_input, free_text, current_question_id } = body
+    const { state, user_input, free_text, current_question_id, path_story_only } = body
 
     // SERVER LOGGING: Log received state
     console.log('SERVER received state', state)
@@ -3782,7 +3782,23 @@ export async function POST(req: NextRequest) {
     // B) SERVER COMMITS ANSWER BEFORE ANY LOGIC
     // ============================================
     // Commit answer deterministically using current_question_id from client
-    if (current_question_id && user_input) {
+    const careerBrainOn = isCareerBrainEnabled()
+    if (current_question_id && user_input && !path_story_only && user_input !== 'PATH_STORY') {
+      const isClassifyId = ['edu', 'exp', 'rel'].includes(current_question_id)
+      const isBrainId =
+        current_question_id.startsWith('cb_') ||
+        current_question_id === 'edu' ||
+        current_question_id === 'exp' ||
+        current_question_id === 'currentJobTitle' ||
+        current_question_id === 'coreSkills'
+      if (careerBrainOn && !isBrainId) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(
+            '[UK Career Assistant] Skipped legacy answer commit during Career Brain:',
+            current_question_id
+          )
+        }
+      } else {
       // Normalize user_input for classify questions
       let normalizedInput: string | string[] = user_input
       if (current_question_id === 'edu' || current_question_id === 'exp' || current_question_id === 'rel') {
@@ -3814,6 +3830,7 @@ export async function POST(req: NextRequest) {
       // Logging
       console.log('COMMIT', current_question_id, normalizedInput)
       console.log('CLASSIFICATION', normalizedState.classification)
+      }
     }
 
     // ============================================
@@ -3822,7 +3839,12 @@ export async function POST(req: NextRequest) {
     // Process free-text if provided and we're in PATH phase (or transitioning to PATH)
     // Only process free-text in PATH phase to avoid interfering with classification
     const phaseForFreeText = getCurrentPhase(normalizedState)
-    if (free_text && free_text.trim() && (phaseForFreeText === 'PATH' || normalizedState.path)) {
+    if (
+      !careerBrainOn &&
+      free_text &&
+      free_text.trim() &&
+      (phaseForFreeText === 'PATH' || normalizedState.path)
+    ) {
       const extractionResult = await extractFromFreeText(free_text.trim(), normalizedState)
       
         // Safety guard: Only use extracted data if confidence >= 0.6
@@ -3872,12 +3894,39 @@ export async function POST(req: NextRequest) {
       // 4. Done/result are controlled by pure functions, not free-text
     }
 
+    normalizedState = syncCareerAdvisorOnState(normalizedState)
+
     // ============================================
-    // D) CLASSIFY SEQUENCE IS SERVER-ONLY
+    // CAREER BRAIN — full question flow (replaces legacy CLASSIFY + PATH)
     // ============================================
-    // During CLASSIFY phase: NEVER ask AI, use deterministic server logic
     const currentPhaseBeforeAI = getCurrentPhase(normalizedState)
-    
+
+    if (careerBrainOn && currentPhaseBeforeAI !== 'RESULT') {
+      if (isBackgroundDiscoveryComplete(normalizedState) && !normalizedState.path) {
+        normalizedState.path = computePathFromClassification(normalizedState)
+      }
+
+      const brainTurn = await runCareerBrainTurn({
+        state: normalizedState,
+        user_input,
+        current_question_id:
+          current_question_id ?? normalizedState.last_question_id ?? null,
+        free_text: free_text?.trim() || undefined,
+        path_story_only: Boolean(path_story_only),
+      })
+      const formatted = formatCareerBrainApiResponse(brainTurn)
+      const mergedForAdvisor = { ...normalizedState, ...formatted.state_updates }
+      const enhanced = await enhanceUkCareerResponse(mergedForAdvisor, formatted)
+      const payload =
+        process.env.NODE_ENV === 'development'
+          ? { ...enhanced, _career_brain_debug: brainTurn.debug }
+          : enhanced
+      return NextResponse.json(payload)
+    }
+
+    // ============================================
+    // D) CLASSIFY SEQUENCE IS SERVER-ONLY (legacy)
+    // ============================================
     if (currentPhaseBeforeAI === 'CLASSIFY') {
       // Server picks next question deterministically
       const answers = normalizedState.answers || {}
@@ -3918,26 +3967,56 @@ export async function POST(req: NextRequest) {
         result: null
       }
       
-      // If classification complete, transition to PATH
+      // If classification complete, transition to PATH (Career Brain or legacy)
       if (shouldTransitionToPath) {
         const finalClassification = extractClassificationAnswers(normalizedState)
         const computedPath = computePathFromClassification(normalizedState)
-        
+
+        normalizedState = {
+          ...normalizedState,
+          classification_done: true,
+          classification: finalClassification,
+          phase: 'PATH',
+          path: computedPath,
+        }
+
+        if (careerBrainOn) {
+          const brainTurn = await runCareerBrainTurn({
+            state: normalizedState,
+            user_input,
+            current_question_id:
+              current_question_id ?? normalizedState.last_question_id ?? null,
+            free_text: free_text?.trim() || undefined,
+            path_story_only: Boolean(path_story_only),
+          })
+          const formatted = formatCareerBrainApiResponse(brainTurn)
+          const mergedForAdvisor = {
+            ...normalizedState,
+            ...formatted.state_updates,
+          }
+          const enhanced = await enhanceUkCareerResponse(mergedForAdvisor, formatted)
+          const payload =
+            process.env.NODE_ENV === 'development'
+              ? { ...enhanced, _career_brain_debug: brainTurn.debug }
+              : enhanced
+          return NextResponse.json(payload)
+        }
+
         response.state_updates = {
           ...response.state_updates,
           classification_done: true,
           classification: finalClassification,
           phase: 'PATH',
-          path: computedPath
+          path: computedPath,
         }
         response.path = computedPath
       }
-      
+
       return NextResponse.json(response)
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[UK Career Assistant] No OPENAI_API_KEY configured')
       // Return a mock response for testing (follows new classification flow)
       const mockResponse: AIResponse = {
@@ -3964,7 +4043,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Build messages array
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    const messages: AiMessage[] = [
       {
         role: 'system',
         content: SYSTEM_PROMPT
@@ -3986,18 +4065,17 @@ export async function POST(req: NextRequest) {
       }
     ]
 
-    // Call OpenAI with JSON mode (force enabled for reliability)
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini'
-    
-    const completion = await openai.chat.completions.create({
-      model,
+    // Call AI provider with JSON-oriented prompt
+    const completion = await aiProvider.generateText({
       messages,
-      temperature: 0.2, // Lower temperature for more consistent JSON
-      max_tokens: 2000,
-      response_format: { type: 'json_object' } // Force JSON mode
+      modelTier: 'quality',
+      temperature: 0.2,
+      maxTokens: 2000,
+      responseFormat: 'json_object',
+      feature: 'uk-career-assistant',
     })
 
-    const rawContent = completion.choices[0]?.message?.content || ''
+    const rawContent = completion.text || ''
     
     // Log raw response in dev
     if (process.env.NODE_ENV === 'development') {
@@ -4182,7 +4260,7 @@ export async function POST(req: NextRequest) {
         
       // Attempt ONE repair call with additional system instruction
         try {
-          const repairMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+          const repairMessages: AiMessage[] = [
             {
               role: 'system',
               content: SYSTEM_PROMPT
@@ -4204,15 +4282,16 @@ export async function POST(req: NextRequest) {
             }
           ]
           
-          const repairCompletion = await openai.chat.completions.create({
-            model,
+          const repairCompletion = await aiProvider.generateText({
             messages: repairMessages,
-          temperature: 0.1,
-            max_tokens: 2000,
-            response_format: { type: 'json_object' }
+            modelTier: 'quality',
+            temperature: 0.1,
+            maxTokens: 2000,
+            responseFormat: 'json_object',
+            feature: 'uk-career-assistant-repair',
           })
           
-          const repairContent = repairCompletion.choices[0]?.message?.content || ''
+          const repairContent = repairCompletion.text || ''
           if (repairContent) {
             const repairParsed = extractJSON(repairContent)
             if (repairParsed && validateAIResponse(repairParsed)) {
@@ -4899,8 +4978,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Success - return validated response
-    return NextResponse.json(parsed)
+    // Success - return validated response (optional AI follow-up injection)
+    const mergedForFollowUp = {
+      ...normalizedState,
+      ...(parsed.state_updates ?? {}),
+    }
+    const enhanced = await enhanceUkCareerResponse(mergedForFollowUp, parsed)
+    return NextResponse.json(enhanced)
   } catch (error: any) {
     // Always return fallback on error - never break the chat
     if (process.env.NODE_ENV === 'development') {

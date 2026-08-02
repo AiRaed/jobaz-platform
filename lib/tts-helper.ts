@@ -22,7 +22,7 @@ let isPlaying = false
  */
 export async function playQuestionWithTts(
   text: string,
-  mode: 'hard' | 'simulation' = 'simulation',
+  mode: 'hard' | 'simulation' | 'voice' = 'simulation',
   onEnded?: () => void,
   onError?: () => void
 ): Promise<void> {
@@ -53,7 +53,7 @@ export async function playQuestionWithTts(
         },
         body: JSON.stringify({
           text: text.trim(),
-          mode: mode === 'hard' ? 'hard-mode' : 'simulation',
+          mode: mode === 'hard' ? 'hard-mode' : mode === 'voice' ? 'voice-training' : 'simulation',
         }),
       })
 
@@ -143,5 +143,35 @@ export function stopQuestionAudio(): void {
  */
 export function clearQuestionAudioCache(): void {
   questionAudioCache.clear()
+}
+
+const READY_PROMPT = "I'm ready whenever you are."
+const THANK_YOU_PROMPT = 'Thank you.'
+
+/**
+ * Play question audio, then the ready prompt before recording starts.
+ */
+export async function playQuestionWithReadyPrompt(
+  questionText: string,
+  mode: 'hard' | 'simulation' | 'voice' = 'simulation',
+  onReady?: () => void,
+  onError?: () => void
+): Promise<void> {
+  await playQuestionWithTts(
+    questionText,
+    mode,
+    () => {
+      void playQuestionWithTts(READY_PROMPT, mode, onReady, onError)
+    },
+    onError
+  )
+}
+
+/** Short acknowledgement after the candidate finishes answering. */
+export async function playThankYou(
+  mode: 'hard' | 'simulation' | 'voice' = 'simulation',
+  onDone?: () => void
+): Promise<void> {
+  await playQuestionWithTts(THANK_YOU_PROMPT, mode, onDone, onDone)
 }
 

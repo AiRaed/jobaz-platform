@@ -8,6 +8,7 @@ export interface AdzunaSearchParams {
   keyword: string
   location?: string
   page?: number
+  pageSize?: number
 }
 
 export interface AdzunaApiResponse {
@@ -64,7 +65,7 @@ export async function fetchAdzunaJobs(
   url.searchParams.set('app_key', appKey)
   url.searchParams.set('what', keyword)
   url.searchParams.set('where', location)
-  url.searchParams.set('results_per_page', '20')
+  url.searchParams.set('results_per_page', String(params.pageSize ?? 20))
   url.searchParams.set('content-type', 'application/json')
 
   try {

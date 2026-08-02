@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       return NextResponse.json({
         ok: true,
@@ -60,8 +56,7 @@ export async function POST(req: NextRequest) {
     
     const questionContext = question ? `Interview Question: ${question}` : ''
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -96,12 +91,13 @@ IMPORTANT:
 - For the "whyBetter" field, provide 3-5 concise bullet points (each as a string in the array) explaining specific improvements made in the improvedSample compared to the original answer. Focus on concrete improvements like better structure, clearer examples, more relevant details, etc.`,
         },
       ],
+      modelTier: 'quality',
       temperature: 0.7,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' },
+      maxTokens: 2000,
+      feature: 'interview/evaluate',
     })
 
-    const content = completion.choices[0]?.message?.content || '{}'
+    const content = completion.text || '{}'
     
     let evaluation
     try {

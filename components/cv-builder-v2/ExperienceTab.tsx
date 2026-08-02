@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Plus, Trash2, Sparkles, CheckCircle2, Zap, Loader2, X, AlertTriangle, AlertCircle, ThumbsUp } from 'lucide-react'
 import { CvData } from '@/app/cv-builder-v2/page'
 import ExperienceAIModal from './ExperienceAIModal'
+import CvPlanSuggestionChips from '@/components/cv-builder-v2/CvPlanSuggestionChips'
 
 interface ExperienceTabProps {
   experience: CvData['experience']
   onUpdate: (experience: CvData['experience']) => void
+  planBulletSuggestions?: string[]
 }
 
 type BulletQualityStatus = 'excellent' | 'good' | 'needs-improvement' | null
@@ -22,7 +24,7 @@ interface BulletSuggestion {
   wordCountChange?: number
 }
 
-export default function ExperienceTab({ experience, onUpdate }: ExperienceTabProps) {
+export default function ExperienceTab({ experience, onUpdate, planBulletSuggestions }: ExperienceTabProps) {
   const [openModalIndex, setOpenModalIndex] = useState<number | null>(null)
   
   // Quality check states per bullet: [expIndex][bulletIndex]
@@ -306,6 +308,35 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
 
   return (
     <div className="space-y-6">
+      {planBulletSuggestions && planBulletSuggestions.length > 0 && (
+        <CvPlanSuggestionChips
+          title="Suggested transferable experience bullets"
+          items={planBulletSuggestions}
+          alreadyHas={(item) =>
+            experience.some((exp) =>
+              exp.bullets.some((b) => b.trim().toLowerCase() === item.trim().toLowerCase())
+            )
+          }
+          onAdd={(item) => {
+            if (experience.length === 0) {
+              onUpdate([
+                {
+                  id: Date.now().toString(),
+                  jobTitle: '',
+                  company: '',
+                  bullets: [item],
+                },
+              ])
+              return
+            }
+            const first = experience[0]!
+            const bullets = [...(first.bullets || []).filter((b) => b.trim()), item]
+            onUpdate(
+              experience.map((exp, i) => (i === 0 ? { ...exp, bullets } : exp))
+            )
+          }}
+        />
+      )}
       {experience.map((exp, expIndex) => (
         <div key={exp.id} className="p-4 bg-slate-900/30 rounded-lg border border-slate-700/50">
           <div className="flex justify-between items-start mb-4">
@@ -326,7 +357,7 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
                 type="text"
                 value={exp.jobTitle}
                 onChange={(e) => updateExperience(expIndex, { jobTitle: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                className="jobaz-input w-full text-sm"
                 placeholder="Senior Software Engineer"
               />
             </div>
@@ -338,7 +369,7 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
                   type="text"
                   value={exp.company}
                   onChange={(e) => updateExperience(expIndex, { company: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                  className="jobaz-input w-full text-sm"
                   placeholder="Company Name"
                 />
               </div>
@@ -348,7 +379,7 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
                   type="text"
                   value={exp.location || ''}
                   onChange={(e) => updateExperience(expIndex, { location: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                  className="jobaz-input w-full text-sm"
                   placeholder="City, Country"
                 />
               </div>
@@ -361,7 +392,7 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
                   type="text"
                   value={exp.startDate || ''}
                   onChange={(e) => updateExperience(expIndex, { startDate: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                  className="jobaz-input w-full text-sm"
                   placeholder="Jan 2020"
                 />
               </div>
@@ -372,7 +403,7 @@ export default function ExperienceTab({ experience, onUpdate }: ExperienceTabPro
                   value={exp.endDate || ''}
                   onChange={(e) => updateExperience(expIndex, { endDate: e.target.value })}
                   disabled={exp.isCurrent}
-                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm disabled:opacity-50"
+                  className="jobaz-input w-full text-sm disabled:opacity-50"
                   placeholder="Present"
                 />
               </div>

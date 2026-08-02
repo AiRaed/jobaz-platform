@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 /**
  * Clean cover letter variant to remove greetings, closings, markdown, and section titles
@@ -128,7 +124,7 @@ export async function POST(req: Request) {
     console.log('[Cover Compare] payload:', body)
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       return NextResponse.json({
         ok: true,
@@ -175,8 +171,7 @@ Return as three blocks separated by:
 ---
 Role/keywords: ${roleKeywords}`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -197,11 +192,13 @@ Each should be maximum 180 words total. Return clean, continuous body text only.
           content: userPromptText,
         },
       ],
+      modelTier: 'quality',
       temperature: 0.8,
-      max_tokens: 1500,
+      maxTokens: 1500,
+      feature: 'cover/compare',
     })
 
-    const result = completion.choices[0]?.message?.content || ''
+    const result = completion.text || ''
 
     // Parse the three variants (handle multiple possible formats)
     // First try parsing by "---" separator

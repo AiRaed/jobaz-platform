@@ -11,6 +11,8 @@
 
 ### AI Features
 - `OPENAI_API_KEY` (Server-only)
+- `OPENAI_MODEL` (optional, default `gpt-4o-mini`)
+- `OPENAI_MODEL_QUALITY` (optional, default `gpt-4o` for complex routes)
 
 ### Text-to-Speech
 - `ELEVENLABS_API_KEY` (Server-only)

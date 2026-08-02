@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 import { normalizeSummaryParagraph, stripPlaceholders } from '@/lib/normalize'
 
 export const dynamic = 'force-dynamic'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
 
 export async function POST(req: Request) {
   try {
@@ -20,7 +16,7 @@ export async function POST(req: Request) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       // Extract role from keywords if possible
       const roleMatch = keywords.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(Engineer|Developer|Designer|Manager|Analyst|Specialist|Consultant)/i)
@@ -67,8 +63,7 @@ STRICT RULES:
 OUTPUT FORMAT:
 A single polished paragraph. Return only the paragraph text, nothing else. Write in ${lang}.`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -79,11 +74,13 @@ A single polished paragraph. Return only the paragraph text, nothing else. Write
           content: prompt,
         },
       ],
+      modelTier: 'quality',
       temperature: 0.7,
-      max_tokens: 200,
+      maxTokens: 200,
+      feature: 'generate',
     })
 
-    let generatedSummary = completion.choices[0]?.message?.content || ''
+    let generatedSummary = completion.text || ''
     
     // Normalize: strip prefaces and ensure single paragraph format
     generatedSummary = stripPlaceholders(generatedSummary)

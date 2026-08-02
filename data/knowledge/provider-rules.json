@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "description": "Provider status meanings and Apply Now safety rules. Do not invent approved partnerships.",
+  "provider_statuses": {
+    "active": "Approved or usable provider with real course/referral/official URL.",
+    "pending": "Application or partnership not yet confirmed.",
+    "problem": "Provider has issue such as missing tracking, unclear payout or broken link.",
+    "rejected": "Provider declined or not suitable.",
+    "need_follow_up": "Needs admin action before relying on it."
+  },
+  "apply_now_rules": [
+    "Only show Apply Now when there is a real published course and safe referral or official URL.",
+    "Do not show Apply Now for recommendation-only courses.",
+    "Track Apply Now clicks when possible.",
+    "Flag missing referral links as revenue blockers."
+  ]
+}

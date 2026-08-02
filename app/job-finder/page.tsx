@@ -4,10 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, MapPin, Briefcase, Clock } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
+import { PlatformToolShell } from '@/components/dashboard/platform'
 import PageHeader from '@/components/PageHeader'
 import TranslatableText from '@/components/TranslatableText'
 // NOTE: Removed user-storage imports - saved jobs now use Supabase API
 import { UK_CITIES, getLocationValue } from '@/lib/uk-cities'
+import JobSourceBadge from '@/components/jobs/JobSourceBadge'
+import type { JobSource } from '@/lib/jobs/types'
 
 const JOB_FINDER_CACHE_KEY = "jobaz-job-finder-cache";
 const JOB_FINDER_TTL_MS = 20 * 60 * 1000; // 20 minutes
@@ -20,6 +23,12 @@ interface Job {
   description: string
   type: string
   link?: string
+  salary?: string
+  source?: JobSource
+  featured?: boolean
+  partnerCompany?: boolean
+  routeTags?: string[]
+  bestMatch?: boolean
 }
 
 export default function JobFinderPage() {
@@ -33,7 +42,9 @@ export default function JobFinderPage() {
   const [searched, setSearched] = useState(false)
   const [savedJobs, setSavedJobs] = useState<Job[]>([])
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set()) // Set of job_key for quick lookups
-  const [savedItems, setSavedItems] = useState<Array<{ job_key: string; job: Job; created_at: string }>>([]) // Full saved items from Supabase
+  const [savedItems, setSavedItems] = useState<Array<{ job_key: string; job: Job; created_at: string }>>([])
+  const jobsViewedRef = useRef(false)
+  const searchViewedDayRef = useRef<string | null>(null) // Full saved items from Supabase
   const [isInitialized, setIsInitialized] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [prefillLabel, setPrefillLabel] = useState<string | null>(null) // Label from Career Assistant
@@ -50,6 +61,13 @@ export default function JobFinderPage() {
     const categoryFromUrl = searchParams.get('category')
     const fromParam = searchParams.get('from')
     const sessionParam = searchParams.get('ca_session')
+    const planTask = searchParams.get('planTask')
+
+    if (planTask === 'apply-steward' || planTask === 'save-security') {
+      void import('@/lib/dashboard/careerOs/actionPlanProgress').then(({ markActionPlanTask }) => {
+        markActionPlanTask(planTask, 'in_progress')
+      })
+    }
     
     // Check if coming from Career Assistant
     if (fromParam === 'career_assistant' || sessionParam) {
@@ -225,7 +243,24 @@ export default function JobFinderPage() {
     }
   }, [searchParams]);
 
-  // Load saved jobs from Supabase on mount
+  // Job Finder page view — once per session/day
+  useEffect(() => {
+    if (jobsViewedRef.current) return
+    jobsViewedRef.current = true
+    const day = new Date().toISOString().slice(0, 10)
+    void import('@/lib/jobaz-ai/emitSignal').then(({ emitAiSignal }) =>
+      emitAiSignal({
+        type: 'jobs_viewed',
+        source: 'job-finder',
+        impact: { engagement: 2, jobSearchActivity: 3 },
+        metadata: {
+          dedupeId: `finder-page-${day}`,
+          action: 'page_view',
+        },
+      })
+    )
+  }, [])
+
   useEffect(() => {
     if (typeof window === 'undefined' || isInitialized) return
 
@@ -355,6 +390,25 @@ export default function JobFinderPage() {
       const data = await response.json()
       const results = data.results || []
       setJobs(results)
+
+      const day = new Date().toISOString().slice(0, 10)
+      if (searchViewedDayRef.current !== day) {
+        searchViewedDayRef.current = day
+        void import('@/lib/jobaz-ai/emitSignal').then(({ emitAiSignal }) =>
+          emitAiSignal({
+            type: 'jobs_viewed',
+            source: 'job-finder',
+            impact: { engagement: 2, jobSearchActivity: 5 },
+            metadata: {
+              dedupeId: `finder-search-${day}`,
+              action: 'search_results',
+              results_count: results.length,
+              keyword: title.trim() || undefined,
+              location: getLocationValue(location) || undefined,
+            },
+          })
+        )
+      }
 
       // Cache Adzuna jobs to sessionStorage when loaded
       if (typeof window !== 'undefined') {
@@ -525,6 +579,20 @@ export default function JobFinderPage() {
         console.log('[SavedJobs] Toggle successful, saved:', data.saved)
         
         if (data.saved) {
+          void import('@/lib/jobaz-ai/emitSignal').then(({ emitAiSignal }) =>
+            emitAiSignal({
+              type: 'jobs_saved',
+              source: 'job-finder',
+              impact: { readiness: 3, engagement: 5, jobSearchActivity: 8 },
+              metadata: {
+                dedupeId: jobKey,
+                job_id: jobKey,
+                job_title: job.title,
+                company: job.company,
+                location: job.location,
+              },
+            })
+          )
           // Job was saved - add to savedItems
           setSavedItems((prev) => [
             ...prev,
@@ -600,11 +668,25 @@ export default function JobFinderPage() {
   }
 
   return (
-    <AppShell className="max-w-7xl">
+    <AppShell wide platform>
+      <PlatformToolShell>
         <PageHeader
           title="Find jobs that match your skills"
           subtitle="Search for roles based on your CV and preferences"
+          showBackToDashboard={false}
         />
+
+        <section className="jobaz-hero jobaz-keep-light mb-5 rounded-2xl border border-slate-400/20 px-4 py-4 md:px-5">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-300/90 font-medium mb-1">
+            JobAZ
+          </p>
+          <h2 className="text-lg md:text-xl font-bold text-slate-50 tracking-tight">
+            Job Finder
+          </h2>
+          <p className="text-sm text-slate-300/95 mt-1.5 max-w-2xl leading-relaxed">
+            Search UK roles that match your skills — then save jobs and open them in your plan.
+          </p>
+        </section>
 
         {/* Back to Career Assistant Results Banner */}
         {caSessionId && (
@@ -664,21 +746,21 @@ export default function JobFinderPage() {
         )}
 
         {/* Search Controls */}
-        <div className="rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-400/60 hover:shadow-[0_18px_50px_rgba(76,29,149,0.7)] transition p-6 mb-8">
+        <div className="jobaz-card mb-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Job Title */}
             <div className="md:col-span-2">
-              <label className="block text-gray-400 font-medium mb-2 text-sm">
+              <label className="block text-[var(--text-secondary)] font-medium mb-2 text-sm">
                 Job Title
               </label>
               <div className="relative">
-                <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--text-muted)] pointer-events-none" />
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Customer Service"
-                  className="w-full bg-[#0D0D0D] border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#9b5cff] transition-colors"
+                  className="jobaz-input w-full pl-10"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       handleSearch()
@@ -690,11 +772,11 @@ export default function JobFinderPage() {
 
             {/* Location */}
             <div>
-              <label className="block text-gray-400 font-medium mb-2 text-sm">
+              <label className="block text-[var(--text-secondary)] font-medium mb-2 text-sm">
                 Location
               </label>
               <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none z-10" />
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--text-muted)] pointer-events-none z-10" />
                 <select
                   value={location}
                   onChange={(e) => {
@@ -704,7 +786,7 @@ export default function JobFinderPage() {
                       handleSearch()
                     }
                   }}
-                  className="w-full bg-[#0D0D0D] border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-[#9b5cff] transition-colors appearance-none cursor-pointer"
+                  className="jobaz-input w-full pl-10 appearance-none cursor-pointer"
                 >
                   {UK_CITIES.map((city) => (
                     <option key={city} value={city}>
@@ -717,15 +799,15 @@ export default function JobFinderPage() {
 
             {/* Job Type */}
             <div>
-              <label className="block text-gray-400 font-medium mb-2 text-sm">
+              <label className="block text-[var(--text-secondary)] font-medium mb-2 text-sm">
                 Job Type
               </label>
               <div className="relative">
-                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none z-10" />
+                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--text-muted)] pointer-events-none z-10" />
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
-                  className="w-full bg-[#0D0D0D] border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-[#9b5cff] transition-colors appearance-none cursor-pointer"
+                  className="jobaz-input w-full pl-10 appearance-none cursor-pointer"
                 >
                   <option value="">All Types</option>
                   <option value="Full-time">Full-time</option>
@@ -736,13 +818,13 @@ export default function JobFinderPage() {
           </div>
 
           {/* Search Button */}
-          <div className="mt-6">
+          <div className="mt-5">
             <button
               onClick={handleSearch}
               disabled={loading}
-              className="w-full md:w-auto rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/60 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="jobaz-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Search className="w-5 h-5" />
+              <Search className="w-4 h-4" />
               {loading ? 'Searching...' : 'Search Jobs'}
             </button>
           </div>
@@ -768,17 +850,17 @@ export default function JobFinderPage() {
                     <p className="text-gray-400">Searching for jobs...</p>
                   </div>
                 ) : jobs.length === 0 ? (
-                  <div className="text-center py-12 rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)]">
-                    <p className="text-gray-400 text-lg mb-2">No jobs found for this search.</p>
-                    <p className="text-gray-500 text-sm">
+                  <div className="jobaz-card text-center py-12 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+                    <p className="text-[var(--text-secondary)] text-lg mb-2">No jobs found for this search.</p>
+                    <p className="text-[var(--text-muted)] text-sm">
                       Try different keywords or location.
                     </p>
                   </div>
                 ) : (
                   <div>
                     <div className="mb-4">
-                      <p className="text-gray-400">
-                        Found <span className="text-white font-semibold">{jobs.length}</span>{' '}
+                      <p className="text-[var(--text-secondary)]">
+                        Found <span className="text-[var(--text-primary)] font-semibold">{jobs.length}</span>{' '}
                         {jobs.length === 1 ? 'job' : 'jobs'}
                       </p>
                     </div>
@@ -786,32 +868,42 @@ export default function JobFinderPage() {
                       {jobs.map((job) => (
                         <div
                           key={job.id}
-                          className="rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-400/60 hover:shadow-[0_18px_50px_rgba(76,29,149,0.7)] transition p-6"
+                          className="jobaz-card rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 transition hover:border-[var(--bg-primary)]/40"
                         >
                           {/* Job Header */}
                           <div className="mb-4">
-                            <h3 className="text-xl font-heading font-semibold mb-1 text-white">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              {job.bestMatch && (
+                                <span className="inline-flex items-center rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                                  Best match
+                                </span>
+                              )}
+                            </div>
+                            <h3 className="text-xl font-heading font-semibold mb-1 text-[var(--text-primary)]">
                               <TranslatableText text={job.title}>
                                 {job.title}
                               </TranslatableText>
                             </h3>
-                            <p className="text-[#9b5cff] font-medium">{job.company}</p>
+                            <p className="text-[var(--bg-primary)] font-medium">{job.company}</p>
+                            {job.salary && (
+                              <p className="text-sm text-emerald-600 dark:text-emerald-400/90 mt-1">{job.salary}</p>
+                            )}
                           </div>
 
                           {/* Job Details */}
                           <div className="space-y-2 mb-4">
-                            <div className="flex items-center gap-2 text-gray-400 text-sm">
+                            <div className="flex items-center gap-2 text-[var(--text-secondary)] text-sm">
                               <MapPin className="w-4 h-4" />
                               <span>{job.location}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-gray-400 text-sm">
+                            <div className="flex items-center gap-2 text-[var(--text-secondary)] text-sm">
                               <Clock className="w-4 h-4" />
                               <span>{job.type}</span>
                             </div>
                           </div>
 
                           {/* Description */}
-                          <p className="text-gray-300 text-sm mb-6 line-clamp-3">
+                          <p className="text-[var(--text-secondary)] text-sm mb-6 line-clamp-3">
                             <TranslatableText text={job.description}>
                               {job.description}
                             </TranslatableText>
@@ -819,29 +911,31 @@ export default function JobFinderPage() {
 
                           {/* Match Badge (Optional placeholder) */}
                           <div className="mb-4">
-                            <span className="inline-block bg-[#9b5cff]/20 text-[#9b5cff] text-xs font-medium px-3 py-1 rounded-full">
-                              Good Match
-                            </span>
+                            <JobSourceBadge
+                              source={job.source}
+                              featured={job.featured}
+                              partnerCompany={job.partnerCompany}
+                            />
                           </div>
 
                           {/* Action Buttons */}
                           <div className="space-y-2">
                             <button
                               onClick={() => handleViewJob(job)}
-                              className="w-full rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/60 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition"
+                              className="jobaz-btn-primary w-full"
                             >
                               View Job
                             </button>
                             <button
                               onClick={() => handleSaveJob(job)}
                               disabled={isJobSaved(job.id)}
-                              className="w-full rounded-full bg-slate-900/80 px-3 py-1.5 text-xs font-medium text-slate-100 border border-slate-600/70 hover:border-violet-400/60 hover:text-violet-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="jobaz-btn-secondary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isJobSaved(job.id) ? 'Saved' : 'Save'}
                             </button>
                             <button
                               onClick={() => handleTailorCV(job.id)}
-                              className="w-full rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/60 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition"
+                              className="jobaz-btn-primary w-full"
                             >
                               Tailor CV
                             </button>
@@ -856,12 +950,12 @@ export default function JobFinderPage() {
 
             {/* Initial State Message */}
             {!searched && (
-              <div className="text-center py-12 rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)]">
-                <Search className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400 text-lg mb-2">
+              <div className="jobaz-card text-center py-12 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+                <Search className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-4" />
+                <p className="text-[var(--text-secondary)] text-lg mb-2">
                   Start your job search
                 </p>
-                <p className="text-gray-500 text-sm">
+                <p className="text-[var(--text-muted)] text-sm">
                   Enter your criteria above and click Search to find matching jobs
                 </p>
               </div>
@@ -871,25 +965,25 @@ export default function JobFinderPage() {
           {/* Right Column: Saved Jobs Sidebar */}
           <div className="w-full md:w-80">
             <div className="md:sticky md:top-4">
-              <h2 className="text-2xl font-heading font-semibold mb-6">Saved Jobs</h2>
+              <h2 className="text-xl font-heading font-semibold mb-4 text-[var(--text-primary)]">Saved Jobs</h2>
               {savedJobs.length === 0 ? (
-                <div className="rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)] p-8 text-center">
-                  <p className="text-gray-400">No saved jobs yet.</p>
+                <div className="jobaz-card rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-8 text-center">
+                  <p className="text-[var(--text-secondary)]">No saved jobs yet.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {savedJobs.map((job) => (
                     <div
                       key={job.id}
-                      className="rounded-2xl border border-slate-700/60 bg-slate-950/60 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-400/60 hover:shadow-[0_18px_50px_rgba(76,29,149,0.7)] transition p-6"
+                      className="jobaz-card rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 transition hover:border-[var(--bg-primary)]/40"
                     >
                       <div className="flex flex-col gap-4">
                         <div className="flex-1">
-                          <h3 className="text-lg font-heading font-semibold mb-1 text-white">
+                          <h3 className="text-lg font-heading font-semibold mb-1 text-[var(--text-primary)]">
                             {job.title}
                           </h3>
-                          <p className="text-[#9b5cff] font-medium mb-2">{job.company}</p>
-                          <div className="flex items-center gap-2 text-gray-400 text-sm">
+                          <p className="text-[var(--bg-primary)] font-medium mb-2">{job.company}</p>
+                          <div className="flex items-center gap-2 text-[var(--text-secondary)] text-sm">
                             <MapPin className="w-4 h-4" />
                             <span>{job.location}</span>
                           </div>
@@ -897,19 +991,19 @@ export default function JobFinderPage() {
                         <div className="space-y-2">
                           <button
                             onClick={() => handleViewJob(job)}
-                            className="w-full rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/60 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center justify-center gap-2"
+                            className="jobaz-btn-primary w-full"
                           >
                             View Job
                           </button>
                           <button
                             onClick={() => handleTailorCV(job.id)}
-                            className="w-full rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/60 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center justify-center gap-2"
+                            className="jobaz-btn-primary w-full"
                           >
                             Tailor CV
                           </button>
                           <button
                             onClick={() => handleRemoveSavedJob(job.id)}
-                            className="w-full rounded-full bg-slate-900/80 px-3 py-1.5 text-xs font-medium text-slate-100 border border-slate-600/70 hover:border-violet-400/60 hover:text-violet-100 transition"
+                            className="jobaz-btn-secondary w-full"
                           >
                             Remove
                           </button>
@@ -922,6 +1016,7 @@ export default function JobFinderPage() {
             </div>
           </div>
         </div>
+      </PlatformToolShell>
     </AppShell>
   )
 }

@@ -1,20 +1,32 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, LogOut, Compass, FileCheck, MessageSquare } from 'lucide-react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { CheckCircle2, XCircle, FileText, Mail, Send, GraduationCap, ArrowRight, Briefcase, Lock, Search, Sparkles, Zap, Target, RefreshCw, Star, Compass, FileCheck, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import AppShell from '@/components/layout/AppShell'
+import {
+  PlatformContent,
+  PlatformSectionHeader,
+  PlatformShell,
+} from '@/components/dashboard/platform'
+import { CareerOsDashboard } from '@/components/dashboard/career-os'
+import DocumentsHub from '@/components/dashboard/DocumentsHub'
+import DashboardSupportFooter from '@/components/dashboard/DashboardSupportFooter'
+import { resolveDashboardTab, dashboardTabHref } from '@/lib/dashboard/navigateDashboardTab'
+import { useCareerJourney } from '@/hooks/useCareerJourney'
+import RecommendedJobCard from '@/components/dashboard/RecommendedJobCard'
 import { type AppliedJob } from '@/lib/applied-jobs-storage'
-import Logo from '@/components/Logo'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { DeleteAccountModal } from '@/components/DeleteAccountModal'
 import { extractCVKeywords, calculateMatchPercentage, generateSearchQueryFromCV, extractSummaryKeywords, filterJobsByRelevance, isTrainingJob } from '@/lib/job-matching'
 import { supabase } from '@/lib/supabase'
 import { clearCurrentUserStorage, initUserStorageCache, getCurrentUserIdSync, getUserScopedKeySync } from '@/lib/user-storage'
+import { clearCachesOnLogout } from '@/lib/career-engine/clearSharedCareerCache'
+import { resetAssessmentLoaderUserCache } from '@/lib/dashboard/careerOs/assessmentLoader'
 import { UK_CITIES, getLocationValue } from '@/lib/uk-cities'
-import { computeCvScore, type CvScoreResult } from '@/lib/cv-score'
+import { calculateCvReadiness } from '@/lib/cv/calculateCvReadiness'
 import type { CvData } from '@/app/cv-builder-v2/page'
 
 // CV Score calculation - use shared utility
@@ -57,13 +69,13 @@ function convertDashboardCvToCvData(cv: any): CvData {
     experience,
     education: cv?.education || [],
     skills: cv?.skills || [],
+    certifications: Array.isArray(cv?.certifications) ? cv.certifications : [],
   }
 }
 
-// Wrapper function for backward compatibility
-function calculateCVScore(cv: any): CvScoreResult {
-  const cvData = convertDashboardCvToCvData(cv)
-  return computeCvScore(cvData)
+// Wrapper — shared readiness used by My Plan + Documents
+function calculateCVScore(cv: any): { score: number } {
+  return { score: calculateCvReadiness(convertDashboardCvToCvData(cv)).score }
 }
 
 const JOB_STORAGE_PREFIX = 'jobaz_job_'
@@ -102,6 +114,12 @@ interface Job {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const activeTab = useMemo(
+    () => resolveDashboardTab(pathname, searchParams.get('tab')),
+    [pathname, searchParams]
+  )
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([])
   const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([])
   const [loading, setLoading] = useState(true)
@@ -150,7 +168,9 @@ export default function DashboardPage() {
     setCvError(null) // Clear previous errors
     
     try {
-      const response = await fetch('/api/cv/get-latest')
+      const response = await fetch('/api/cv/get-latest', {
+        signal: AbortSignal.timeout(12_000),
+      })
       
       // Handle 401 - Not authenticated
       if (response.status === 401) {
@@ -168,6 +188,7 @@ export default function DashboardPage() {
           message: 'Permission error. Please sign out and sign in again to refresh your session.'
         })
         setBaseCv(null)
+        setCvId(null)
         setCvLastUpdated(null)
         setReadiness(null)
         setLoadingCv(false)
@@ -186,6 +207,7 @@ export default function DashboardPage() {
           message: `Server error: ${errorMessage}`
         })
         setBaseCv(null)
+        setCvId(null)
         setCvLastUpdated(null)
         setReadiness(null)
         setLoadingCv(false)
@@ -209,6 +231,7 @@ export default function DashboardPage() {
           message: data.error || 'Failed to fetch CV'
         })
         setBaseCv(null)
+        setCvId(null)
         setCvLastUpdated(null)
         setReadiness(null)
         setLoadingCv(false)
@@ -223,6 +246,7 @@ export default function DashboardPage() {
       // Handle hasCv: false (no CV found - this is OK)
       if (!data.hasCv || !data.cv) {
         setBaseCv(null)
+        setCvId(null)
         setCvLastUpdated(null)
         setReadiness(null)
         setLoadingCv(false)
@@ -263,9 +287,18 @@ export default function DashboardPage() {
         skills: data.cv.skills || [],
         experience: mappedExperience,
         education: data.cv.education || [],
+        certifications: Array.isArray(data.cv.certifications) ? data.cv.certifications : [],
       }
       
       setBaseCv(dashboardCv)
+      setCvId(typeof data.cvId === 'string' ? data.cvId : null)
+      if (typeof data.cvId === 'string') {
+        try {
+          localStorage.setItem('jobaz_active_cv_id', data.cvId)
+        } catch {
+          // ignore
+        }
+      }
       setCvLastUpdated(data.readiness?.lastUpdated || null)
       setReadiness(data.readiness)
     } catch (error: any) {
@@ -276,6 +309,7 @@ export default function DashboardPage() {
         message: error.message || 'Network error. Please check your connection and try again.'
       })
       setBaseCv(null)
+      setCvId(null)
       setCvLastUpdated(null)
       setReadiness(null)
     } finally {
@@ -488,6 +522,16 @@ export default function DashboardPage() {
     }
   }, [loadingCv])
 
+  // Safety net: never leave the full-page skeleton forever if a fetch hangs
+  useEffect(() => {
+    const safety = window.setTimeout(() => {
+      setLoadingCv(false)
+      setLoading(false)
+      setIsLoading(false)
+    }, 15_000)
+    return () => window.clearTimeout(safety)
+  }, [])
+
   // Listen for CV and cover letter save events and storage changes to auto-refresh
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -534,8 +578,13 @@ export default function DashboardPage() {
     // NOTE: localStorage persistence has been removed - storage events are no longer used
     // window.addEventListener('storage', handleStorageChange)
     
-    // Also check on window focus (in case CV, cover, or applied jobs were updated in another tab)
+    // Throttle focus refresh — avoid refetching CV/cover/jobs on every tab switch
+    const FOCUS_REFRESH_MS = 60_000
+    let lastFocusRefresh = 0
     const handleFocus = () => {
+      const now = Date.now()
+      if (now - lastFocusRefresh < FOCUS_REFRESH_MS) return
+      lastFocusRefresh = now
       fetchCvFromApi()
       fetchCoverFromApi()
       fetchAppliedJobsFromApi()
@@ -983,8 +1032,8 @@ export default function DashboardPage() {
 
       // Success - sign out and redirect
       await supabase.auth.signOut()
-      
-      // Clear user storage
+      clearCachesOnLogout()
+      resetAssessmentLoaderUserCache()
       await clearCurrentUserStorage()
       
       // Show success message briefly before redirect
@@ -1160,6 +1209,77 @@ export default function DashboardPage() {
 
   const nextStep = getNextJourneyStep()
 
+  useEffect(() => {
+    if (searchParams.get('tab') === 'feed') {
+      router.replace('/feed')
+    }
+    if (searchParams.get('tab') === 'training') {
+      router.replace('/dashboard#recommended-training')
+    }
+  }, [searchParams, router])
+
+  const cvQualityScore = useMemo(() => {
+    // Always derive from real saved CV fields (shared calculateCvReadiness)
+    if (!baseCv) return 0
+    if (readiness?.score != null && typeof readiness.score === 'number') {
+      // Prefer API shared score when present; recompute as fallback for consistency
+      return readiness.score
+    }
+    return calculateCVScore(baseCv).score
+  }, [readiness, baseCv])
+
+  const interviewConfidence = useMemo(() => {
+    let score = 15
+    if (savedJobs.some((j) => j.statuses.training === 'available')) score += 45
+    if (appliedJobs.length > 0) score += 25
+    if (appliedJobs.some((j) => j.hasCv)) score += 15
+    return Math.min(score, 100)
+  }, [savedJobs, appliedJobs])
+
+  const jobMatchStrength = useMemo(() => {
+    if (recommendedJobs.length === 0) return 0
+    return Math.round(
+      recommendedJobs.reduce((s, j) => s + (j.matchPercentage ?? 0), 0) / recommendedJobs.length
+    )
+  }, [recommendedJobs])
+
+  const journeySignals = useMemo(
+    () => ({
+      hasAssessment: false,
+      readinessScore: cvQualityScore,
+      cvQualityScore,
+      hasBaseCv: !!baseCv,
+      applicationsCount: appliedJobs.length,
+      interviewConfidence,
+      savedJobsCount: savedJobs.length,
+    }),
+    [cvQualityScore, baseCv, appliedJobs.length, interviewConfidence, savedJobs.length]
+  )
+
+  const { snapshot: careerJourneySnapshot } = useCareerJourney(journeySignals)
+
+  const handleLogout = useCallback(async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const userId = user?.id || null
+      await supabase.auth.signOut()
+      if (typeof window !== 'undefined') {
+        clearCachesOnLogout()
+        resetAssessmentLoaderUserCache()
+        if (userId) {
+          await clearCurrentUserStorage()
+        }
+      }
+      router.push('/')
+      router.refresh()
+    } catch (error) {
+      console.error('Error signing out:', error)
+      router.push('/')
+    }
+  }, [router])
+
   // Helper for truncated summary
   const shortSummary = baseCv?.summary ? (baseCv.summary.length > 160 ? baseCv.summary.slice(0, 160) + "…" : baseCv.summary) : ""
 
@@ -1215,629 +1335,163 @@ export default function DashboardPage() {
 
   return (
     <div>
-  <AppShell>
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between md:gap-4">
-          <div className="flex-1">
-            <div className="flex items-end gap-3 -ml-4">
-              <Logo />
-              <h1 className="text-3xl md:text-4xl font-bold">Dashboard</h1>
-            </div>
-            {(displayName || displayEmail) && (
-              <div className="text-sm md:text-base text-slate-300/90 mt-1">
-                {displayName && <span>{displayName}</span>}
-                {displayName && displayEmail && <span className="mx-2">·</span>}
-                {displayEmail && <span>{displayEmail}</span>}
-              </div>
-            )}
-            <p className="text-slate-300/90 text-sm md:text-base mt-1">
-              Everything you've prepared in one place.
-            </p>
-          </div>
-          {/* Logout Button and Support Button */}
-          <div className="flex flex-col items-end gap-2 mt-4 md:mt-0">
-            {/* Right Actions Container - Both buttons on one row */}
-            <div className="flex items-center gap-3 flex-nowrap">
-              {/* Support Button and Text Container */}
-              <div className="flex flex-col items-start">
-                <a
-                  href="https://buymeacoffee.com/jobaz.support"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/30 border border-slate-700/30 hover:border-violet-500/40 hover:bg-violet-500/10 text-slate-300 hover:text-violet-300 transition-colors text-xs sm:text-sm font-medium whitespace-nowrap"
-                >
-                  <span>☕</span>
-                  <span>Support JobAZ — Keep it free</span>
-                </a>
-                {/* Support message text below button */}
-                <p className="text-xs text-slate-400/70 text-left mt-1 max-w-[300px]">
-                  If JobAZ helped you, your support helps keep it free — especially for people who can't afford paid tools.
+  <AppShell wide platform>
+      <PlatformShell
+        identity={{
+          displayName: displayName || 'Your career',
+          displayEmail: displayEmail || undefined,
+          careerStateLabel: careerJourneySnapshot?.stateLabel,
+          onLogout: handleLogout,
+        }}
+      >
+      <PlatformContent>
+      {/* Tab-specific platform content */}
+      <>
+        {activeTab === 'overview' && (
+          <CareerOsDashboard
+            cvQualityScore={cvQualityScore}
+            hasBaseCv={Boolean(baseCv)}
+            appliedJobsCount={appliedJobs.length}
+            savedJobsCount={savedJobs.length + savedJobsFromJobFinder.length}
+            interviewConfidence={interviewConfidence}
+            onCvCleared={() => {
+              setBaseCv(null)
+              setCvId(null)
+              setCvLastUpdated(null)
+              setReadiness(null)
+            }}
+            onPlanCleared={() => {
+              // Plan local caches cleared by ManagePlanDataControls; page reloads
+            }}
+          />
+        )}
+
+        {activeTab === 'career-path' && (
+          <section className="mb-10 space-y-5">
+            <h2 className="text-xl font-semibold text-slate-50 tracking-tight flex items-center gap-2">
+              <span className="inline-block h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.9)]" />
+              Career Path
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Link
+                href="/uk-career-assistant"
+                className={cn(
+                  'group relative overflow-hidden rounded-2xl border border-violet-500/30 bg-slate-950/50 p-6',
+                  'hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.4)] transition'
+                )}
+              >
+                <span className="absolute top-3 right-3 rounded-full bg-violet-600/90 px-2 py-0.5 text-[10px] font-medium uppercase text-violet-100">
+                  Recommended
+                </span>
+                <MessageSquare className="w-6 h-6 text-violet-400 mb-3" />
+                <h3 className="text-lg font-semibold text-slate-50 mb-2">UK Career Assistant</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  AI-guided assessment: Work Now vs Improve Later, personalised paths, and next steps.
                 </p>
+              </Link>
+              <Link
+                href="/career-hub"
+                className={cn(
+                  'group relative overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/50 p-6',
+                  'hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.35)] transition'
+                )}
+              >
+                <Compass className="w-6 h-6 text-violet-400 mb-3" />
+                <h3 className="text-lg font-semibold text-slate-50 mb-2">Career Hub</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  Courses, licences, certifications, and career routes — explore or follow your AI plan.
+                </p>
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'documents' && (
+          <>
+        <PlatformSectionHeader
+          title="Documents"
+          description="Your CV hub — view, improve, and keep applications ready."
+          dotColor="violet"
+        />
+
+        <DocumentsHub
+          baseCv={baseCv}
+          cvId={cvId}
+          cvLastUpdated={cvLastUpdated}
+          baseCover={baseCover}
+          formatDaysAgo={formatDaysAgo}
+          onViewCv={() => setIsCvModalOpen(true)}
+          onViewCover={() => setIsCoverModalOpen(true)}
+          appliedJobsCount={appliedJobs.length}
+          savedJobsCount={savedJobs.length + savedJobsFromJobFinder.length}
+          interviewConfidence={interviewConfidence}
+          cvQualityScore={cvQualityScore}
+        />
+
+        {cvError && (
+          <p className="text-sm text-red-400 mb-6 rounded-lg border border-red-500/30 bg-red-950/30 px-4 py-2">
+            {cvError.message}
+          </p>
+        )}
+          </>
+        )}
+
+        {activeTab === 'interview' && (
+          <section className="mb-10 space-y-6">
+            <h2 className="text-xl font-semibold text-slate-50 tracking-tight flex items-center gap-2">
+              <span className="inline-block h-2 w-2 rounded-full bg-blue-400 shadow-[0_0_12px_rgba(96,165,250,0.9)]" />
+              Interview Readiness
+            </h2>
+            <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-6">
+              <div className="flex flex-wrap items-center gap-6 mb-6">
+                <div>
+                  <p className="text-xs uppercase text-slate-500 mb-1">Interview Confidence</p>
+                  <p className={cn('text-4xl font-bold tabular-nums', interviewConfidence >= 70 ? 'text-emerald-400' : interviewConfidence >= 50 ? 'text-amber-400' : 'text-slate-300')}>
+                    {interviewConfidence}
+                    <span className="text-lg text-slate-500 font-normal">/100</span>
+                  </p>
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
+                      style={{ width: `${interviewConfidence}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Practice with Interview Coach and tailor applications to build confidence.
+                  </p>
+                </div>
               </div>
               <button
-                onClick={async () => {
-                  try {
-                    // Get user ID before signing out (needed to clear user-scoped storage)
-                    const { data: { user } } = await supabase.auth.getUser()
-                    const userId = user?.id || null
-                    
-                    // Sign out from Supabase
-                    await supabase.auth.signOut()
-                    
-                    // Clear all user-scoped localStorage data
-                    if (typeof window !== 'undefined' && userId) {
-                      await clearCurrentUserStorage()
-                    }
-                    
-                    router.push('/')
-                    router.refresh()
-                  } catch (error) {
-                    console.error('Error signing out:', error)
-                    router.push('/')
-                  }
-                }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-red-500/50 hover:bg-red-500/10 text-slate-200 hover:text-red-400 transition-colors whitespace-nowrap"
+                type="button"
+                onClick={() => router.push('/interview-coach')}
+                className="rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-2.5 text-sm font-medium text-white hover:from-violet-500 hover:to-purple-500 transition shadow-[0_0_18px_rgba(139,92,246,0.6)]"
               >
-                <LogOut className="w-4 h-4" />
-                <span className="text-sm font-medium">Logout</span>
+                Open Interview Coach
               </button>
             </div>
-          </div>
-        </div>
-        <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
-      </div>
-
-      {/* Main Dashboard Content */}
-      <>
-
-        {/* Quick Actions - single row on xl (≥1280px), wrap on smaller screens */}
-        <section className="mb-6">
-          <h2 className="text-sm font-semibold tracking-wide text-slate-300/80 uppercase mb-3">
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-            <Link
-              href="/cv-builder-v2"
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
-                "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
-                "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
-              )}
-            >
-              <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
-              <FileText className="w-4 h-4 text-violet-400 flex-shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <div className="text-sm font-semibold text-slate-50">CV Builder</div>
-                <div className="text-xs text-slate-400 leading-snug">Create or edit your CV</div>
-              </div>
-            </Link>
-            
-            <Link
-              href="/cover"
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
-                "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
-                "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
-              )}
-            >
-              <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
-              <Mail className="w-4 h-4 text-violet-400 flex-shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <div className="text-sm font-semibold text-slate-50">Cover Letter</div>
-                <div className="text-xs text-slate-400 leading-snug">Write a tailored cover letter</div>
-              </div>
-            </Link>
-            
-            <Link
-              href="/job-finder"
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
-                "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
-                "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
-              )}
-            >
-              <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
-              <Search className="w-4 h-4 text-violet-400 flex-shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <div className="text-sm font-semibold text-slate-50">Job Finder</div>
-                <div className="text-xs text-slate-400 leading-snug">Search for jobs with this CV</div>
-              </div>
-            </Link>
-            
-            <Link
-              href="/interview-coach"
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
-                "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
-                "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
-              )}
-            >
-              <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
-              <GraduationCap className="w-4 h-4 text-violet-400 flex-shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <div className="text-sm font-semibold text-slate-50">Interview Coach</div>
-                <div className="text-xs text-slate-400 leading-snug">Practice your interview answers</div>
-              </div>
-            </Link>
-
-            <Link
-              href="/build-your-path"
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
-                "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
-                "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
-              )}
-            >
-              <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
-              <Compass className="w-4 h-4 text-violet-400 flex-shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <div className="text-sm font-semibold text-slate-50">Build Your Path</div>
-                <div className="text-xs text-slate-400 leading-snug">Explore career paths and build skills</div>
-              </div>
-            </Link>
-
-            <Link
-              href="/uk-career-assistant"
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
-                "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
-                "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
-              )}
-            >
-              <span className="absolute top-2 right-2 rounded-full bg-gradient-to-r from-violet-600/90 to-purple-600/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-100/95 shadow-[0_0_12px_rgba(139,92,246,0.25)]">
-                Beta
-              </span>
-              <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
-              <MessageSquare className="w-4 h-4 text-violet-400 flex-shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <div className="text-sm font-semibold text-slate-50">UK Career Assistant</div>
-                <div className="text-xs text-slate-400 leading-snug">Assess your work situation step-by-step</div>
-              </div>
-            </Link>
-
-            <Link
-              href="/proofreading"
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/50 h-full min-w-0",
-                "px-4 py-3 flex items-center gap-3 shadow-[0_0_40px_rgba(88,28,135,0.35)]/20",
-                "hover:border-violet-400/70 hover:shadow-[0_0_40px_rgba(168,85,247,0.55)] transition-all duration-300 cursor-pointer"
-              )}
-            >
-              <span className="absolute top-2 right-2 rounded-full bg-gradient-to-r from-violet-600/90 to-purple-600/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-100/95 shadow-[0_0_12px_rgba(139,92,246,0.25)]">
-                Beta
-              </span>
-              <div className="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-b from-violet-500/25 to-transparent opacity-0 group-hover:opacity-100 transition" />
-              <FileCheck className="w-4 h-4 text-violet-400 flex-shrink-0 relative z-10" />
-              <div className="flex flex-col min-w-0 flex-1 relative z-10">
-                <div className="text-sm font-semibold text-slate-50">Writing Review</div>
-                <div className="text-xs text-slate-400 leading-snug">Review and improve any text</div>
-              </div>
-            </Link>
-          </div>
-        </section>
-
-        {/* My CV & My Cover Letters Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
-          {/* My CV Section */}
-          <div>
-            {baseCv ? (
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 px-4 py-3 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition max-h-[160px] flex flex-col">
-                <h3 className="text-base font-semibold text-slate-50 mb-2">My CV</h3>
-                {formatDaysAgo(cvLastUpdated) && (
-                  <p className="text-xs text-slate-400 mb-3">
-                    Last updated: {formatDaysAgo(cvLastUpdated)}
-                  </p>
-                )}
-                <div className="flex gap-2 mt-auto">
-                  <button
-                    onClick={() => setIsCvModalOpen(true)}
-                    className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                  >
-                    View
-                  </button>
-                  <button
-                    onClick={() => {
-                      const url = cvId 
-                        ? `/cv-builder-v2?cvId=${cvId}`
-                        : '/cv-builder-v2'
-                      router.push(url)
-                    }}
-                    className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                  >
-                    Edit
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 px-4 py-3 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition max-h-[160px] flex flex-col">
-                <h3 className="text-base font-semibold text-slate-50 mb-2">My CV</h3>
-                <p className="text-sm text-slate-400 mb-3">
-                  You don't have a base CV saved yet.
-                </p>
-                <div className="mt-auto">
-                  <button
-                    onClick={() => router.push("/cv-builder-v2")}
-                    className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                  >
-                    Create your CV
-                  </button>
-                </div>
-              </div>
+            {appliedJobs.length > 0 && (
+              <p className="text-sm text-slate-400">
+                You have {appliedJobs.length} application{appliedJobs.length !== 1 ? 's' : ''} — use the{' '}
+                <Link href={dashboardTabHref('jobs')} className="text-violet-400 hover:text-violet-300 underline">
+                  Saved Jobs tab
+                </Link>{' '}
+                to train for specific roles.
+              </p>
             )}
-          </div>
-
-          {/* My Cover Letters Section */}
-          <div>
-            {baseCover ? (
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 px-4 py-3 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition max-h-[160px] flex flex-col">
-                <h3 className="text-base font-semibold text-slate-50 mb-2">My Cover Letters</h3>
-                <p className="text-sm text-slate-300 mb-3">
-                  Base cover letter saved.
-                </p>
-                <div className="flex gap-2 mt-auto">
-                  <button
-                    onClick={() => setIsCoverModalOpen(true)}
-                    className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                  >
-                    View
-                  </button>
-                  <button
-                    onClick={() => router.push("/cover")}
-                    className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                  >
-                    Edit
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 px-4 py-3 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition max-h-[160px] flex flex-col">
-                <h3 className="text-base font-semibold text-slate-50 mb-2">My Cover Letters</h3>
-                <p className="text-sm text-slate-400 mb-3">
-                  No base cover letter saved yet.
-                </p>
-                <div className="mt-auto">
-                  <button
-                    onClick={() => router.push("/cover")}
-                    className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                  >
-                    Create a cover letter
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Two-Column Section: CV Readiness + How to use JobAZ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-stretch">
-          {/* Left Column: CV Readiness - Always shown */}
-          <section className="flex flex-col h-full">
-            <h2 className="text-xl font-semibold text-slate-50 tracking-tight mb-4 flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)]" />
-              Your CV Readiness
-            </h2>
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 px-5 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition flex-1 flex flex-col">
-              {loadingCv ? (
-                // Loading skeleton
-                <>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="flex-shrink-0">
-                      <div className="h-12 w-16 bg-slate-800 rounded animate-pulse" />
-                      <div className="h-3 w-12 bg-slate-800 rounded mt-1 animate-pulse" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="h-3 bg-slate-800 rounded-full overflow-hidden animate-pulse mb-2" />
-                      <div className="h-3 w-3/4 bg-slate-800 rounded animate-pulse" />
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <div className="h-3 w-20 bg-slate-800 rounded mb-2 animate-pulse" />
-                    <div className="space-y-2">
-                      <div className="h-3 w-full bg-slate-800 rounded animate-pulse" />
-                      <div className="h-3 w-5/6 bg-slate-800 rounded animate-pulse" />
-                      <div className="h-3 w-4/6 bg-slate-800 rounded animate-pulse" />
-                    </div>
-                  </div>
-                </>
-              ) : cvError ? (
-                // Error state
-                <>
-                  <div className="flex items-start gap-3 mb-4">
-                    <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold text-red-400 mb-1">
-                        {cvError.type === '403' ? 'Permission Error' : cvError.type === '500' ? 'Server Error' : 'Network Error'}
-                      </div>
-                      <div className="text-xs text-slate-400 mb-3">
-                        {cvError.message}
-                      </div>
-                      {cvError.type === '403' && (
-                        <button
-                          onClick={async () => {
-                            await supabase.auth.signOut()
-                            router.push('/')
-                          }}
-                          className="text-xs text-violet-400 hover:text-violet-300 underline"
-                        >
-                          Sign out and sign in again
-                        </button>
-                      )}
-                      {(cvError.type === '500' || cvError.type === 'network') && (
-                        <button
-                          onClick={fetchCvFromApi}
-                          disabled={loadingCv}
-                          className="text-xs text-violet-400 hover:text-violet-300 underline disabled:opacity-50"
-                        >
-                          Try again
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </>
-              ) : baseCv ? (() => {
-                // Use readiness from API if available, otherwise calculate
-                const scoreResult = readiness 
-                  ? { score: readiness.score, level: readiness.level, fixes: readiness.topFixes }
-                  : calculateCVScore(baseCv)
-                const searchQuery = generateSearchQueryFromCV({
-                  summary: baseCv.summary,
-                  skills: baseCv.skills,
-                  experience: baseCv.experience,
-                })
-                
-                return (
-                  <>
-                    {/* Header with Refresh button */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex-1">
-                        {/* Score Display */}
-                        <div className="flex items-center gap-4">
-                          <div className="flex-shrink-0">
-                            <div className={cn(
-                              "text-4xl font-bold",
-                              scoreResult.score >= 70 ? "text-emerald-400" : scoreResult.score >= 50 ? "text-amber-400" : "text-red-400"
-                            )}>
-                              {scoreResult.score}
-                            </div>
-                            <div className="text-xs text-slate-400 mt-1">out of 100</div>
-                          </div>
-                          
-                          {/* Progress Bar */}
-                          <div className="flex-1">
-                            <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-                              <div
-                                className={cn(
-                                  "h-full transition-all duration-500 rounded-full",
-                                  scoreResult.score >= 70 
-                                    ? "bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                                    : scoreResult.score >= 50
-                                    ? "bg-gradient-to-r from-amber-500 to-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.6)]"
-                                    : "bg-gradient-to-r from-red-500 to-red-400 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
-                                )}
-                                style={{ width: `${scoreResult.score}%` }}
-                              />
-                            </div>
-                            <div className="text-xs text-slate-400 mt-1.5">
-                              {scoreResult.score >= 80 
-                                ? "Your CV is ready for job applications."
-                                : scoreResult.score >= 60
-                                ? "Your CV is solid. A few improvements can boost results."
-                                : "Your CV needs improvement before applying."}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {/* Refresh Readiness button */}
-                      <button
-                        onClick={fetchCvFromApi}
-                        disabled={loadingCv}
-                        className="ml-2 p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Refresh Readiness"
-                      >
-                        <RefreshCw className={cn("w-4 h-4", loadingCv && "animate-spin")} />
-                      </button>
-                    </div>
-
-                    {/* Top Fixes */}
-                    {scoreResult.fixes.length > 0 && (
-                      <div className="mb-4">
-                        <div className="text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wide">Top Fixes</div>
-                        <ul className="space-y-1.5">
-                          {scoreResult.fixes.map((fix, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-xs text-slate-400">
-                              <span className="text-violet-400 mt-0.5">•</span>
-                              <span>{fix}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    
-                    {/* Last Updated */}
-                    {readiness?.lastUpdated && (
-                      <div className="text-xs text-slate-500 mb-2">
-                        Last updated: {new Date(readiness.lastUpdated).toLocaleDateString()}
-                      </div>
-                    )}
-
-                    {/* Counters */}
-                    <div className="space-y-3 mb-4">
-                      {/* Recommended Jobs Counter */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/40 border border-slate-700/50">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20 text-amber-300">
-                            <Star className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-slate-50">Recommended Jobs</div>
-                            <div className="text-xs text-slate-400">{recommendedJobs.length} available</div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => recommendedJobsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                          className="px-3 py-1.5 rounded-full bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition shadow-[0_0_12px_rgba(139,92,246,0.6)]"
-                        >
-                          View
-                        </button>
-                      </div>
-
-                      {/* Jobs Applied Counter */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/40 border border-slate-700/50">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
-                            <Briefcase className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-slate-50">Jobs You Applied For</div>
-                            <div className="text-xs text-slate-400">{appliedJobs.length} {appliedJobs.length === 1 ? 'job' : 'jobs'}</div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => appliedJobsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                          className="px-3 py-1.5 rounded-full bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition shadow-[0_0_12px_rgba(139,92,246,0.6)]"
-                        >
-                          View
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* CTA Button */}
-                    <button
-                      onClick={() => {
-                        if (scoreResult.score < 70) {
-                          const url = cvId 
-                            ? `/cv-builder-v2?cvId=${cvId}`
-                            : '/cv-builder-v2'
-                          router.push(url)
-                        } else {
-                          // Navigate to job-finder with query auto-filled
-                          const params = new URLSearchParams()
-                          if (searchQuery) {
-                            params.set('jobTitle', searchQuery)
-                          }
-                          router.push(`/job-finder?${params.toString()}`)
-                        }
-                      }}
-                      className={cn(
-                        "w-full rounded-full px-4 py-2.5 text-sm font-medium text-white transition",
-                        scoreResult.score < 70
-                          ? "bg-violet-600 hover:bg-violet-500 shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                          : "bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.8)]"
-                      )}
-                    >
-                      {scoreResult.score < 70 ? 'Improve my CV' : 'Find Jobs for this CV'}
-                    </button>
-                  </>
-                )
-              })() : (
-                <>
-                  {/* Empty State - No CV */}
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="flex-shrink-0">
-                      <div className="text-4xl font-bold text-slate-500">
-                        0
-                      </div>
-                      <div className="text-xs text-slate-400 mt-1">out of 100</div>
-                    </div>
-                    
-                    {/* Progress Bar - Neutral */}
-                    <div className="flex-1">
-                      <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full transition-all duration-500 rounded-full bg-slate-600"
-                          style={{ width: '0%' }}
-                        />
-                      </div>
-                      <div className="text-xs text-slate-400 mt-1.5">
-                        No CV saved yet. Create your CV to get a readiness score and recommendations.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Top Fixes - Placeholders */}
-                  <div className="mb-4">
-                    <div className="text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wide">Top Fixes</div>
-                    <ul className="space-y-1.5">
-                      <li className="flex items-start gap-2 text-xs text-slate-400">
-                        <span className="text-violet-400 mt-0.5">•</span>
-                        <span>Add a summary</span>
-                      </li>
-                      <li className="flex items-start gap-2 text-xs text-slate-400">
-                        <span className="text-violet-400 mt-0.5">•</span>
-                        <span>Add experience</span>
-                      </li>
-                      <li className="flex items-start gap-2 text-xs text-slate-400">
-                        <span className="text-violet-400 mt-0.5">•</span>
-                        <span>Add skills</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  {/* CTA Button - Create CV */}
-                  <button
-                    onClick={() => router.push('/cv-builder-v2')}
-                    className="w-full rounded-full px-4 py-2.5 text-sm font-medium text-white transition bg-violet-600 hover:bg-violet-500 shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                  >
-                    Create your CV
-                  </button>
-                </>
-              )}
-            </div>
           </section>
+        )}
 
-          {/* Right Column: How to use JobAZ */}
-          <section className="flex flex-col h-full">
-            <h2 className="text-xl font-semibold text-slate-50 tracking-tight mb-4 flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.9)]" />
-              How to use JobAZ
-            </h2>
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 px-5 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition flex-1 flex flex-col">
-              <div className="space-y-4 flex-1">
-                <div>
-                  <p className="text-base text-slate-300 mb-3">
-                    JobAZ can be used step by step or as individual tools. Choose what works best for you!
-                  </p>
-                  <p className="text-base text-slate-300 mb-3">
-                    Not sure where to start? Use Build Your Path to explore career options, understand required skills, and get job-ready before applying.
-                  </p>
-                </div>
+        {activeTab === 'jobs' && (
+        <>
+        <PlatformSectionHeader
+          title="Saved Jobs"
+          description="Jobs you saved or applied to — your private job workspace on JobAZ."
+          dotColor="amber"
+        />
 
-                <div>
-                  <h3 className="text-base font-semibold text-slate-200 mb-2">Use tools individually:</h3>
-                  <ul className="space-y-2 text-base text-slate-300">
-                    <li className="flex items-start gap-2">
-                      <span className="text-violet-400 mt-0.5">•</span>
-                      <span><strong>CV Builder:</strong> Create or update your CV anytime.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-violet-400 mt-0.5">•</span>
-                      <span><strong>Cover Letter:</strong> Write a tailored cover letter for any job.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-violet-400 mt-0.5">•</span>
-                      <span><strong>Job Finder:</strong> Search for jobs that match your CV.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-violet-400 mt-0.5">•</span>
-                      <span><strong>Interview Coach:</strong> Practice interviews to build confidence.</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-semibold text-slate-200 mb-2">Or follow the full journey:</h3>
-                  <p className="text-base text-slate-300">
-                    <strong>Build your CV</strong> → Tailor CV & cover letter → Apply for jobs → Track applications → Prepare for interviews.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        {/* Recommended Jobs for You (AI Match) */}
-        <section ref={recommendedJobsRef} className="mt-10">
+        <section ref={recommendedJobsRef}>
           <div className="flex items-center justify-between mb-6">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
@@ -2005,95 +1659,43 @@ export default function DashboardPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {recommendedJobs.map((job) => (
-                  <div
+                  <RecommendedJobCard
                     key={job.id}
-                    className="rounded-2xl border border-slate-700/60 bg-slate-950/50 px-5 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.85)] hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition"
-                  >
-                    {/* Match Badge */}
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
-                          (job.matchPercentage || 0) >= 70
-                            ? "bg-emerald-500/20 text-emerald-300"
-                            : (job.matchPercentage || 0) >= 50
-                            ? "bg-amber-500/20 text-amber-300"
-                            : "bg-slate-700/50 text-slate-400"
-                        )}>
-                          <Target className="w-3 h-3" />
-                          {job.matchPercentage || 0}% Match
-                        </span>
-                        {(job.matchPercentage || 0) < 40 && (
-                          <span className="text-xs text-slate-400">Entry-level friendly</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Job Header */}
-                    <div className="mb-3">
-                      <h3 className="text-lg font-semibold text-slate-50 mb-1 line-clamp-2">
-                        {job.title}
-                      </h3>
-                      {/* Job Type Badge */}
-                      <div className="mb-2">
-                        <span className={cn(
-                          "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                          job.isTraining
-                            ? "bg-amber-500/20 text-amber-300"
-                            : "bg-emerald-500/20 text-emerald-300"
-                        )}>
-                          {job.isTraining ? 'Training' : 'Job'}
-                        </span>
-                      </div>
-                      <p className="text-sm text-violet-300 font-medium mb-1">
-                        {job.company}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {job.location}
-                      </p>
-                    </div>
-
-                    {/* Description Preview */}
-                    {job.description && (
-                      <p className="text-xs text-slate-300 leading-snug mb-4 line-clamp-2">
-                        {job.description}
-                      </p>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => handleViewRecommendedJob(job)}
-                        className="w-full rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                      >
-                        View Job
-                      </button>
-                      <button
-                        onClick={() => handleSaveRecommendedJob(job)}
-                        disabled={isRecommendedJobSaved(job.id)}
-                        className="w-full rounded-full bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 border border-slate-600/70 hover:border-violet-400/60 hover:text-violet-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isRecommendedJobSaved(job.id) ? 'Saved ✓' : 'Save to Job Finder'}
-                      </button>
-                      <button
-                        onClick={() => handleTailorCVFromRecommended(job.id)}
-                        className="w-full rounded-full bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 border border-slate-600/70 hover:border-violet-400/60 hover:text-violet-100 transition"
-                      >
-                        Tailor CV
-                      </button>
-                      <button
-                        onClick={() => handleTrainInterviewFromRecommended(job)}
-                        className="w-full rounded-full bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 border border-slate-600/70 hover:border-violet-400/60 hover:text-violet-100 transition"
-                      >
-                        Train Interview
-                      </button>
-                    </div>
-                  </div>
+                    job={job}
+                    isSaved={isRecommendedJobSaved(job.id)}
+                    onView={() => handleViewRecommendedJob(job)}
+                    onSave={() => handleSaveRecommendedJob(job)}
+                    onTailorCv={() => handleTailorCVFromRecommended(job.id)}
+                    onTrainInterview={() => handleTrainInterviewFromRecommended(job)}
+                  />
                 ))}
               </div>
             </>
           )}
         </section>
+
+        {/* Saved Jobs from Job Finder */}
+        {savedJobsFromJobFinder.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-xl font-bold text-slate-50 tracking-tight mb-4 flex items-center gap-2">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.9)]" />
+              Saved Jobs
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {savedJobsFromJobFinder.map((job) => (
+                <RecommendedJobCard
+                  key={job.id}
+                  job={job}
+                  isSaved
+                  onView={() => handleViewRecommendedJob(job)}
+                  onSave={() => {}}
+                  onTailorCv={() => handleTailorCVFromRecommended(job.id)}
+                  onTrainInterview={() => handleTrainInterviewFromRecommended(job)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Jobs you applied for */}
         <section ref={appliedJobsRef} className="mt-10">
@@ -2284,8 +1886,10 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
+        </>
+        )}
 
-        {/* Support JobAZ Section */}
+        {activeTab === 'overview' && (
         <section className="mt-12 pt-8 border-t border-slate-700/40">
           <div className="max-w-xl mx-auto text-center">
             <blockquote className="text-xs md:text-sm text-slate-400/80 mb-4 italic border-l-2 border-violet-500/20 pl-3">
@@ -2319,6 +1923,7 @@ export default function DashboardPage() {
             </a>
           </div>
         </section>
+        )}
 
         {/* CV Modal */}
         {isCvModalOpen && baseCv && (
@@ -2486,27 +2091,21 @@ export default function DashboardPage() {
           isDeleting={isDeletingAccount}
         />
       </>
+      </PlatformContent>
 
-      {/* Footer */}
-      <footer className="mt-16 pt-8 border-t border-slate-700/60">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-400">
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="hover:text-violet-300 transition-colors">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:text-violet-300 transition-colors">
-              Terms & Conditions
-            </Link>
-            <button
-              onClick={() => setDeleteAccountModalOpen(true)}
-              className="text-red-400 hover:text-red-300 transition-colors"
-            >
-              Delete Account
-            </button>
-          </div>
-          <p className="text-slate-500">© {new Date().getFullYear()} JobAZ</p>
-        </div>
-      </footer>
+      <DashboardSupportFooter
+        onDeleteAccount={() => setDeleteAccountModalOpen(true)}
+        onCvCleared={() => {
+          setBaseCv(null)
+          setCvId(null)
+          setCvLastUpdated(null)
+          setReadiness(null)
+        }}
+        onPlanCleared={() => {
+          // Plan local caches cleared by ManagePlanDataControls; refresh UI
+        }}
+      />
+      </PlatformShell>
   </AppShell>
 
       {/* Toast notification */}

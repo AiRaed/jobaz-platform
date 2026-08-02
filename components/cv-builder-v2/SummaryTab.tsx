@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Sparkles, Loader2, Undo2, X, CheckCircle2, AlertCircle, AlertTriangle, Zap, Check, Copy } from 'lucide-react'
 import { CvData } from '@/app/cv-builder-v2/page'
 import { hasSummaryGrammarOrSpellingIssues } from '@/lib/cv-summary-grammar-detect'
+import CvSummaryAssistant from '@/components/cv-builder-v2/CvSummaryAssistant'
+import type { ResolvedCvSuggestions } from '@/lib/cv-builder/suggestions'
 
 interface SummaryTabProps {
   summary: string
@@ -10,12 +12,21 @@ interface SummaryTabProps {
   experience?: CvData['experience']
   onUpdate: (summary: string) => void
   onLoadingChange: (loading: boolean) => void
+  planSuggestions?: ResolvedCvSuggestions | null
 }
 
 type QualityStatus = 'strong' | 'good' | 'needs-improvement' | null
 type FeedbackItem = { type: 'success' | 'warning' | 'error'; text: string }
 
-export default function SummaryTab({ summary, personalInfo, skills, experience, onUpdate, onLoadingChange }: SummaryTabProps) {
+export default function SummaryTab({
+  summary,
+  personalInfo,
+  skills,
+  experience,
+  onUpdate,
+  onLoadingChange,
+  planSuggestions,
+}: SummaryTabProps) {
   const [previousSummary, setPreviousSummary] = useState<string>('')
   const [aiLoading, setAiLoading] = useState<string | null>(null)
   const [showKeywordModal, setShowKeywordModal] = useState(false)
@@ -368,14 +379,24 @@ Important: If there are NO grammar or spelling issues, return the EXACT same tex
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {planSuggestions && (
+        <CvSummaryAssistant
+          suggestions={planSuggestions}
+          onInsert={(text) => {
+            setPreviousSummary(summary)
+            onUpdate(text)
+          }}
+        />
+      )}
+
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-1.5">Professional Summary</label>
         <textarea
           value={summary}
           onChange={(e) => onUpdate(e.target.value)}
-          rows={6}
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-y"
+          rows={4}
+          className="jobaz-input w-full resize-y"
           placeholder="Write a compelling summary of your professional experience, skills, and career goals..."
         />
         <p className="mt-1.5 text-xs text-slate-500">Recommended: 60-100 words</p>
@@ -671,14 +692,14 @@ Important: If there are NO grammar or spelling issues, return the EXACT same tex
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
                 <input
                   type="text"
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
                   placeholder="animation, leadership, adobe after effects, problem solving"
-                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                  className="jobaz-input w-full text-sm"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey && keywords.trim()) {
                       e.preventDefault()

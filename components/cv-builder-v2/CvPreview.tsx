@@ -1,4 +1,5 @@
 import { CvData, CvTemplateId } from '@/app/cv-builder-v2/page'
+import { certificationLabel } from '@/lib/cv/cvCertification'
 
 interface CvPreviewProps {
   data: CvData
@@ -203,17 +204,17 @@ function AtsClassicTemplate({ data }: { data: CvData }) {
         </section>
       )}
 
-      {/* Certifications */}
+      {/* Certifications / Licences */}
       {data.certifications && data.certifications.length > 0 && (
         <section className="mb-4">
           <h2 className="text-[12.5px] font-bold uppercase tracking-[0.05em] text-[#000000] mb-3">
-            Certifications
+            Certifications / Licences
           </h2>
           <ul className="mt-2 space-y-0.5 list-none ml-0">
             {data.certifications.map((cert, idx) => (
               <li key={idx} className="leading-[1.5] flex items-start">
                 <span className="mr-1.5 text-[#2c2c2c] font-bold">•</span>
-                <span className="flex-1">{cert}</span>
+                <span className="flex-1">{certificationLabel(cert)}</span>
               </li>
             ))}
           </ul>
@@ -350,16 +351,16 @@ function TwoColumnProTemplate({ data }: { data: CvData }) {
             </section>
           )}
 
-          {/* Certifications */}
+          {/* Certifications / Licences */}
           {data.certifications && data.certifications.length > 0 && (
             <section className="mb-4">
               <h2 className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#2c2c2c] mb-2">
-                Certifications
+                Certifications / Licences
               </h2>
               <div className="border-t border-[#d1d5db] mb-2" />
               <div className="text-[10.5px] text-[#4a4a4a] space-y-1 leading-[1.4]">
                 {data.certifications.map((cert, idx) => (
-                  <div key={idx}>{cert}</div>
+                  <div key={idx}>{certificationLabel(cert)}</div>
                 ))}
               </div>
             </section>

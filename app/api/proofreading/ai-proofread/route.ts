@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
 
 const PROOFREAD_SYSTEM = `You are a professional English proofreader. Your task:
 
@@ -88,7 +84,7 @@ export async function POST(req: NextRequest) {
       console.log('[Proofreading AI] LLM INPUT length:', content.length, 'first 200 chars:', content.slice(0, 200))
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       return NextResponse.json(
         {
           ok: false,
@@ -98,17 +94,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const completion = await aiProvider.generateText({
       messages: [
         { role: 'system', content: PROOFREAD_SYSTEM },
         { role: 'user', content: `Proofread and improve the following text. Identify ALL grammar, spelling, agreement, tense, article, collocation, and repetition errors. List every change in the issues array. Return only the JSON object.\n\n${content}` },
       ],
+      modelTier: 'default',
       temperature: 0.3,
-      max_tokens: MAX_OUTPUT_TOKENS,
+      maxTokens: MAX_OUTPUT_TOKENS,
+      feature: 'proofreading/ai-proofread',
     })
 
-    const rawContent = completion.choices[0]?.message?.content?.trim() ?? ''
+    const rawContent = completion.text
     if (process.env.NODE_ENV === 'development') {
       console.log('[Proofreading AI] LLM RAW RESPONSE length:', rawContent.length, 'preview:', rawContent.slice(0, 300))
     }

@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 // Formatting instruction for AI Preview output
 const FORMATTING_INSTRUCTION = `CRITICAL FORMATTING REQUIREMENTS FOR OUTPUT:
@@ -38,7 +34,7 @@ export async function POST(req: Request) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       return NextResponse.json({
         ok: true,
@@ -142,8 +138,7 @@ Job description/key needs (if any):
 ${jobSnippet}${jobKeywords ? `\n${jobKeywords}` : ''}`
       : `Rewrite this cover letter body text. Return ONLY the main paragraph content (no greeting, no closing, no signature).\n\n${FORMATTING_INSTRUCTION}\n\nBody text to rewrite:\n${bodyText}`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -154,11 +149,13 @@ ${jobSnippet}${jobKeywords ? `\n${jobKeywords}` : ''}`
           content: userPrompt,
         },
       ],
+      modelTier: 'quality',
       temperature: 0.7,
-      max_tokens: (isImproveMode || isBodyOnlyMode || isTailorMode) ? 250 : 1000,
+      maxTokens: (isImproveMode || isBodyOnlyMode || isTailorMode) ? 250 : 1000,
+      feature: 'cover/rewrite',
     })
 
-    const content = completion.choices[0]?.message?.content || ''
+    const content = completion.text || ''
 
     return NextResponse.json({ ok: true, body: content, letter: content })
   } catch (error: any) {

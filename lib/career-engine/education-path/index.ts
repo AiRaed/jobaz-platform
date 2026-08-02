@@ -1,0 +1,5 @@
+export * from './types'
+export * from './questions'
+export { buildEducationPathResult, loadKnowledgeForField } from './decisionEngine'
+export { fetchEducationFieldKnowledge, listEducationFields } from './knowledge/loadField'
+export { getSeedKnowledge, EDUCATION_FIELD_KNOWLEDGE } from './knowledge/seed'

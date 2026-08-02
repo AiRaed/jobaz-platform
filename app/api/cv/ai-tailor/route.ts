@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +11,7 @@ export async function POST(req: Request) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       return NextResponse.json({
         ok: true,
@@ -28,8 +24,7 @@ export async function POST(req: Request) {
 
     switch (mode) {
       case 'analyze': {
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4-turbo-preview',
+        const completion = await aiProvider.generateText({
           messages: [
             {
               role: 'system',
@@ -53,11 +48,13 @@ Job description:
 ${jobDescription}`,
             },
           ],
+          modelTier: 'quality',
           temperature: 0.3,
-          max_tokens: 500,
+          maxTokens: 500,
+          feature: 'cv/ai-tailor-analyze',
         })
 
-        const result = completion.choices[0]?.message?.content || '{}'
+        const result = completion.text || '{}'
         let analysis
         try {
           // Try to extract JSON from the response (in case it's wrapped in markdown)
@@ -90,8 +87,7 @@ ${jobDescription}`,
           return NextResponse.json({ ok: false, error: 'Current summary is required' }, { status: 400 })
         }
 
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4-turbo-preview',
+        const completion = await aiProvider.generateText({
           messages: [
             {
               role: 'system',
@@ -117,11 +113,13 @@ ${currentSkills && currentSkills.length > 0 ? `Current skills: ${currentSkills.j
 Return only the tailored summary text.`,
             },
           ],
+          modelTier: 'quality',
           temperature: 0.7,
-          max_tokens: 300,
+          maxTokens: 300,
+          feature: 'cv/ai-tailor-summary',
         })
 
-        const tailoredSummary = completion.choices[0]?.message?.content || currentSummary
+        const tailoredSummary = completion.text || currentSummary
 
         return NextResponse.json({
           ok: true,
@@ -134,8 +132,7 @@ Return only the tailored summary text.`,
           return NextResponse.json({ ok: false, error: 'Experience is required' }, { status: 400 })
         }
 
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4-turbo-preview',
+        const completion = await aiProvider.generateText({
           messages: [
             {
               role: 'system',
@@ -154,11 +151,13 @@ ${jobDescription}
 Return the tailored experience array as JSON with the same structure. Keep all original data (id, jobTitle, company, location, startDate, endDate, isCurrent) but reorder entries by relevance and enhance bullets to match the job. Each entry must have a bullets array.`,
             },
           ],
+          modelTier: 'quality',
           temperature: 0.7,
-          max_tokens: 2000,
+          maxTokens: 2000,
+          feature: 'cv/ai-tailor-experience',
         })
 
-        const result = completion.choices[0]?.message?.content || '[]'
+        const result = completion.text || '[]'
         let tailoredExperience
         try {
           // Try to extract JSON from the response (in case it's wrapped in markdown)
@@ -196,8 +195,7 @@ Return the tailored experience array as JSON with the same structure. Keep all o
       }
 
       case 'skills': {
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4-turbo-preview',
+        const completion = await aiProvider.generateText({
           messages: [
             {
               role: 'system',
@@ -213,11 +211,13 @@ ${jobDescription}
 Return only a JSON array like: ["skill1", "skill2", ...]`,
             },
           ],
+          modelTier: 'quality',
           temperature: 0.5,
-          max_tokens: 200,
+          maxTokens: 200,
+          feature: 'cv/ai-tailor-skills',
         })
 
-        const result = completion.choices[0]?.message?.content || '[]'
+        const result = completion.text || '[]'
         let suggestedSkills: string[] = []
         try {
           // Try to extract JSON array from the response (in case it's wrapped in markdown)

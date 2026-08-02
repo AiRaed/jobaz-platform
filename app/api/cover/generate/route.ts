@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 interface GenerateRequest {
   applicantName: string
@@ -46,7 +42,7 @@ export async function POST(req: Request) {
     const isBodyOnlyMode = mode === 'Body Only'
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       {
         // Simple mock that respects body-only + brevity; capped at ~180 words
@@ -90,9 +86,8 @@ My relevant experience (bullets or sentences):
 
 ${candidateHighlights}`
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
+      const completion = await aiProvider.generateText({
+      messages: [
           {
             role: 'system',
             content: systemPrompt,
@@ -102,11 +97,13 @@ ${candidateHighlights}`
             content: userPrompt,
           },
         ],
-        temperature: 0.6,
-        max_tokens: 260,
-      })
+      modelTier: 'default',
+      temperature: 0.6,
+      maxTokens: 260,
+      feature: 'cover/generate',
+    })
 
-      let body = (completion.choices[0]?.message?.content || '').trim()
+      let body = (completion.text || '').trim()
       // Enforce body-only and word limit defensively
       body = body.replace(/^Dear\s+[^,]+,?\s*\n?/gim, '')
       body = body.replace(/\s*(Sincerely|Best regards|Regards|Respectfully|Thank you|Cordially|With appreciation),?\s*$/gim, '')
@@ -139,8 +136,7 @@ Constraints:
 ${company ? `\nCompany context: ${company}` : ''}
 ${role ? `\nPosition: ${role}` : ''}`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -151,11 +147,13 @@ ${role ? `\nPosition: ${role}` : ''}`
           content: userPrompt,
         },
       ],
+      modelTier: 'default',
       temperature: 0.6,
-      max_tokens: 300,
+      maxTokens: 300,
+      feature: 'cover/generate',
     })
 
-    let letter = (completion.choices[0]?.message?.content || '').trim()
+    let letter = (completion.text || '').trim()
 
     // Clean up excessive spacing and ensure body-only output
     let cleanedBody = letter

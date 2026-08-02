@@ -46,7 +46,7 @@ export function extractCVKeywords(cvData: {
 /**
  * Extract keywords from text by splitting on common separators and cleaning
  */
-function extractKeywordsFromText(text: string): string[] {
+export function extractKeywordsFromText(text: string): string[] {
   if (!text) return []
 
   // Split on spaces, commas, dashes, parentheses, etc.

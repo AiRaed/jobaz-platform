@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { getOpenAiQualityModel } from '@/lib/openai-model'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
       : `Generate three distinct, high-quality CV sections based on these keywords suitable for UI/UX or front-end developer roles. Write as clean paragraph text only - no headings, no bullets, no labels, no prefixes. Write in English only:\n\n${keywords}`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: getOpenAiQualityModel(),
       messages: [
         {
           role: 'system',

@@ -1,45 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import {
+  createProofreadingServerClient,
+  isSupabaseConfigured,
+  proofreadingProjectsJsonError,
+} from '@/lib/proofreading/supabaseServer'
 
 export const dynamic = 'force-dynamic'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 /**
  * DELETE /api/proofreading/projects/[id]
  */
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // Ignore in route handler
-          }
-        },
-      },
-    })
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { ok: false, error: 'Authentication required' },
-        { status: 401 }
+    if (!isSupabaseConfigured()) {
+      return proofreadingProjectsJsonError(
+        'Writing Review is not configured yet.',
+        503,
+        { code: 'NOT_CONFIGURED' }
       )
+    }
+
+    const supabase = createProofreadingServerClient()
+    if (!supabase) {
+      return proofreadingProjectsJsonError(
+        'Writing Review is not configured yet.',
+        503,
+        { code: 'NOT_CONFIGURED' }
+      )
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return proofreadingProjectsJsonError('Authentication required', 401, {
+        code: 'AUTH_REQUIRED',
+      })
     }
 
     const { id } = params
@@ -51,20 +52,18 @@ export async function DELETE(
       .eq('user_id', user.id)
 
     if (error) {
-      console.error('[Proofreading Projects] Error:', error)
-      return NextResponse.json(
-        { ok: false, error: 'Failed to delete project' },
-        { status: 500 }
-      )
+      console.error('[Proofreading Projects] Delete error:', error)
+      return proofreadingProjectsJsonError('Failed to delete project', 500, {
+        code: error.code ?? 'DB_ERROR',
+      })
     }
 
-    return NextResponse.json({ ok: true })
-  } catch (error: any) {
-    console.error('[Proofreading Projects] Unexpected error:', error)
-    return NextResponse.json(
-      { ok: false, error: error.message || 'Internal server error' },
-      { status: 500 }
+    return NextResponse.json({ ok: true, projects: [] })
+  } catch (error: unknown) {
+    console.error('[Proofreading Projects] Unexpected DELETE error:', error)
+    return proofreadingProjectsJsonError(
+      error instanceof Error ? error.message : 'Failed to delete project',
+      500
     )
   }
 }
-

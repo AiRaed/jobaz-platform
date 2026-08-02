@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { computeCvScore } from '@/lib/cv-score'
+import { calculateCvReadiness } from '@/lib/cv/calculateCvReadiness'
+import { isMeaningfulCv } from '@/lib/cv/isMeaningfulCv'
+import { mapCvsRowToProfile } from '@/lib/cv/cvProfile'
 import type { CvData } from '@/app/cv-builder-v2/page'
 
 export const dynamic = 'force-dynamic'
@@ -11,18 +13,13 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 /**
  * GET /api/cv/get-latest
- * 
- * Fetches the latest saved CV for the authenticated user from the database.
- * Returns CV data and calculated readiness score.
- * 
- * Response:
- * - { ok: true, hasCv: boolean, cv: {...} | null, readiness: {...} | null }
- * - { ok: false, error: string } on error
- * - 401 if not authenticated
+ *
+ * Fetches the primary/latest saved CV for the authenticated user.
+ * Readiness uses shared calculateCvReadiness (same as Documents + Builder).
+ * Does not change the upsert / single-CV save path.
  */
 export async function GET(req: NextRequest) {
   try {
-    // Create Supabase client with route handler (uses cookies for auth)
     const cookieStore = cookies()
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
@@ -35,30 +32,70 @@ export async function GET(req: NextRequest) {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // The `setAll` method was called from a Route Handler.
-            // This can be ignored if you have middleware refreshing user sessions.
+            // Route Handler cookie set may be ignored when middleware refreshes sessions.
           }
         },
       },
     })
 
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
     if (authError || !user) {
-      return NextResponse.json(
-        { ok: false, error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ ok: false, error: 'Authentication required' }, { status: 401 })
     }
 
-    // Query the latest CV for this user (order by updated_at desc, limit 1)
-    const { data: cvRows, error: queryError } = await supabase
-      .from('cvs')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(1)
+    const cvIdParam = req.nextUrl.searchParams.get('cvId')
+
+    // Prefer exact cvId when requested; else primary; else latest
+    let cvRows: Record<string, any>[] | null = null
+    let queryError: { message?: string } | null = null
+
+    if (cvIdParam) {
+      const byId = await supabase
+        .from('cvs')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('id', cvIdParam)
+        .limit(1)
+      cvRows = byId.data
+      queryError = byId.error
+    }
+
+    if ((!cvRows || cvRows.length === 0) && !cvIdParam) {
+      const primaryQuery = await supabase
+        .from('cvs')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_primary', true)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+
+      if (!primaryQuery.error && primaryQuery.data && primaryQuery.data.length > 0) {
+        cvRows = primaryQuery.data
+      } else {
+        const latestQuery = await supabase
+          .from('cvs')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+        cvRows = latestQuery.data
+        queryError = latestQuery.error
+      }
+    } else if (cvIdParam && (!cvRows || cvRows.length === 0) && !queryError) {
+      // Requested id missing — fall back to primary so Builder can still open
+      const latestQuery = await supabase
+        .from('cvs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+      cvRows = latestQuery.data
+      queryError = latestQuery.error
+    }
 
     if (queryError) {
       console.error('[CV Get Latest] Database error:', queryError)
@@ -68,23 +105,33 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // If no CV found, return hasCv=false
     if (!cvRows || cvRows.length === 0) {
       return NextResponse.json({
         ok: true,
         hasCv: false,
         cv: null,
         readiness: null,
+        profile: null,
       })
     }
 
     const cvRow = cvRows[0]
+    const profile = mapCvsRowToProfile({
+      id: cvRow.id,
+      user_id: cvRow.user_id,
+      title: cvRow.title,
+      target_role: cvRow.target_role,
+      target_route: cvRow.target_route,
+      linked_plan_id: cvRow.linked_plan_id,
+      is_primary: cvRow.is_primary,
+      created_at: cvRow.created_at,
+      updated_at: cvRow.updated_at,
+      saved_at: cvRow.saved_at,
+      data: cvRow.data,
+    })
 
-    // The CV data is stored in the 'data' column as a JSONB object
-    // Read from cvRow.data instead of trying to access flattened fields
     const rawCvData = cvRow.data || {}
-    
-    // Map database row to CvData format - read from data column
+
     const cvData: CvData = {
       personalInfo: {
         fullName: rawCvData.personalInfo?.fullName || rawCvData.personal_info?.fullName || '',
@@ -100,26 +147,41 @@ export async function GET(req: NextRequest) {
       skills: Array.isArray(rawCvData.skills) ? rawCvData.skills : [],
       projects: Array.isArray(rawCvData.projects) ? rawCvData.projects : undefined,
       languages: Array.isArray(rawCvData.languages) ? rawCvData.languages : undefined,
-      certifications: Array.isArray(rawCvData.certifications) ? rawCvData.certifications : undefined,
+      certifications: Array.isArray(rawCvData.certifications)
+        ? rawCvData.certifications
+        : undefined,
       publications: Array.isArray(rawCvData.publications) ? rawCvData.publications : undefined,
     }
 
-    // Calculate readiness score
-    const scoreResult = computeCvScore(cvData)
+    const readinessResult = calculateCvReadiness(cvData)
+    const meaningful = isMeaningfulCv(cvData)
 
-    // Format readiness response
     const readiness = {
-      score: scoreResult.score,
-      level: scoreResult.level,
-      topFixes: scoreResult.fixes,
+      score: readinessResult.score,
+      level: readinessResult.statusLabel,
+      status: readinessResult.status,
+      topFixes: readinessResult.missing.slice(0, 5),
+      suggestedNextStep: readinessResult.suggestedNextStep,
       lastUpdated: cvRow.updated_at || cvRow.saved_at || new Date().toISOString(),
+      isMeaningfulCv: meaningful,
     }
 
     return NextResponse.json({
       ok: true,
       hasCv: true,
+      cvId: cvRow.id,
       cv: cvData,
       readiness,
+      isMeaningfulCv: meaningful,
+      profile: {
+        id: profile.id,
+        title: profile.title,
+        isPrimary: profile.is_primary,
+        targetRole: profile.target_role,
+        targetRoute: profile.target_route,
+        linkedPlanId: profile.linked_plan_id,
+        updatedAt: profile.updated_at,
+      },
     })
   } catch (error: any) {
     console.error('[CV Get Latest] Unexpected error:', error)
@@ -129,4 +191,3 @@ export async function GET(req: NextRequest) {
     )
   }
 }
-

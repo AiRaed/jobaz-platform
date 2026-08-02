@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 interface CoverLetterRequest {
   fullName: string
@@ -41,9 +37,8 @@ export async function POST(req: Request) {
       )
     }
 
-    // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
-      console.warn('[AI MOCK] no OPENAI_API_KEY')
+    if (!aiProvider.isConfigured()) {
+      console.warn('[AI MOCK] no AI provider configured')
       const mockContent = `Dear ${recipientName || 'Hiring Manager'},
 
 I am writing to express my interest in the ${roleTitle} position${company ? ` at ${company}` : ''}.
@@ -69,8 +64,7 @@ ${[email, phone].filter(Boolean).join(' · ')}`
       Friendly: 'warm and approachable while maintaining professionalism',
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -89,13 +83,14 @@ ${[email, phone].filter(Boolean).join(' · ')}`
 - Position: ${roleTitle}${company ? ` at ${company}` : ''}${keywords ? `\n- Keywords: ${keywords}` : ''}`,
         },
       ],
+      modelTier: 'quality',
       temperature: 0.7,
-      max_tokens: 800,
+      maxTokens: 800,
+      feature: 'cover',
     })
 
-    const content = completion.choices[0]?.message?.content || ''
+    const content = completion.text || ''
 
-    // Ensure proper greeting and signature
     const normalized = content
       .replace(/^Dear .+?,/m, `Dear ${recipientName || 'Hiring Manager'},`)
       .replace(/^(Sincerely|Best regards|Best regards|Regards|Yours truly),?\s*$/m, 

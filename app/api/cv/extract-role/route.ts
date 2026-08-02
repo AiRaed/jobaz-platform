@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +11,7 @@ export async function POST(req: Request) {
     }
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[AI MOCK] no OPENAI_API_KEY')
       // Mock response: try to extract a simple role from context
       const contextLower = context.toLowerCase()
@@ -64,8 +60,7 @@ ${context}
 
 Return ONLY the job title, nothing else.`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -76,11 +71,13 @@ Return ONLY the job title, nothing else.`
           content: userPrompt,
         },
       ],
+      modelTier: 'default',
       temperature: 0.3,
-      max_tokens: 50,
+      maxTokens: 50,
+      feature: 'cv/extract-role',
     })
 
-    const role = completion.choices[0]?.message?.content?.trim() || ''
+    const role = completion.text?.trim() || ''
 
     if (!role) {
       return NextResponse.json({ ok: false, error: 'Failed to extract role' }, { status: 500 })

@@ -1,0 +1,883 @@
+/**
+ * Populate Career Knowledge Library roles for Electrical Engineering only.
+ *
+ * UK-focused. Power systems, electrical infrastructure, building electrical
+ * services, control systems and electrical machines stay here.
+ * Semiconductors / embedded / microelectronics stay with Electronic Engineering.
+ *
+ * Sources: National Careers Service, Prospects, IET (CEng/IEng pathway).
+ *
+ *   npx tsx scripts/populate-career-library-electrical-engineering-roles.ts
+ */
+
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { normalizeSlug } from '../lib/admin/career-library/guards'
+import type {
+  CareerLibraryAcademicRequirement,
+  CareerLibraryFitClassification,
+  CareerLibraryRegistrationRequirement,
+  CareerLibraryRoleCategory,
+  CareerLibrarySeniorityLevel,
+} from '../lib/admin/career-library/types'
+
+function loadEnvLocal() {
+  const envPath = resolve(process.cwd(), '.env.local')
+  if (!existsSync(envPath)) return
+  const text = readFileSync(envPath, 'utf8')
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim()
+    let val = trimmed.slice(eq + 1).trim()
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
+
+type StageKey = 'degree' | 'masters' | 'phd'
+
+type RoleSeed = {
+  name: string
+  description: string
+  roleCategory: CareerLibraryRoleCategory
+  seniorityLevel: CareerLibrarySeniorityLevel
+  minimumExperienceYears: number
+  experienceRequirementLabel: string
+  professionalRegistrationRequirement: CareerLibraryRegistrationRequirement
+  professionalMembershipRequirement: CareerLibraryRegistrationRequirement
+  academicRequirement: CareerLibraryAcademicRequirement
+  isResearchRole: boolean
+  isAcademicRole: boolean
+  isRegulatedOrRestricted: boolean
+  eligibilityNote: string
+  fitClassification: CareerLibraryFitClassification
+  priority: number
+}
+
+const DEGREE_ROLES: RoleSeed[] = [
+  {
+    name: 'Graduate Electrical Engineer',
+    description:
+      'Entry UK role on a structured graduate scheme supporting electrical design, testing and project delivery toward IET professional development.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior industry experience required',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'accredited_degree_preferred',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate graduate-entry role. IET membership supports later IEng/CEng progression but is not required to start.',
+    fitClassification: 'immediate',
+    priority: 10,
+  },
+  {
+    name: 'Electrical Design Engineer',
+    description:
+      'Prepares electrical schematics, cable schedules and equipment specifications for industrial, infrastructure or building projects.',
+    roleCategory: 'design',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years electrical design experience or strong placement',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Degree makes the role academically relevant; employers usually expect applied design exposure beyond academic projects.',
+    fitClassification: 'realistic_next',
+    priority: 20,
+  },
+  {
+    name: 'Power Systems Engineer (Graduate)',
+    description:
+      'Supports analysis and design of electrical networks, substations and generation connections within UK power utilities and consultancies.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior industry experience required on graduate power schemes',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate graduate pathway into UK power networks. Authorising engineer / senior network responsibility comes later with experience.',
+    fitClassification: 'immediate',
+    priority: 30,
+  },
+  {
+    name: 'Building Services Electrical Engineer',
+    description:
+      'Designs or supports electrical building services (lighting, power distribution, fire alarm interfaces) for UK construction projects.',
+    roleCategory: 'design',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years building services electrical experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Common UK electrical pathway in construction/MEP. Lead designer status depends on project experience, not the degree alone.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    name: 'Protection and Control Engineer (Junior)',
+    description:
+      'Assists with protection relay settings, control schemes and commissioning support for substations and industrial electrical systems.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years protection, control or power systems experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Specialist early-career role. Setting and approving protection schemes usually needs supervised practice beyond academic study.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    name: 'High Voltage / Substation Engineer (Graduate)',
+    description:
+      'Supports HV plant, switchgear and substation project delivery for transmission, distribution or large industrial sites.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry via graduate schemes; site safety training required',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate graduate route into substations/HV projects. Authorisation and senior site responsibility require experience and competence assessment.',
+    fitClassification: 'immediate',
+    priority: 60,
+  },
+  {
+    name: 'Electrical Machines / Drives Engineer (Graduate)',
+    description:
+      'Supports design, testing or application of motors, generators and drive systems for industrial and energy applications.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry possible with strong machines/power modules or placement',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Degree relevance is strong for machines/drives. Client-facing specialist authority grows with applied product and site experience.',
+    fitClassification: 'realistic_next',
+    priority: 70,
+  },
+  {
+    name: 'Electrical Site / Maintenance Engineer',
+    description:
+      'Supports installation, inspection, fault-finding and planned maintenance of electrical plant and distribution systems on UK sites.',
+    roleCategory: 'site_delivery',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years site or maintenance electrical experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Academic relevance is not the same as unsupervised site electrical responsibility; H&S competence and experience are essential.',
+    fitClassification: 'realistic_next',
+    priority: 80,
+  },
+  {
+    name: 'Assistant Project Engineer (Electrical)',
+    description:
+      'Supports electrical work packages through design and delivery, coordinating suppliers, schedules and documentation under a project lead.',
+    roleCategory: 'project_management',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–2 years project or design support experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Assistant-level project delivery. Full package ownership is not implied by academic stage alone.',
+    fitClassification: 'realistic_next',
+    priority: 90,
+  },
+  {
+    name: 'Electrical Engineering Technician / EngTech pathway',
+    description:
+      'Provides drawing, testing, assembly or maintenance technical support; may align with EngTech or IEng development routes via the IET.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior experience required; EngTech/IEng pathway available',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate technical pathway. Professional registration is a later goal, not an entry gate.',
+    fitClassification: 'immediate',
+    priority: 100,
+  },
+]
+
+const MASTERS_ROLES: RoleSeed[] = [
+  {
+    name: 'Power Systems Analysis Engineer',
+    description:
+      'Performs load-flow, fault-level and stability studies for UK transmission, distribution and large industrial networks.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–4 years power systems analysis experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'A Master’s strengthens academic fit for network studies; competent practice still depends on project verification experience.',
+    fitClassification: 'realistic_next',
+    priority: 10,
+  },
+  {
+    name: 'Protection Engineer',
+    description:
+      'Designs and validates protection schemes, relay settings and coordination studies for substations and industrial power systems.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years protection engineering experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s relevance does not replace protection setting experience or competence assessment for live network work.',
+    fitClassification: 'realistic_next',
+    priority: 20,
+  },
+  {
+    name: 'Grid Connection / Network Planning Engineer',
+    description:
+      'Assesses generation and demand connections, network reinforcement needs and DNO/TSO interface requirements for UK projects.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years network planning or connections experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Academic stage indicates relevance; connection offers and planning judgements require regulatory and network experience.',
+    fitClassification: 'realistic_next',
+    priority: 30,
+  },
+  {
+    name: 'Building Services Electrical Design Engineer',
+    description:
+      'Leads electrical building-services design packages for commercial, healthcare or infrastructure buildings in the UK.',
+    roleCategory: 'design',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years building services electrical design experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s can support complex MEP electrical design; lead designer responsibility depends on project experience and often chartership trajectory.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    name: 'Control Systems Engineer (Electrical / Industrial)',
+    description:
+      'Designs and commissions industrial electrical control systems, PLC/SCADA interfaces and automation for plant and infrastructure.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years industrial control systems experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Kept under Electrical Engineering as industrial/power control. Embedded microelectronics product design belongs under Electronic Engineering.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    name: 'Project Engineer (Electrical)',
+    description:
+      'Owns electrical work packages through design and delivery, managing programme, suppliers, risk and stakeholder communication.',
+    roleCategory: 'project_management',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years design/delivery experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s relevance does not replace package ownership, commercial awareness or delivery experience.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    name: 'Renewable Energy Electrical Integration Engineer',
+    description:
+      'Designs and assesses electrical integration of wind, solar, storage and other renewables into UK networks and private wire systems.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years renewables or power systems experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s study supports academic relevance; grid-code and connection delivery competence comes from project experience.',
+    fitClassification: 'realistic_next',
+    priority: 70,
+  },
+  {
+    name: 'HV Plant / Substation Design Engineer',
+    description:
+      'Designs high-voltage plant layouts, primary equipment specifications and substation arrangements for UK transmission and distribution projects.',
+    roleCategory: 'design',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 4,
+    experienceRequirementLabel: 'Typically 4–6 years HV / substation design experience',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Specialist HV design is Master’s-relevant but not immediate for new graduates; substantial project experience is expected.',
+    fitClassification: 'future_progression',
+    priority: 80,
+  },
+  {
+    name: 'Senior Electrical Design Engineer',
+    description:
+      'Leads complex electrical design packages, mentoring juniors and coordinating multidisciplinary design reviews.',
+    roleCategory: 'design',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 5,
+    experienceRequirementLabel: 'Typically 5–8 years progressive electrical design experience',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'May appear for Master’s graduates as future progression. A Master’s alone does not qualify someone for senior design leadership.',
+    fitClassification: 'future_progression',
+    priority: 90,
+  },
+  {
+    name: 'Lead Electrical Engineer',
+    description:
+      'Acts as technical lead for electrical scope on larger programmes, setting standards and resolving critical design/delivery issues.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 6,
+    experienceRequirementLabel: 'Typically 6–10 years experience including technical leadership',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Lead-level title requires substantial delivery leadership. Not an immediate Master’s role.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+]
+
+const PHD_ROLES: RoleSeed[] = [
+  {
+    name: 'Research Associate / Postdoctoral Researcher (Electrical Engineering)',
+    description:
+      'Conducts funded research in universities or research centres on advanced electrical engineering topics and publications.',
+    roleCategory: 'research',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD (or near completion) is the primary gate; postdoc contracts vary',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: true,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate or near-term academic/research fit after PhD. Not a senior industry practice role.',
+    fitClassification: 'immediate',
+    priority: 10,
+  },
+  {
+    name: 'University Lecturer / Assistant Professor (Electrical Engineering)',
+    description:
+      'Teaches electrical engineering modules and supervises student projects while developing an academic research portfolio.',
+    roleCategory: 'academic',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel:
+      'Typically postdoctoral research record plus teaching evidence; PhD alone is rarely sufficient',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: true,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'PhD makes the role academically relevant, but appointments usually need publications, teaching experience and often postdoctoral experience.',
+    fitClassification: 'academic_or_research',
+    priority: 20,
+  },
+  {
+    name: 'Power Systems Modelling / Research Specialist',
+    description:
+      'Develops advanced power-system models, stability studies and network innovation research for utilities, academia or R&D centres.',
+    roleCategory: 'research',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–5 years modelling research or applied specialist experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Strong PhD relevance for advanced modelling. Senior network authority still depends on applied utility delivery experience.',
+    fitClassification: 'academic_or_research',
+    priority: 30,
+  },
+  {
+    name: 'Electrical Machines / Power Conversion Research Specialist',
+    description:
+      'Researches electrical machines, drives and power-conversion systems for industrial, transport or energy applications.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–5 years machines/power-conversion research or specialist experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Kept under Electrical Engineering (machines/power conversion). Semiconductor device design stays with Electronic Engineering.',
+    fitClassification: 'academic_or_research',
+    priority: 40,
+  },
+  {
+    name: 'Smart Grid / Energy Systems Specialist',
+    description:
+      'Advises on smart-grid technologies, flexibility, storage integration and low-carbon electrical system strategies for UK networks.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years smart-grid or energy-systems project experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'PhD supports academic relevance; advisory specialist roles usually need applied project and stakeholder experience.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    name: 'High Voltage Engineering Specialist',
+    description:
+      'Specialises in HV insulation, partial discharge, testing and high-voltage equipment performance for research or specialist consultancy.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years HV research or specialist testing experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'PhD is often valuable for HV specialism; industry authority grows through laboratory and field application experience.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    name: 'Innovation / Industrial R&D Engineer (Electrical Systems)',
+    description:
+      'Leads new electrical system, grid or low-carbon technology research within industrial R&D or collaborative UK programmes.',
+    roleCategory: 'research',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–5 years research or industry R&D experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Realistic for PhD holders with research delivery skills; not a principal consulting or expert witness role.',
+    fitClassification: 'realistic_next',
+    priority: 70,
+  },
+  {
+    name: 'Principal / Specialist Power Systems Consultant',
+    description:
+      'Provides expert power-systems advice on complex network risk, failure investigation and major connection or reinforcement schemes.',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'principal',
+    minimumExperienceYears: 12,
+    experienceRequirementLabel: 'Typically 12+ years specialist power systems consulting experience',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    eligibilityNote:
+      'PhD may support specialist credibility, but principal consulting requires substantial industry experience and usually chartered status. Not an immediate PhD role.',
+    fitClassification: 'future_progression',
+    priority: 80,
+  },
+  {
+    name: 'Technical Authority / Expert Witness (Electrical Engineering)',
+    description:
+      'Acts as a recognised technical authority on disputes, standards development and highly specialised electrical engineering problems.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'principal',
+    minimumExperienceYears: 15,
+    experienceRequirementLabel:
+      'Typically 15+ years recognised specialist practice; expert witness work is reputation-based',
+    professionalRegistrationRequirement: 'required',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    eligibilityNote:
+      'Must not be presented as an immediate PhD role. Requires substantial specialist career history; PhD alone is insufficient.',
+    fitClassification: 'future_progression',
+    priority: 90,
+  },
+  {
+    name: 'Research & Innovation Manager (Electrical / Energy Systems)',
+    description:
+      'Manages research programmes, industry–university partnerships and innovation funding for electrical and energy-system technology.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'leadership',
+    minimumExperienceYears: 6,
+    experienceRequirementLabel: 'Typically 6–10 years research leadership or programme management experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Management of research programmes needs leadership experience beyond the PhD award itself.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+]
+
+async function insertRolesForStage(
+  supabase: SupabaseClient,
+  specialismId: string,
+  stage: { id: string; stage_key: string; label: string },
+  roles: RoleSeed[],
+  existingSlugs: Set<string>
+): Promise<{ created: string[]; skipped: string[] }> {
+  const created: string[] = []
+  const skipped: string[] = []
+
+  for (const role of roles) {
+    const baseSlug = normalizeSlug(undefined, role.name)
+    if (!baseSlug) {
+      skipped.push(role.name)
+      continue
+    }
+    const slug = `${stage.stage_key}-${baseSlug}`
+
+    if (existingSlugs.has(slug)) {
+      skipped.push(role.name)
+      continue
+    }
+
+    const { error } = await supabase.from('career_library_roles').insert({
+      specialism_id: specialismId,
+      stage_id: stage.id,
+      name: role.name,
+      slug,
+      description: role.description,
+      status: 'draft',
+      active: true,
+      sort_order: role.priority,
+      priority: role.priority,
+      role_category: role.roleCategory,
+      seniority_level: role.seniorityLevel,
+      minimum_experience_years: role.minimumExperienceYears,
+      experience_requirement_label: role.experienceRequirementLabel,
+      professional_registration_requirement: role.professionalRegistrationRequirement,
+      professional_membership_requirement: role.professionalMembershipRequirement,
+      academic_requirement: role.academicRequirement,
+      is_research_role: role.isResearchRole,
+      is_academic_role: role.isAcademicRole,
+      is_regulated_or_restricted: role.isRegulatedOrRestricted,
+      eligibility_note: role.eligibilityNote,
+      fit_classification: role.fitClassification,
+      metadata: {
+        stage_id: stage.id,
+        stage_key: stage.stage_key as StageKey,
+        stage_label: stage.label,
+        academic_level: stage.stage_key,
+        specialism_slug: 'electrical-engineering',
+        country_focus: 'uk',
+        professional_body_focus: 'IET',
+        eligibility_model_version: 1,
+        sources: [
+          'national_careers_service_electrical_engineer',
+          'prospects_electrical_engineer',
+          'iet_ceng_ieng_pathway',
+        ],
+      },
+    })
+
+    if (error) {
+      if (error.code === '23505') {
+        skipped.push(role.name)
+        continue
+      }
+      throw new Error(`${role.name} [${stage.stage_key}]: ${error.message}`)
+    }
+
+    created.push(role.name)
+    existingSlugs.add(slug)
+  }
+
+  return { created, skipped }
+}
+
+async function main() {
+  loadEnvLocal()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  }
+
+  const supabase = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const { data: specialism, error: specErr } = await supabase
+    .from('career_library_specialisms')
+    .select('id, name, slug, professional_body')
+    .eq('slug', 'electrical-engineering')
+    .maybeSingle()
+
+  if (specErr || !specialism) {
+    throw new Error(
+      `Electrical Engineering specialism not found: ${specErr?.message ?? 'missing row'}`
+    )
+  }
+
+  if (!specialism.professional_body) {
+    await supabase
+      .from('career_library_specialisms')
+      .update({
+        professional_body: 'Institution of Engineering and Technology (IET)',
+      })
+      .eq('id', specialism.id)
+  }
+
+  // Cross-check Electronic Engineering so we can report genuine overlaps if any exist
+  const { data: electronic } = await supabase
+    .from('career_library_specialisms')
+    .select('id')
+    .eq('slug', 'electronic-engineering')
+    .maybeSingle()
+
+  let electronicNames = new Set<string>()
+  if (electronic?.id) {
+    const { data: eRoles } = await supabase
+      .from('career_library_roles')
+      .select('name')
+      .eq('specialism_id', electronic.id)
+    electronicNames = new Set((eRoles ?? []).map((r) => r.name.trim().toLowerCase()))
+  }
+
+  const allSeeds = [...DEGREE_ROLES, ...MASTERS_ROLES, ...PHD_ROLES]
+  const crossDuplicates = allSeeds
+    .filter((r) => electronicNames.has(r.name.trim().toLowerCase()))
+    .map((r) => r.name)
+
+  const { data: model, error: modelErr } = await supabase
+    .from('career_library_stage_models')
+    .select('id')
+    .eq('model_key', 'academic_level')
+    .maybeSingle()
+
+  if (modelErr || !model) {
+    throw new Error(`academic_level stage model not found: ${modelErr?.message ?? 'missing'}`)
+  }
+
+  const { data: stages, error: stagesErr } = await supabase
+    .from('career_library_stages')
+    .select('id, stage_key, label, sort_order')
+    .eq('stage_model_id', model.id)
+    .in('stage_key', ['degree', 'masters', 'phd'])
+    .order('sort_order', { ascending: true })
+
+  if (stagesErr || !stages?.length) {
+    throw new Error(`Academic stages not found: ${stagesErr?.message ?? 'empty'}`)
+  }
+
+  const stageByKey = new Map(stages.map((s) => [s.stage_key, s]))
+  for (const key of ['degree', 'masters', 'phd'] as const) {
+    if (!stageByKey.has(key)) throw new Error(`Missing academic stage: ${key}`)
+  }
+
+  const { data: existingRoles, error: rolesErr } = await supabase
+    .from('career_library_roles')
+    .select('slug')
+    .eq('specialism_id', specialism.id)
+
+  if (rolesErr) throw new Error(rolesErr.message)
+  const existingSlugs = new Set((existingRoles ?? []).map((r) => r.slug))
+
+  const degree = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('degree')!,
+    DEGREE_ROLES,
+    existingSlugs
+  )
+  const masters = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('masters')!,
+    MASTERS_ROLES,
+    existingSlugs
+  )
+  const phd = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('phd')!,
+    PHD_ROLES,
+    existingSlugs
+  )
+
+  const { count } = await supabase
+    .from('career_library_roles')
+    .select('id', { count: 'exact', head: true })
+    .eq('specialism_id', specialism.id)
+    .eq('status', 'draft')
+
+  const totalCreated = degree.created.length + masters.created.length + phd.created.length
+  const totalSkipped = degree.skipped.length + masters.skipped.length + phd.skipped.length
+
+  console.log('\n=== Electrical Engineering roles populate summary ===')
+  console.log(`Specialism: ${specialism.name} (${specialism.slug})`)
+  console.log(`Stage model: academic_level`)
+  console.log(`Status: draft`)
+  console.log(`Roles created this run: ${totalCreated}`)
+  console.log(`Duplicates skipped (same specialism): ${totalSkipped}`)
+  console.log(`Cross-specialism title overlaps with Electronic Engineering: ${crossDuplicates.length}`)
+  if (crossDuplicates.length) {
+    for (const n of crossDuplicates) console.log(`  ! ${n}`)
+  }
+  console.log(`Draft roles now in specialism: ${count ?? 'n/a'}`)
+
+  console.log('\nDegree / Bachelor roles:')
+  for (const n of degree.created) console.log(`  + ${n}`)
+  if (!degree.created.length) console.log('  (none new)')
+  if (degree.skipped.length) {
+    console.log('  skipped:')
+    for (const n of degree.skipped) console.log(`    - ${n}`)
+  }
+
+  console.log("\nMaster's roles:")
+  for (const n of masters.created) console.log(`  + ${n}`)
+  if (!masters.created.length) console.log('  (none new)')
+  if (masters.skipped.length) {
+    console.log('  skipped:')
+    for (const n of masters.skipped) console.log(`    - ${n}`)
+  }
+
+  console.log('\nPhD roles:')
+  for (const n of phd.created) console.log(`  + ${n}`)
+  if (!phd.created.length) console.log('  (none new)')
+  if (phd.skipped.length) {
+    console.log('  skipped:')
+    for (const n of phd.skipped) console.log(`    - ${n}`)
+  }
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

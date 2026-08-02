@@ -17,6 +17,15 @@ import { cn } from '@/lib/utils'
 import { useJazContext } from '@/contexts/JazContextContext'
 import type { CoverLetterContext } from '@/components/JazAssistant'
 import { getUserScopedKeySync, getCurrentUserIdSync, initUserStorageCache } from '@/lib/user-storage'
+import { useToolGuestMode } from '@/lib/guest-tools/useToolGuestMode'
+import { GUEST_LIMITS } from '@/lib/guest-tools/constants'
+import {
+  incrementGuestUsage,
+  readGuestDraft,
+  readGuestUsage,
+  writeGuestDraft,
+} from '@/lib/guest-tools/storage'
+import PublicToolLayout from '@/components/guest-tools/PublicToolLayout'
 
 type Tab = 'recipient' | 'letter' | 'layout'
 
@@ -102,6 +111,61 @@ export default function CoverPage() {
     setMounted(true)
     initUserStorageCache()
   }, [])
+
+  const guest = useToolGuestMode('coverLetter')
+
+  useEffect(() => {
+    if (!mounted || !guest.authReady || !guest.isGuest) return
+    const draft = readGuestDraft<{
+      applicantName?: string
+      recipientName?: string
+      company?: string
+      cityState?: string
+      role?: string
+      keywords?: string
+      letterBody?: string
+    }>('coverLetter')
+    if (!draft) return
+    if (draft.applicantName) setApplicantName(draft.applicantName)
+    if (draft.recipientName || draft.company || draft.cityState || draft.role) {
+      setRecipientInfo({
+        recipientName: draft.recipientName ?? recipientName,
+        company: draft.company ?? company,
+        cityState: draft.cityState ?? cityState,
+        role: draft.role ?? role,
+      })
+    }
+    if (draft.keywords) setKeywords(draft.keywords)
+    if (draft.letterBody) setLetterBody(draft.letterBody)
+  }, [mounted, guest.authReady, guest.isGuest])
+
+  useEffect(() => {
+    if (!mounted || !guest.authReady || !guest.isGuest) return
+    const timeout = setTimeout(() => {
+      writeGuestDraft('coverLetter', {
+        applicantName,
+        recipientName,
+        company,
+        cityState,
+        role,
+        keywords,
+        letterBody,
+        savedAt: Date.now(),
+      })
+    }, 500)
+    return () => clearTimeout(timeout)
+  }, [
+    mounted,
+    guest.authReady,
+    guest.isGuest,
+    applicantName,
+    recipientName,
+    company,
+    cityState,
+    role,
+    keywords,
+    letterBody,
+  ])
 
   // Helper function to get user-scoped storage keys
   const getUserKey = useCallback((baseKey: string) => {
@@ -305,10 +369,6 @@ export default function CoverPage() {
     router.back()
   }
 
-  const handleBackToDashboard = () => {
-    router.push('/dashboard')
-  }
-
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message })
     setTimeout(() => setToast(null), 3000)
@@ -383,6 +443,7 @@ export default function CoverPage() {
   }
 
   const handleSaveCoverLetterToDashboard = async () => {
+    if (guest.promptForAuth('save')) return
     try {
       // Clean the cover letter before saving
       const cleanedBody = hasLetterContent ? cleanCoverLetterClosing(safeLetterBody, applicantName || 'Your Name') : ''
@@ -452,6 +513,14 @@ export default function CoverPage() {
   }
 
   const handleGenerate = async () => {
+    if (guest.isGuest) {
+      const usage = readGuestUsage('coverLetter')
+      if ((usage.generations ?? 0) >= GUEST_LIMITS.coverLetterGenerations) {
+        guest.promptForAuth('fullAccess')
+        return
+      }
+    }
+
     setLoading(prev => ({ ...prev, gen: true }))
 
     try {
@@ -495,6 +564,7 @@ export default function CoverPage() {
         setIsImprovePreview(false)
         showToast('success', 'Preview generated - click Apply to update')
       }
+      if (guest.isGuest) incrementGuestUsage('coverLetter', 'generations')
     } catch (error: any) {
       console.error('[AI] Generate error:', error)
       showToast('error', 'Request timed out or failed. Please try again.')
@@ -778,6 +848,14 @@ export default function CoverPage() {
       return
     }
 
+    if (guest.isGuest) {
+      const usage = readGuestUsage('coverLetter')
+      if ((usage.generations ?? 0) >= GUEST_LIMITS.coverLetterGenerations) {
+        guest.promptForAuth('fullAccess')
+        return
+      }
+    }
+
     console.log('[COVER] generate from job description', { jobDescription, jobDraft })
     setLoading(prev => ({ ...prev, tailorFromDescription: true }))
 
@@ -828,6 +906,7 @@ export default function CoverPage() {
           ? `${jobDraft?.jobTitle || 'this position'} at ${jobDraft.company}`
           : jobDraft?.jobTitle || jobContext.jobTitle || 'this job'
         showToast('success', `Cover letter generated from job description for ${jobInfo}.`)
+        if (guest.isGuest) incrementGuestUsage('coverLetter', 'generations')
       } else {
         showToast('error', 'Failed to generate cover letter. Please try again.')
       }
@@ -840,6 +919,7 @@ export default function CoverPage() {
   }
 
   const handleExport = async (format: 'pdf' | 'docx') => {
+    if (guest.promptForAuth('download')) return
     if (!hasLetterContent) {
       showToast('error', 'Please add content first')
       return
@@ -885,43 +965,38 @@ export default function CoverPage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 relative overflow-hidden">
-      {/* Background glows */}
-      <div className="pointer-events-none absolute -top-40 -left-24 h-72 w-72 rounded-full bg-violet-600/30 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-fuchsia-500/25 blur-3xl" />
-
-      {/* Main container */}
-      <main className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10">
-        <header className="mb-4 pb-4 border-b border-slate-800/60">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-4 text-xs md:text-sm text-slate-400 mb-3">
-              <button
-                type="button"
-                onClick={handleBackToDashboard}
-                className="hover:text-slate-100 transition"
-              >
-                ← Back to Dashboard
-              </button>
-
-              {hasJobContext && (
-                <button
-                  type="button"
-                  onClick={handleBackToJobDetails}
-                  className="hover:text-slate-100 transition"
-                >
-                  ← Back to Job Details
-                </button>
+    <PublicToolLayout
+      title="Cover Letter Builder"
+      subtitle="Generate personalized cover letters that match your CV and target job"
+      guest={guest}
+      secondaryBackLinks={
+        hasJobContext
+          ? [{ label: 'Back to Job Details', onClick: handleBackToJobDetails }]
+          : []
+      }
+      continueGuestLabel="Continue editing as guest"
+      footer={
+        toast ? (
+          <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
+            <div
+              className={cn(
+                'rounded-lg px-4 py-3 shadow-lg flex items-center gap-2',
+                toast.type === 'success'
+                  ? 'bg-green-600/90 text-white'
+                  : 'bg-red-600/90 text-white'
               )}
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5" />
+              ) : (
+                <X className="w-5 h-5" />
+              )}
+              <span className="text-sm font-medium">{toast.message}</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-slate-50 m-0">
-              JobAZ – Cover Letter Builder
-            </h1>
-            <p className="mt-1 text-xs md:text-sm text-slate-400 m-0">
-              Generate personalized cover letters that match your CV and target job
-            </p>
           </div>
-        </header>
-
+        ) : null
+      }
+    >
         {/* Action buttons */}
         <div className="mb-6 flex flex-wrap gap-2">
           <button
@@ -974,7 +1049,7 @@ export default function CoverPage() {
                         placeholder="Your Name"
                         value={applicantName}
                         onChange={(e) => setApplicantName(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-700/60 bg-slate-900/50 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition"
+                        className="jobaz-input w-full"
                       />
                       <p className="text-[10px] md:text-xs text-slate-400 mt-1">
                         Used in the signature (e.g., &quot;Sincerely, Your Name&quot;)
@@ -987,7 +1062,7 @@ export default function CoverPage() {
                         placeholder="Hiring Manager"
                         value={recipientName}
                         onChange={(e) => setRecipientInfo({ recipientName: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-700/60 bg-slate-900/50 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition"
+                        className="jobaz-input w-full"
                       />
                       <p className="text-[10px] md:text-xs text-slate-400 mt-1">
                         If left blank, we&apos;ll use generic salutations (&apos;Dear Hiring Manager,&apos;).
@@ -1002,7 +1077,7 @@ export default function CoverPage() {
                     <div className="relative">
                       <textarea
                         placeholder="Write or paste your cover letter here..."
-                        className="w-full px-4 py-3 rounded-xl border border-slate-700/60 bg-slate-900/50 text-slate-100 placeholder:text-slate-500 min-h-[300px] focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition resize-y"
+                        className="jobaz-input w-full min-h-[300px] resize-y"
                         value={letterBody}
                         onChange={(e) => setLetterBody(e.target.value)}
                       />
@@ -1014,7 +1089,7 @@ export default function CoverPage() {
                           onClick={handleImprove}
                           disabled={loading.improve || !hasLetterContent}
                           data-jaz-action="cover_improve"
-                          className="w-full rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/70 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="jobaz-btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {loading.improve ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -1053,7 +1128,7 @@ export default function CoverPage() {
                               showToast('success', 'Applied to form');
                             }}
                             disabled={!aiPreview.trim()}
-                            className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white border border-violet-400/70 hover:bg-violet-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="jobaz-btn-primary-sm disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Apply to Form
                           </button>
@@ -1108,7 +1183,7 @@ export default function CoverPage() {
                       <button
                         onClick={handleTailor}
                         disabled={loading.tailor}
-                        className="w-full rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/70 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="jobaz-btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {loading.tailor ? (
                           <>
@@ -1134,7 +1209,7 @@ export default function CoverPage() {
                       <label className="block text-xs md:text-sm font-medium text-slate-200 mb-2">Generate from Keywords</label>
                       <textarea
                         placeholder="e.g., Senior Software Engineer, Python, React, AWS..."
-                        className="w-full px-4 py-3 rounded-xl border border-slate-700/60 bg-slate-900/50 text-slate-100 placeholder:text-slate-500 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition resize-y"
+                        className="jobaz-input w-full min-h-[80px] resize-y"
                         value={keywords}
                         onChange={(e) => setKeywords(e.target.value)}
                       />
@@ -1142,7 +1217,7 @@ export default function CoverPage() {
                     <div>
                       <label className="block text-xs md:text-sm font-medium text-slate-200 mb-2">Mode</label>
                       <select
-                        className="w-full px-4 py-3 rounded-xl border border-slate-700/60 bg-slate-900/50 text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition"
+                        className="jobaz-input w-full"
                         value={generateMode}
                         onChange={(e) => setGenerateMode(e.target.value as any)}
                       >
@@ -1156,7 +1231,7 @@ export default function CoverPage() {
                       onClick={handleGenerate}
                       disabled={loading.gen || !keywords}
                       data-jaz-action="cover_generate_keywords"
-                      className="w-full rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/70 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="jobaz-btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading.gen ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -1174,7 +1249,7 @@ export default function CoverPage() {
                     <div>
                       <label className="block text-xs md:text-sm font-medium text-slate-200 mb-2">Rewrite Mode</label>
                       <select
-                        className="w-full px-4 py-3 rounded-xl border border-slate-700/60 bg-slate-900/50 text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition"
+                        className="jobaz-input w-full"
                         value={rewriteMode}
                         onChange={(e) => setRewriteMode(e.target.value as any)}
                       >
@@ -1188,7 +1263,7 @@ export default function CoverPage() {
                       onClick={handleRewrite}
                       disabled={loading.rewrite || !hasLetterContent}
                       data-jaz-action="cover_rewrite"
-                      className="w-full rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/70 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="jobaz-btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading.rewrite ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -1239,7 +1314,7 @@ export default function CoverPage() {
                       <label className="block text-xs md:text-sm font-medium text-slate-200 mb-2">Job Description</label>
                       <textarea
                         placeholder="Paste the job description here so we can tailor your cover letter to this role..."
-                        className="w-full px-4 py-3 rounded-xl border border-slate-700/60 bg-slate-900/50 text-slate-100 placeholder:text-slate-500 min-h-[150px] focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition resize-y"
+                        className="jobaz-input w-full min-h-[150px] resize-y"
                         value={jobDescription}
                         onChange={(e) => setJobDescription(e.target.value)}
                       />
@@ -1248,7 +1323,7 @@ export default function CoverPage() {
                       onClick={handleGenerateFromJobDescription}
                       disabled={loading.tailorFromDescription || !jobDescription.trim()}
                       data-jaz-action="cover_generate_from_jd"
-                      className="w-full rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white border border-violet-400/70 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="jobaz-btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading.tailorFromDescription ? (
                         <>
@@ -1280,7 +1355,7 @@ export default function CoverPage() {
                   <button
                     onClick={() => handleExport('pdf')}
                     disabled={loading.export}
-                    className="rounded-full bg-violet-600 px-4 py-2 text-xs md:text-sm font-medium text-white border border-violet-400/70 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="jobaz-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Download PDF"
                   >
                     {loading.export ? (
@@ -1295,7 +1370,7 @@ export default function CoverPage() {
                   <button
                     onClick={() => handleExport('docx')}
                     disabled={loading.export}
-                    className="rounded-full bg-violet-600 px-4 py-2 text-xs md:text-sm font-medium text-white border border-violet-400/70 shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:bg-violet-500 hover:border-violet-300 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="jobaz-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Download DOCX"
                   >
                     {loading.export ? (
@@ -1334,7 +1409,6 @@ export default function CoverPage() {
             </div>
           </div>
         </section>
-      </main>
 
       {/* Compare Panel */}
       {showCompare && variants.length > 0 && (
@@ -1360,27 +1434,7 @@ export default function CoverPage() {
         />
       )}
 
-      {/* Toast notification */}
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
-          <div
-            className={cn(
-              'rounded-lg px-4 py-3 shadow-lg flex items-center gap-2',
-              toast.type === 'success'
-                ? 'bg-green-600/90 text-white'
-                : 'bg-red-600/90 text-white'
-            )}
-          >
-            {toast.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5" />
-            ) : (
-              <X className="w-5 h-5" />
-            )}
-            <span className="text-sm font-medium">{toast.message}</span>
-          </div>
-        </div>
-      )}
-    </div>
+    </PublicToolLayout>
   )
 }
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Sparkles, CheckCircle2, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import SkillsAIModal from './SkillsAIModal'
+import CvPlanSuggestionChips from '@/components/cv-builder-v2/CvPlanSuggestionChips'
 
 interface SkillsTabProps {
   skills: string[]
@@ -10,6 +11,7 @@ interface SkillsTabProps {
   experiencePreview?: string
   onToast?: (type: 'success' | 'error', message: string) => void
   jobDescription?: string
+  planSkillSuggestions?: string[]
 }
 
 type SkillsQualityRating = 'excellent' | 'good' | 'needs-improvement' | null
@@ -29,6 +31,7 @@ export default function SkillsTab({
   experiencePreview,
   onToast,
   jobDescription,
+  planSkillSuggestions,
 }: SkillsTabProps) {
   const [inputValue, setInputValue] = useState('')
   const [showAIModal, setShowAIModal] = useState(false)
@@ -122,6 +125,18 @@ export default function SkillsTab({
 
   return (
     <div className="space-y-4">
+      {planSkillSuggestions && planSkillSuggestions.length > 0 && (
+        <CvPlanSuggestionChips
+          title="Suggested skills for your plan"
+          items={planSkillSuggestions}
+          alreadyHas={(item) => skills.some((s) => s.toLowerCase() === item.toLowerCase())}
+          onAdd={(item) => {
+            if (!skills.some((s) => s.toLowerCase() === item.toLowerCase())) {
+              onUpdate([...skills, item])
+            }
+          }}
+        />
+      )}
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="block text-sm font-medium text-slate-300">Add Skills</label>
@@ -170,7 +185,7 @@ export default function SkillsTab({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+            className="jobaz-input flex-1"
             placeholder="Type a skill and press Enter"
           />
           <button

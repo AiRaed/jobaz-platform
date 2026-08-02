@@ -23,6 +23,8 @@ export function normalizeAdzunaJob(
     salaryMax: job.salary_max,
     url: job.redirect_url || '',
     source: 'adzuna',
+    jobType: job.category?.label,
+    postedAt: job.created,
   }
 }
 
@@ -42,6 +44,8 @@ export function normalizeReedJob(
     salaryMax: job.maximumSalary,
     url: job.jobUrl || '',
     source: 'reed',
+    jobType: job.jobType,
+    postedAt: job.date,
   }
 }
 

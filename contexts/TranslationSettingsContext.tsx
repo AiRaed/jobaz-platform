@@ -53,26 +53,14 @@ function saveSettings(settings: TranslationSettings) {
   }
 }
 
+const DEFAULT_SETTINGS: TranslationSettings = { hoverEnabled: false, targetLanguage: 'EN' }
+
 export function TranslationSettingsProvider({ children }: { children: ReactNode }) {
-  // Initialize from localStorage once, preventing flicker
-  const [settings, setSettings] = useState<TranslationSettings>(() => {
-    // Only load from localStorage on client side
-    if (typeof window === 'undefined') {
-      return { hoverEnabled: false, targetLanguage: 'EN' }
-    }
-    return loadSettings()
-  })
-  
-  // Track if settings are initialized to prevent duplicate initialization
-  const isInitialized = useRef(false)
-  
-  // Initialize from localStorage on mount (only once)
+  // Stable SSR/client first paint; load persisted settings after mount only
+  const [settings, setSettings] = useState<TranslationSettings>(DEFAULT_SETTINGS)
+
   useEffect(() => {
-    if (!isInitialized.current && typeof window !== 'undefined') {
-      const loaded = loadSettings()
-      setSettings(loaded)
-      isInitialized.current = true
-    }
+    setSettings(loadSettings())
   }, [])
 
   const setHoverEnabled = useCallback((enabled: boolean) => {

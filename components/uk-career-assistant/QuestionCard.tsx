@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { Sparkles } from 'lucide-react'
 import { Question } from '@/app/uk-career-assistant/page'
 
 interface QuestionCardProps {
@@ -20,95 +21,107 @@ export default function QuestionCard({
   onMultiSubmit,
   loading = false,
   isTyping = false,
-  contextChip
+  contextChip,
 }: QuestionCardProps) {
-  const maxSelectReached = question.type === 'multi' && 
-    question.max_select && 
-    selectedOptions.length >= question.max_select
+  const maxSelectReached =
+    question.type === 'multi' && question.max_select && selectedOptions.length >= question.max_select
   const canSubmitMulti = question.type === 'multi' && selectedOptions.length > 0
 
   return (
-    <div className="mb-6 rounded-2xl border border-white/5 bg-[#111827]/60 backdrop-blur-xl shadow-[0_0_40px_rgba(139,92,246,0.15)] p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Question Title */}
-      <div className="mb-5">
-        <div className="flex items-start gap-3 mb-3">
-          <h3 className="text-lg font-medium text-slate-50 flex-1 leading-snug">
-            {question.text}
-          </h3>
-          {contextChip && (
-            <span className="px-3 py-1 text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-400/30 rounded-full whitespace-nowrap">
-              {contextChip}
-            </span>
-          )}
+    <div className="uk-ca-question mb-6 rounded-2xl border border-violet-500/20 bg-gradient-to-br from-slate-950/80 via-violet-950/20 to-slate-900/60 backdrop-blur-xl shadow-[0_0_40px_rgba(139,92,246,0.12)] p-5 md:p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="uk-ca-icon w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center shrink-0">
+          <Sparkles className="w-4 h-4 text-violet-300" />
         </div>
-        {/* Subtle animated divider */}
-        <div className="h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent mb-4" />
-        {question.type === 'multi' && question.max_select && (
-          <p className="text-sm text-slate-400 mb-2">
-            Select up to {question.max_select} option{question.max_select > 1 ? 's' : ''}
-            {selectedOptions.length > 0 && ` (${selectedOptions.length} selected)`}
-          </p>
+        <div className="flex-1 min-w-0">
+          <p className="uk-ca-label text-[10px] uppercase tracking-wider text-violet-400/80 mb-1">JAZ asks</p>
+          <h3 className="uk-ca-title text-base md:text-lg font-medium text-slate-50 leading-snug">{question.text}</h3>
+        </div>
+        {contextChip && (
+          <span className="px-2.5 py-1 text-[10px] font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 rounded-full whitespace-nowrap">
+            {contextChip}
+          </span>
         )}
       </div>
 
-      {/* Options as premium buttons */}
-      <div className="space-y-3 mb-5">
-        {question.options.map((option) => {
-          const isSelected = selectedOptions.includes(option.value)
-          return (
-            <button
-              key={option.value}
-              onClick={() => onOptionClick(option.value)}
-              disabled={loading || isTyping || (question.type === 'multi' && !!maxSelectReached && !isSelected)}
-              className={cn(
-                "w-full text-left px-5 py-3.5 rounded-xl border transition-all duration-200",
-                "hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-900/20",
-                question.type === 'single'
-                  ? "bg-slate-800/60 border-slate-600/30 hover:bg-purple-600/20 hover:border-purple-400/40 text-slate-100"
-                  : isSelected
-                  ? "border-purple-500 bg-purple-600/25 text-white shadow-lg shadow-purple-900/30 ring-2 ring-purple-500/30"
-                  : "bg-slate-800/60 border-slate-600/30 hover:bg-purple-600/20 hover:border-purple-400/40 text-slate-100",
-                "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
-              )}
-            >
-              {option.label}
-            </button>
-          )
-        })}
-      </div>
+      <div className="h-px bg-gradient-to-r from-transparent via-violet-500/25 to-transparent mb-4" />
 
-      {/* Multi-select: Show selected pills summary + submit button */}
-      {question.type === 'multi' && selectedOptions.length > 0 && (
-        <div className="space-y-3">
-          {/* Selected options summary */}
-          <div className="flex flex-wrap gap-2 pb-2">
-            {selectedOptions.map((optValue) => {
-              const option = question.options.find(o => o.value === optValue)
+      {question.type === 'multi' && question.max_select && (
+        <p className="text-xs text-slate-500 mb-3">
+          Select up to {question.max_select}
+          {selectedOptions.length > 0 && ` · ${selectedOptions.length} selected`}
+        </p>
+      )}
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        {question.id === 'cb_user_goal' ? (
+          <div className="w-full space-y-2">
+            {(question.options ?? []).map((option) => {
+              const isSelected = selectedOptions.includes(option.value)
               return (
-                <span
-                  key={optValue}
-                  className="px-3 py-1.5 text-xs font-medium bg-purple-600/30 text-purple-200 border border-purple-500/40 rounded-full"
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onOptionClick(option.value)}
+                  disabled={loading || isTyping}
+                  className={cn(
+                    'uk-ca-option w-full text-left px-4 py-3 rounded-xl border text-sm transition-all duration-200',
+                    'hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(139,92,246,0.2)]',
+                    isSelected
+                      ? 'uk-ca-option--selected bg-gradient-to-r from-violet-600/40 to-cyan-600/30 border-violet-400/50 text-white shadow-[0_0_16px_rgba(139,92,246,0.25)] ring-1 ring-violet-400/30'
+                      : 'bg-slate-900/60 border-slate-600/40 text-slate-200 hover:border-violet-500/40 hover:bg-violet-950/30',
+                    'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none'
+                  )}
                 >
-                  {option?.label || optValue}
-                </span>
+                  <span className="font-semibold block">{option.label}</span>
+                  {option.description && (
+                    <span className="uk-ca-option-desc block text-xs text-slate-400 mt-1 font-normal leading-snug">
+                      {option.description}
+                    </span>
+                  )}
+                </button>
               )
             })}
           </div>
-          {/* Submit button with gradient */}
-          <button
-            onClick={onMultiSubmit}
-            disabled={!canSubmitMulti || loading || isTyping}
-            className={cn(
-              "w-full px-5 py-3.5 bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400",
-              "text-white rounded-xl font-medium transition-all duration-200 shadow-[0_0_25px_rgba(139,92,246,0.4)]",
-              "hover:scale-[1.03] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            )}
-          >
-            Submit {selectedOptions.length > 0 && `(${selectedOptions.length})`}
-          </button>
-        </div>
+        ) : (
+          (question.options ?? []).map((option) => {
+            const isSelected = selectedOptions.includes(option.value)
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onOptionClick(option.value)}
+                disabled={loading || isTyping || (question.type === 'multi' && !!maxSelectReached && !isSelected)}
+                className={cn(
+                  'uk-ca-option px-4 py-2.5 rounded-full text-sm font-medium border transition-all duration-200',
+                  'hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(139,92,246,0.2)]',
+                  isSelected
+                    ? 'uk-ca-option--selected bg-gradient-to-r from-violet-600/40 to-cyan-600/30 border-violet-400/50 text-white shadow-[0_0_16px_rgba(139,92,246,0.25)] ring-1 ring-violet-400/30'
+                    : 'bg-slate-900/60 border-slate-600/40 text-slate-200 hover:border-violet-500/40 hover:bg-violet-950/30',
+                  'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none'
+                )}
+              >
+                {option.label}
+              </button>
+            )
+          })
+        )}
+      </div>
+
+      {question.type === 'multi' && selectedOptions.length > 0 && (
+        <button
+          type="button"
+          onClick={onMultiSubmit}
+          disabled={!canSubmitMulti || loading || isTyping}
+          className={cn(
+            'w-full px-5 py-3 bg-gradient-to-r from-violet-600 to-cyan-500 hover:from-violet-500 hover:to-cyan-400',
+            'text-white rounded-xl font-medium transition-all duration-200 shadow-[0_0_25px_rgba(139,92,246,0.35)]',
+            'hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100'
+          )}
+        >
+          Continue · {selectedOptions.length} selected
+        </button>
       )}
     </div>
   )
 }
-

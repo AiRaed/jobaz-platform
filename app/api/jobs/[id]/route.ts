@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { parseJobId } from '@/lib/jobs/parse-id'
+import { fetchJobazJobById } from '@/lib/jobs/jobaz'
 import { mockJobs } from '@/lib/jobs/mock-jobs'
 
 export const dynamic = 'force-dynamic'
@@ -162,7 +163,28 @@ export async function GET(
     let job: any = null
 
     // Fetch from the appropriate provider
-    if (parsed.provider === 'reed') {
+    if (parsed.provider === 'jobaz') {
+      const jobaz = await fetchJobazJobById(parsed.rawId)
+      if (jobaz) {
+        job = {
+          id: jobaz.id,
+          title: jobaz.title,
+          company: jobaz.company,
+          location: jobaz.location,
+          description: jobaz.description,
+          type: jobaz.jobType,
+          link: jobaz.url,
+          salary: jobaz.salary,
+          source: 'jobaz',
+          featured: jobaz.featured,
+          partnerCompany: jobaz.partnerCompany,
+          requirements: jobaz.requirements,
+          benefits: jobaz.benefits,
+          companyWebsite: jobaz.companyWebsite,
+          routeTags: jobaz.routeTags,
+        }
+      }
+    } else if (parsed.provider === 'reed') {
       const reedJob = await fetchReedJobById(parsed.rawId)
       if (reedJob) {
         job = normalizeReedJobForDetails(reedJob, parsed.fullId)

@@ -1,0 +1,204 @@
+{
+  "version": 1,
+  "description": "JobAZ career route definitions. Public/business knowledge only — no user PII or secrets.",
+  "routes": [
+    {
+      "route_id": "extra_income_security",
+      "title": "Extra Income / Security & Events",
+      "goal_type": "extra_income",
+      "category": "security_events",
+      "description": "Practical UK route for people who want extra income or flexible work, often via stewarding and security-related progression. Start with work-now roles, then upgrade with SIA Door Supervisor when ready.",
+      "work_now_roles": [
+        "Matchday Steward",
+        "Event Steward",
+        "Delivery Driver",
+        "Warehouse Operative"
+      ],
+      "next_upgrade": [
+        "SIA Door Supervisor"
+      ],
+      "optional_addons": [
+        "First Aid at Work",
+        "SIA CCTV Operator"
+      ],
+      "cv_focus_keywords": [
+        "reliability",
+        "availability",
+        "customer service",
+        "right to work",
+        "event work",
+        "calm under pressure"
+      ],
+      "notes": [
+        "Matchday Steward is a work-now role, not a course.",
+        "SIA Door Supervisor is the next upgrade training/licence — not a work-now role.",
+        "Never flag 'no published course for Matchday Steward' as a course gap.",
+        "Optional add-ons (First Aid, CCTV) are nice to have, not required for a good plan."
+      ],
+      "status": "active"
+    },
+    {
+      "route_id": "care_entry_route",
+      "title": "Care Entry Route",
+      "goal_type": "start_new_career",
+      "category": "care",
+      "description": "Entry route into UK care and support work. Focus on work-now care roles first, then formal care training as the next upgrade.",
+      "work_now_roles": [
+        "Care Assistant",
+        "Support Worker",
+        "Healthcare Support Worker"
+      ],
+      "next_upgrade": [
+        "Level 2 Diploma in Care or equivalent care training"
+      ],
+      "optional_addons": [
+        "First Aid",
+        "Safeguarding",
+        "Food Safety",
+        "Medication Awareness"
+      ],
+      "cv_focus_keywords": [
+        "empathy",
+        "reliability",
+        "communication",
+        "safeguarding awareness",
+        "care values"
+      ],
+      "notes": [
+        "Prioritise empathy, reliability and safeguarding language on the CV.",
+        "Recommend published care training when available; otherwise recommend the course type only."
+      ],
+      "status": "active"
+    },
+    {
+      "route_id": "construction_cscs_route",
+      "title": "Construction / CSCS Route",
+      "goal_type": "start_new_career",
+      "category": "construction",
+      "description": "Practical construction entry route. Work-now site roles first, then CSCS / health and safety training as the next upgrade.",
+      "work_now_roles": [
+        "Labourer",
+        "Site Assistant",
+        "Construction Operative"
+      ],
+      "next_upgrade": [
+        "CSCS Card route"
+      ],
+      "optional_addons": [
+        "Health and Safety in Construction",
+        "First Aid",
+        "Manual Handling"
+      ],
+      "cv_focus_keywords": [
+        "reliability",
+        "physical work",
+        "site safety",
+        "teamwork",
+        "punctuality"
+      ],
+      "notes": [
+        "CSCS and Health and Safety in Construction are high-priority next-upgrade training types.",
+        "Do not invent providers or claim approved partnerships."
+      ],
+      "status": "active"
+    },
+    {
+      "route_id": "forklift_warehouse_route",
+      "title": "Forklift / Warehouse Route",
+      "goal_type": "extra_income",
+      "category": "warehouse_logistics",
+      "description": "Warehouse and logistics route with forklift training as the main upgrade path for better roles and pay progression.",
+      "work_now_roles": [
+        "Warehouse Operative",
+        "Picker/Packer",
+        "Logistics Assistant"
+      ],
+      "next_upgrade": [
+        "Forklift licence/training"
+      ],
+      "optional_addons": [
+        "Manual Handling",
+        "Health and Safety",
+        "First Aid"
+      ],
+      "cv_focus_keywords": [
+        "accuracy",
+        "reliability",
+        "warehouse systems",
+        "safety",
+        "shift availability"
+      ],
+      "notes": [
+        "Forklift training is the primary next upgrade.",
+        "Emphasise shift availability and safety awareness on the CV."
+      ],
+      "status": "active"
+    },
+    {
+      "route_id": "teaching_assistant_tefl_route",
+      "title": "Teaching Assistant / TEFL Route",
+      "goal_type": "start_new_career",
+      "category": "education",
+      "description": "Education support route covering Teaching Assistant pathways and TEFL for language teaching support roles.",
+      "work_now_roles": [
+        "Teaching Assistant",
+        "Learning Support Assistant",
+        "ESOL Support"
+      ],
+      "next_upgrade": [
+        "Teaching Assistant qualification or TEFL"
+      ],
+      "optional_addons": [
+        "Safeguarding",
+        "SEND awareness",
+        "First Aid"
+      ],
+      "cv_focus_keywords": [
+        "communication",
+        "patience",
+        "classroom support",
+        "safeguarding awareness",
+        "language skills"
+      ],
+      "notes": [
+        "Teaching Assistant qualification is commonly recommended; TEFL may be optional or recommended depending on the user's goal.",
+        "Safeguarding awareness is important for education settings."
+      ],
+      "status": "active"
+    },
+    {
+      "route_id": "engineering_education_route",
+      "title": "Engineering / Education Progression Route",
+      "goal_type": "career_progression",
+      "category": "engineering",
+      "description": "Engineering and technical progression route for users with technical backgrounds seeking UK-relevant next steps, membership, or practical certifications.",
+      "work_now_roles": [
+        "Engineering Technician",
+        "Junior Engineer",
+        "Design Engineer",
+        "Project Assistant"
+      ],
+      "next_upgrade": [
+        "UK professional membership or practical certification depending on route"
+      ],
+      "optional_addons": [
+        "AutoCAD",
+        "Project Management",
+        "ECS/18th Edition if relevant"
+      ],
+      "cv_focus_keywords": [
+        "technical skills",
+        "UK standards awareness",
+        "projects",
+        "software",
+        "problem solving"
+      ],
+      "notes": [
+        "Next upgrade depends on the specific engineering path — do not invent a single mandatory course.",
+        "Separate old/test Design Engineer historical sessions from current Extra Income / Security flows when reviewing quality.",
+        "Recommend course types and memberships carefully; never invent providers."
+      ],
+      "status": "active"
+    }
+  ]
+}

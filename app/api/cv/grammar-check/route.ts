@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { aiProvider } from '@/lib/jobaz-ai/providers'
 
 interface CvData {
   personalInfo: {
@@ -266,7 +262,7 @@ export async function POST(req: NextRequest) {
     const issues: GrammarIssue[] = []
 
     // Check if API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiProvider.isConfigured()) {
       console.warn('[Grammar Check] No OPENAI_API_KEY - using heuristic fallback')
       // Fallback to basic heuristic checks
       return NextResponse.json({
@@ -431,8 +427,7 @@ Return ONLY a valid JSON array of issues in this exact format:
 
 If no errors are found, return an empty array []. Return ONLY the JSON array, no other text.`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const completion = await aiProvider.generateText({
       messages: [
         {
           role: 'system',
@@ -443,11 +438,13 @@ If no errors are found, return an empty array []. Return ONLY the JSON array, no
           content: prompt,
         },
       ],
+      modelTier: 'default',
       temperature: 0.2,
-      max_tokens: 2000,
+      maxTokens: 2000,
+      feature: 'cv/grammar-check',
     })
 
-    const result = completion.choices[0]?.message?.content?.trim()
+    const result = completion.text?.trim()
     
     if (!result) {
       throw new Error('No response from AI')

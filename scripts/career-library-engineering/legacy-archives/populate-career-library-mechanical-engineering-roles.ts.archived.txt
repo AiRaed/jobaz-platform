@@ -1,0 +1,857 @@
+/**
+ * ARCHIVED � NON-EXECUTABLE historical copy.
+ * DO NOT RUN. Degree / Master's / PhD must not be used as Engineering stages.
+ * Canonical path: scripts/populate-career-library-engineering.ts +
+ *   scripts/remap-engineering-professional-stages.ts
+ * See scripts/career-library-engineering/legacy-archives/README.md
+ */
+import { refuseLegacyEngineeringAcademicPopulate } from '../refuseLegacyAcademicPopulate'
+refuseLegacyEngineeringAcademicPopulate('legacy-archives/' + (typeof __filename !== 'undefined' ? __filename : 'archived-script'))
+
+/* ===== ORIGINAL LEGACY BODY BELOW (unreachable) ===== */
+/**
+ * Populate Career Knowledge Library roles for Mechanical Engineering only.
+ *
+ * UK-focused roles validated against National Careers Service, Prospects, and
+ * IMechE graduate / CEng pathways. Draft status only.
+ * Education stage = academic relevance; seniority/experience = eligibility.
+ *
+ *   npx tsx scripts/populate-career-library-mechanical-engineering-roles.ts
+ */
+
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { normalizeSlug } from '../lib/admin/career-library/guards'
+import type {
+  CareerLibraryAcademicRequirement,
+  CareerLibraryFitClassification,
+  CareerLibraryRegistrationRequirement,
+  CareerLibraryRoleCategory,
+  CareerLibrarySeniorityLevel,
+} from '../lib/admin/career-library/types'
+
+function loadEnvLocal() {
+  const envPath = resolve(process.cwd(), '.env.local')
+  if (!existsSync(envPath)) return
+  const text = readFileSync(envPath, 'utf8')
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim()
+    let val = trimmed.slice(eq + 1).trim()
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
+
+type StageKey = 'degree' | 'masters' | 'phd'
+
+type RoleSeed = {
+  name: string
+  description: string
+  roleCategory: CareerLibraryRoleCategory
+  seniorityLevel: CareerLibrarySeniorityLevel
+  minimumExperienceYears: number
+  experienceRequirementLabel: string
+  professionalRegistrationRequirement: CareerLibraryRegistrationRequirement
+  professionalMembershipRequirement: CareerLibraryRegistrationRequirement
+  academicRequirement: CareerLibraryAcademicRequirement
+  isResearchRole: boolean
+  isAcademicRole: boolean
+  isRegulatedOrRestricted: boolean
+  eligibilityNote: string
+  fitClassification: CareerLibraryFitClassification
+  priority: number
+}
+
+/** Sources: National Careers Service; Prospects; IMechE graduate schemes / CEng */
+const DEGREE_ROLES: RoleSeed[] = [
+  {
+    name: 'Graduate Mechanical Engineer',
+    description:
+      'Entry UK role on a structured graduate scheme, rotating through design, manufacturing and project support toward IMechE professional development.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior industry experience required',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'accredited_degree_preferred',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate graduate-entry role. IMechE student/affiliate membership helps CEng progression later but is not required to start.',
+    fitClassification: 'immediate',
+    priority: 10,
+  },
+  {
+    name: 'CAD / Mechanical Design Support Engineer',
+    description:
+      'Produces and revises mechanical drawings and 3D CAD models under supervision for manufacturing and product development teams.',
+    roleCategory: 'design',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry level; placement or strong CAD portfolio helpful',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate design-support pathway. Signing off designs or acting as lead designer is not implied by the degree alone.',
+    fitClassification: 'immediate',
+    priority: 20,
+  },
+  {
+    name: 'Mechanical Design Engineer',
+    description:
+      'Designs mechanical components and assemblies using CAD/CAE tools for products, plant or machinery in UK manufacturing and consultancy.',
+    roleCategory: 'design',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years design experience or strong industrial placement',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Degree makes the role academically relevant; employers usually expect some applied design exposure beyond academic projects.',
+    fitClassification: 'realistic_next',
+    priority: 30,
+  },
+  {
+    name: 'Manufacturing Engineer',
+    description:
+      'Improves production processes, tooling and work instructions to raise quality, efficiency and cost control on UK manufacturing sites.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years manufacturing or industrial experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Common UK destination after a mechanical degree. Process ownership grows with shop-floor and lean experience, not the degree title alone.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    name: 'Test and Validation Engineer',
+    description:
+      'Plans and runs mechanical tests, analyses results and supports product or component validation against UK and customer specifications.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry possible with laboratory/placement experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Often realistic soon after graduation where test/lab experience exists. Senior test authority still requires deeper product experience.',
+    fitClassification: 'immediate',
+    priority: 50,
+  },
+  {
+    name: 'Maintenance / Reliability Engineer',
+    description:
+      'Supports planned maintenance, fault diagnosis and reliability improvement for plant, machinery and building mechanical systems.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years maintenance, plant or site experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Academic relevance is strong; unsupervised plant responsibility usually needs operational and H&S experience.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    name: 'HVAC / Building Services Mechanical Engineer',
+    description:
+      'Designs or supports mechanical building services (HVAC, heating, ventilation) for UK construction and consultancy projects.',
+    roleCategory: 'design',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years building services or MEP experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Common UK mechanical pathway in construction. CIBSE/IMechE membership is useful; degree alone does not equal lead designer status.',
+    fitClassification: 'realistic_next',
+    priority: 70,
+  },
+  {
+    name: 'Plant / Process Mechanical Engineer (Graduate)',
+    description:
+      'Supports mechanical plant, piping interfaces and equipment packages in process, energy or industrial facilities under senior supervision.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior industry experience required on graduate schemes',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate graduate pathway into plant/process employers. Package ownership and site authority come later with experience.',
+    fitClassification: 'immediate',
+    priority: 80,
+  },
+  {
+    name: 'Assistant Project Engineer (Mechanical)',
+    description:
+      'Supports mechanical work packages through design and delivery, coordinating suppliers, schedules and documentation under a project lead.',
+    roleCategory: 'project_management',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–2 years project or design support experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Assistant-level project delivery. Full project engineer ownership is not implied by academic stage alone.',
+    fitClassification: 'realistic_next',
+    priority: 90,
+  },
+  {
+    name: 'Mechanical Engineering Technician / EngTech pathway',
+    description:
+      'Provides drawing, assembly, testing or maintenance technical support; may align with EngTech or IEng development routes.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior experience required; EngTech/IEng pathway available',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate technical pathway. Professional registration is a later goal, not an entry gate.',
+    fitClassification: 'immediate',
+    priority: 100,
+  },
+]
+
+const MASTERS_ROLES: RoleSeed[] = [
+  {
+    name: 'Stress / FEA Engineer',
+    description:
+      'Performs structural and mechanical integrity analysis using finite-element methods for product, plant or vehicle systems.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–4 years FEA / stress analysis experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'A Master’s strengthens academic fit for analysis roles; competent FEA practice still depends on project verification experience.',
+    fitClassification: 'realistic_next',
+    priority: 10,
+  },
+  {
+    name: 'Thermofluids / CFD Engineer',
+    description:
+      'Applies fluid dynamics and heat-transfer modelling to mechanical systems, cooling, HVAC or turbomachinery problems.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–4 years CFD / thermofluids experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s study is strongly relevant; client-facing specialist status still requires applied modelling delivery experience.',
+    fitClassification: 'realistic_next',
+    priority: 20,
+  },
+  {
+    name: 'Project Engineer (Mechanical)',
+    description:
+      'Owns mechanical work packages through design and delivery, managing programme, suppliers, risk and stakeholder communication.',
+    roleCategory: 'project_management',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years design/delivery experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s relevance does not replace package ownership, commercial awareness or delivery experience.',
+    fitClassification: 'realistic_next',
+    priority: 30,
+  },
+  {
+    name: 'Building Services Design Engineer (Mechanical)',
+    description:
+      'Leads mechanical building-services design packages (HVAC, public health interfaces) for UK buildings and infrastructure.',
+    roleCategory: 'design',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years building services design experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s can support complex MEP design; lead designer responsibility depends on project experience and often chartership trajectory.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    name: 'Rotating Equipment Engineer',
+    description:
+      'Specifies, assesses and supports pumps, compressors, turbines and other rotating machinery in energy and process industries.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years rotating equipment experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Specialist plant role common in UK energy/process sectors. Master’s helps academically; vendor and site experience remain essential.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    name: 'Manufacturing Systems / Process Improvement Engineer',
+    description:
+      'Leads lean, automation and process-improvement programmes across manufacturing cells, lines or multi-site operations.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years manufacturing engineering experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Academic stage indicates relevance; cross-site improvement leadership needs demonstrated manufacturing delivery results.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    name: 'R&D Mechanical Engineer',
+    description:
+      'Develops new products, prototypes and test methods within industrial R&D teams in manufacturing, energy or transport.',
+    roleCategory: 'research',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–4 years R&D or product development experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s strengthens R&D fit. Not equivalent to principal consultancy or academic appointment.',
+    fitClassification: 'realistic_next',
+    priority: 70,
+  },
+  {
+    name: 'Quality / Compliance Engineer (Mechanical Products)',
+    description:
+      'Owns mechanical product quality, APQP/PPAP-style controls, non-conformance and compliance with customer and regulatory standards.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–5 years quality or product compliance experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Master’s may help analytically; quality ownership depends on standards, audit and production experience.',
+    fitClassification: 'realistic_next',
+    priority: 80,
+  },
+  {
+    name: 'Senior Mechanical Design Engineer',
+    description:
+      'Leads complex mechanical design packages, mentoring juniors and coordinating multidisciplinary design reviews.',
+    roleCategory: 'design',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 5,
+    experienceRequirementLabel: 'Typically 5–8 years progressive design experience with leadership evidence',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'May appear for Master’s graduates as future progression. A Master’s alone does not qualify someone for senior design leadership.',
+    fitClassification: 'future_progression',
+    priority: 90,
+  },
+  {
+    name: 'Lead Mechanical Engineer',
+    description:
+      'Acts as technical lead for mechanical scope on larger programmes, setting standards and resolving critical design/delivery issues.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 6,
+    experienceRequirementLabel: 'Typically 6–10 years experience including technical leadership',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Lead-level title requires substantial delivery leadership. Not an immediate Master’s role.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+]
+
+const PHD_ROLES: RoleSeed[] = [
+  {
+    name: 'Research Associate / Postdoctoral Researcher (Mechanical Engineering)',
+    description:
+      'Conducts funded research in universities or research centres on advanced mechanical engineering topics and publications.',
+    roleCategory: 'research',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD (or near completion) is the primary gate; postdoc contracts vary',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: true,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate or near-term academic/research fit after PhD. Not a senior industry practice role.',
+    fitClassification: 'immediate',
+    priority: 10,
+  },
+  {
+    name: 'University Lecturer / Assistant Professor (Mechanical Engineering)',
+    description:
+      'Teaches mechanical engineering modules and supervises student projects while developing an academic research portfolio.',
+    roleCategory: 'academic',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel:
+      'Typically postdoctoral research record plus teaching evidence; PhD alone is rarely sufficient',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: true,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'PhD makes the role academically relevant, but appointments usually need publications, teaching experience and often postdoctoral experience.',
+    fitClassification: 'academic_or_research',
+    priority: 20,
+  },
+  {
+    name: 'Computational Mechanics / FEA Specialist',
+    description:
+      'Develops advanced finite-element, multiphysics or computational mechanics methods for research-led design and innovation projects.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–5 years modelling research or applied specialist experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Strong PhD relevance for specialist modelling. Senior client-facing authority still depends on applied delivery experience.',
+    fitClassification: 'academic_or_research',
+    priority: 30,
+  },
+  {
+    name: 'Materials / Tribology Specialist',
+    description:
+      'Researches and advises on mechanical materials performance, wear, friction and durability for products and industrial plant.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years materials research or specialist consulting experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'PhD is often valuable for materials/tribology specialism; industry authority grows through applied testing and project advice.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    name: 'Advanced Manufacturing / Additive Manufacturing Specialist',
+    description:
+      'Develops additive manufacturing, advanced process or digital manufacturing methods within industry R&D or Catapult-style centres.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years advanced manufacturing R&D or specialist experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Realistic for PhD holders with manufacturing research delivery skills; not equivalent to principal consultancy.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    name: 'NVH / Acoustics Specialist (Mechanical Systems)',
+    description:
+      'Specialises in noise, vibration and harshness analysis for vehicles, machinery or industrial equipment in UK engineering firms.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years NVH / acoustics project experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'PhD supports academic relevance for NVH; specialist delivery roles usually need applied test and programme experience.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    name: 'Innovation / Industrial R&D Engineer',
+    description:
+      'Leads new product, materials or low-carbon mechanical system research within industrial R&D or collaborative UK programmes.',
+    roleCategory: 'research',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–5 years research or industry R&D experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Realistic for PhD holders with research delivery skills; not a principal consulting or expert witness role.',
+    fitClassification: 'realistic_next',
+    priority: 70,
+  },
+  {
+    name: 'Principal / Specialist Mechanical Consultant',
+    description:
+      'Provides expert mechanical advice on complex design integrity, failure investigation and high-risk plant or product problems.',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'principal',
+    minimumExperienceYears: 12,
+    experienceRequirementLabel: 'Typically 12+ years specialist mechanical consulting experience',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    eligibilityNote:
+      'PhD may support specialist credibility, but principal consulting requires substantial industry experience and usually chartered status. Not an immediate PhD role.',
+    fitClassification: 'future_progression',
+    priority: 80,
+  },
+  {
+    name: 'Technical Authority / Expert Witness (Mechanical Engineering)',
+    description:
+      'Acts as a recognised technical authority on disputes, standards development and highly specialised mechanical engineering problems.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'principal',
+    minimumExperienceYears: 15,
+    experienceRequirementLabel:
+      'Typically 15+ years recognised specialist practice; expert witness work is reputation-based',
+    professionalRegistrationRequirement: 'required',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: true,
+    eligibilityNote:
+      'Must not be presented as an immediate PhD role. Requires substantial specialist career history; PhD alone is insufficient.',
+    fitClassification: 'future_progression',
+    priority: 90,
+  },
+  {
+    name: 'Research & Innovation Manager (Mechanical / Manufacturing)',
+    description:
+      'Manages research programmes, industry–university partnerships and innovation funding for mechanical and manufacturing technology.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'leadership',
+    minimumExperienceYears: 6,
+    experienceRequirementLabel: 'Typically 6–10 years research leadership or programme management experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Management of research programmes needs leadership experience beyond the PhD award itself.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+]
+
+async function insertRolesForStage(
+  supabase: SupabaseClient,
+  specialismId: string,
+  stage: { id: string; stage_key: string; label: string },
+  roles: RoleSeed[],
+  existingSlugs: Set<string>
+): Promise<{ created: string[]; skipped: string[] }> {
+  const created: string[] = []
+  const skipped: string[] = []
+
+  for (const role of roles) {
+    const baseSlug = normalizeSlug(undefined, role.name)
+    if (!baseSlug) {
+      skipped.push(role.name)
+      continue
+    }
+    const slug = `${stage.stage_key}-${baseSlug}`
+
+    if (existingSlugs.has(slug)) {
+      skipped.push(role.name)
+      continue
+    }
+
+    const { error } = await supabase.from('career_library_roles').insert({
+      specialism_id: specialismId,
+      stage_id: stage.id,
+      name: role.name,
+      slug,
+      description: role.description,
+      status: 'draft',
+      active: true,
+      sort_order: role.priority,
+      priority: role.priority,
+      role_category: role.roleCategory,
+      seniority_level: role.seniorityLevel,
+      minimum_experience_years: role.minimumExperienceYears,
+      experience_requirement_label: role.experienceRequirementLabel,
+      professional_registration_requirement: role.professionalRegistrationRequirement,
+      professional_membership_requirement: role.professionalMembershipRequirement,
+      academic_requirement: role.academicRequirement,
+      is_research_role: role.isResearchRole,
+      is_academic_role: role.isAcademicRole,
+      is_regulated_or_restricted: role.isRegulatedOrRestricted,
+      eligibility_note: role.eligibilityNote,
+      fit_classification: role.fitClassification,
+      metadata: {
+        stage_id: stage.id,
+        stage_key: stage.stage_key as StageKey,
+        stage_label: stage.label,
+        academic_level: stage.stage_key,
+        specialism_slug: 'mechanical-engineering',
+        country_focus: 'uk',
+        professional_body_focus: 'IMechE',
+        eligibility_model_version: 1,
+        sources: [
+          'national_careers_service_mechanical_engineer',
+          'prospects_mechanical_engineer',
+          'imeche_graduate_schemes_ceng',
+        ],
+      },
+    })
+
+    if (error) {
+      if (error.code === '23505') {
+        skipped.push(role.name)
+        continue
+      }
+      throw new Error(`${role.name} [${stage.stage_key}]: ${error.message}`)
+    }
+
+    created.push(role.name)
+    existingSlugs.add(slug)
+  }
+
+  return { created, skipped }
+}
+
+async function main() {
+  loadEnvLocal()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  }
+
+  const supabase = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const { data: specialism, error: specErr } = await supabase
+    .from('career_library_specialisms')
+    .select('id, name, slug, stage_model_id, professional_body')
+    .eq('slug', 'mechanical-engineering')
+    .maybeSingle()
+
+  if (specErr || !specialism) {
+    throw new Error(
+      `Mechanical Engineering specialism not found: ${specErr?.message ?? 'missing row'}`
+    )
+  }
+
+  // Align professional body metadata without changing status/active
+  if (!specialism.professional_body) {
+    await supabase
+      .from('career_library_specialisms')
+      .update({ professional_body: 'Institution of Mechanical Engineers (IMechE)' })
+      .eq('id', specialism.id)
+  }
+
+  const { data: model, error: modelErr } = await supabase
+    .from('career_library_stage_models')
+    .select('id, model_key')
+    .eq('model_key', 'academic_level')
+    .maybeSingle()
+
+  if (modelErr || !model) {
+    throw new Error(`academic_level stage model not found: ${modelErr?.message ?? 'missing'}`)
+  }
+
+  const { data: stages, error: stagesErr } = await supabase
+    .from('career_library_stages')
+    .select('id, stage_key, label, sort_order')
+    .eq('stage_model_id', model.id)
+    .in('stage_key', ['degree', 'masters', 'phd'])
+    .order('sort_order', { ascending: true })
+
+  if (stagesErr || !stages?.length) {
+    throw new Error(`Academic stages not found: ${stagesErr?.message ?? 'empty'}`)
+  }
+
+  const stageByKey = new Map(stages.map((s) => [s.stage_key, s]))
+  for (const key of ['degree', 'masters', 'phd'] as const) {
+    if (!stageByKey.has(key)) {
+      throw new Error(`Missing academic stage: ${key}`)
+    }
+  }
+
+  const { data: existingRoles, error: rolesErr } = await supabase
+    .from('career_library_roles')
+    .select('slug')
+    .eq('specialism_id', specialism.id)
+
+  if (rolesErr) throw new Error(rolesErr.message)
+  const existingSlugs = new Set((existingRoles ?? []).map((r) => r.slug))
+
+  const degree = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('degree')!,
+    DEGREE_ROLES,
+    existingSlugs
+  )
+  const masters = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('masters')!,
+    MASTERS_ROLES,
+    existingSlugs
+  )
+  const phd = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('phd')!,
+    PHD_ROLES,
+    existingSlugs
+  )
+
+  const { count } = await supabase
+    .from('career_library_roles')
+    .select('id', { count: 'exact', head: true })
+    .eq('specialism_id', specialism.id)
+    .eq('status', 'draft')
+
+  const totalCreated = degree.created.length + masters.created.length + phd.created.length
+  const totalSkipped = degree.skipped.length + masters.skipped.length + phd.skipped.length
+
+  console.log('\n=== Mechanical Engineering roles populate summary ===')
+  console.log(`Specialism: ${specialism.name} (${specialism.slug})`)
+  console.log(`Stage model: academic_level`)
+  console.log(`Status: draft`)
+  console.log(`Roles created this run: ${totalCreated}`)
+  console.log(`Duplicates skipped: ${totalSkipped}`)
+  console.log(`Draft roles now in specialism: ${count ?? 'n/a'}`)
+
+  console.log('\nDegree / Bachelor roles:')
+  for (const n of degree.created) console.log(`  + ${n}`)
+  if (!degree.created.length) console.log('  (none new)')
+
+  console.log("\nMaster's roles:")
+  for (const n of masters.created) console.log(`  + ${n}`)
+  if (!masters.created.length) console.log('  (none new)')
+
+  console.log('\nPhD roles:')
+  for (const n of phd.created) console.log(`  + ${n}`)
+  if (!phd.created.length) console.log('  (none new)')
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

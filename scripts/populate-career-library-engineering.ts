@@ -1,10 +1,15 @@
 /**
  * Populate Career Knowledge Library: Engineering field + specialisms.
  *
- * Uses the same data layer / validation as admin Career Library APIs
- * (normalizeSlug, service-role Supabase client). No raw SQL inserts.
+ * CANONICAL Engineering seed path (step 1 of 3):
+ *   1. npx tsx scripts/populate-career-library-engineering.ts  (this file)
+ *   2. npx tsx scripts/remap-engineering-professional-stages.ts
+ *   3. npx tsx scripts/career-library-engineering/audit.ts
  *
- *   npx tsx scripts/populate-career-library-engineering.ts
+ * Links new specialisms to engineering_professional_route only.
+ * Does NOT create roles and does NOT use Degree / Master's / PhD as stages.
+ * Per-discipline role populate scripts are RETIRED — see
+ * scripts/career-library-engineering/legacy-archives/README.md
  *
  * Requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in .env.local
  */
@@ -192,17 +197,19 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // Prefer academic_level for engineering education routes (same linkage as admin create).
+  // Canonical Engineering stage model only.
+  // Academic qualifications (Bachelor's / Master's / PhD) are role metadata — never stages.
+  // Do NOT fall back to academic_level (retired for Engineering progression).
   const { data: stageModel, error: stageErr } = await supabase
     .from('career_library_stage_models')
     .select('id, model_key')
-    .eq('model_key', 'academic_level')
+    .eq('model_key', 'engineering_professional_route')
     .eq('active', true)
     .maybeSingle()
 
   if (stageErr || !stageModel?.id) {
     throw new Error(
-      `Could not resolve academic_level stage model: ${stageErr?.message ?? 'not found'}`
+      `Could not resolve engineering_professional_route stage model: ${stageErr?.message ?? 'not found'}. Apply migration 20250803380000 or run remap-engineering-professional-stages.ts.`
     )
   }
 
@@ -313,7 +320,7 @@ async function main() {
   console.log(
     `Engineering field: ${fieldCreated ? 'created' : 'already existed'} (id=${fieldId}, slug=${fieldSlug})`
   )
-  console.log(`Stage model linked: academic_level (${stageModel.id})`)
+  console.log(`Stage model linked: ${stageModel.model_key} (${stageModel.id})`)
   console.log(`Specialisms created: ${createdCount}`)
   console.log(`Duplicates skipped: ${skippedDuplicates}`)
   if (createdNames.length) {

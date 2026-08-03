@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
 import { requireAdminApiUser } from '@/lib/auth/adminApi'
+import {
+  isMissingDisabledStageKeysColumn,
+  stripDisabledStageMarker,
+  withDisabledStageMarker,
+} from '@/lib/admin/career-library/disabledStages'
 import { friendlyCareerLibraryError } from '@/lib/admin/career-library/errors'
 import {
   countSpecialismDependents,
+  normalizeDisabledStageKeys,
   normalizeSlug,
+  validateDisabledStageKeysForModel,
 } from '@/lib/admin/career-library/guards'
 import { mapSpecialismRow } from '@/lib/admin/career-library/mappers'
 import { getCareerLibrarySupabase } from '@/lib/admin/career-library/supabaseServer'
@@ -19,6 +26,7 @@ type PatchBody = {
   slug?: string
   description?: string
   stageModelId?: string | null
+  disabledStageKeys?: string[]
   regulatedProfession?: boolean
   professionalBody?: string | null
   status?: 'draft' | 'approved'
@@ -78,6 +86,20 @@ export async function PATCH(
     }
     patch.stage_model_id = body.stageModelId.trim()
   }
+
+  let normalizedDisabled: string[] | undefined
+  if (body.disabledStageKeys !== undefined) {
+    const disabledStageKeys = normalizeDisabledStageKeys(body.disabledStageKeys)
+    if (disabledStageKeys === null) {
+      return NextResponse.json(
+        { error: 'Disabled stage keys must be an array of valid stage keys.' },
+        { status: 400 }
+      )
+    }
+    normalizedDisabled = disabledStageKeys
+    patch.disabled_stage_keys = disabledStageKeys
+  }
+
   if (typeof body.regulatedProfession === 'boolean') {
     patch.regulated_profession = body.regulatedProfession
   }
@@ -95,12 +117,51 @@ export async function PATCH(
     return NextResponse.json({ error: 'No updates provided.' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
+  const { data: current } = await supabase
+    .from('career_library_specialisms')
+    .select('stage_model_id, description')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (normalizedDisabled !== undefined || patch.stage_model_id !== undefined) {
+    const stageModelId =
+      (typeof patch.stage_model_id === 'string' ? patch.stage_model_id : null) ??
+      current?.stage_model_id ??
+      null
+    const keys = normalizedDisabled ?? []
+    if (stageModelId && normalizedDisabled !== undefined) {
+      const disabledCheck = await validateDisabledStageKeysForModel(supabase, stageModelId, keys)
+      if (!disabledCheck.ok) {
+        return NextResponse.json({ error: disabledCheck.error }, { status: 400 })
+      }
+    }
+  }
+
+  let { data, error } = await supabase
     .from('career_library_specialisms')
     .update(patch)
     .eq('id', id)
     .select(SPECIALISM_SELECT)
     .single()
+
+  if (error && isMissingDisabledStageKeysColumn(error) && normalizedDisabled !== undefined) {
+    const { disabled_stage_keys: _drop, ...withoutColumn } = patch
+    const baseDesc =
+      typeof withoutColumn.description === 'string'
+        ? (withoutColumn.description as string)
+        : stripDisabledStageMarker(current?.description ?? '')
+    const retry = await supabase
+      .from('career_library_specialisms')
+      .update({
+        ...withoutColumn,
+        description: withDisabledStageMarker(baseDesc, normalizedDisabled),
+      })
+      .eq('id', id)
+      .select(SPECIALISM_SELECT)
+      .single()
+    data = retry.data
+    error = retry.error
+  }
 
   if (error || !data) {
     return NextResponse.json(

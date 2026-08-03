@@ -137,6 +137,8 @@ export type CareerLibrarySpecialism = {
   slug: string
   description: string
   stageModelId: string | null
+  /** Stage keys from the linked model that are not relevant for this specialism. */
+  disabledStageKeys: string[]
   regulatedProfession: boolean
   professionalBody: string | null
   status: CareerLibraryPublishStatus
@@ -165,6 +167,8 @@ export type CareerLibrarySpecialismInput = {
   slug?: string
   description?: string
   stageModelId: string
+  /** Stage keys to disable for this specialism (must belong to the chosen stage model). */
+  disabledStageKeys?: string[]
   regulatedProfession?: boolean
   professionalBody?: string | null
   status?: CareerLibraryPublishStatus

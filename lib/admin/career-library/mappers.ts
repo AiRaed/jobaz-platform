@@ -1,3 +1,7 @@
+import {
+  DISABLED_STAGE_MARKER_RE,
+  stripDisabledStageMarker,
+} from './disabledStages'
 import type {
   CareerLibraryAcademicRequirement,
   CareerLibraryField,
@@ -57,6 +61,7 @@ type SpecialismRow = {
   slug: string
   description?: string | null
   stage_model_id: string | null
+  disabled_stage_keys?: string[] | null
   regulated_profession: boolean
   professional_body: string | null
   status: string
@@ -130,19 +135,34 @@ export function mapStageModelRow(
   }
 }
 
+function parseDisabledStageKeysFromDescription(description: string): string[] {
+  const match = description.match(DISABLED_STAGE_MARKER_RE)
+  if (!match?.[1]) return []
+  return match[1]
+    .split(',')
+    .map((k) => k.trim().toLowerCase())
+    .filter((k) => /^[a-z][a-z0-9_]*$/.test(k))
+}
+
 export function mapSpecialismRow(
   row: SpecialismRow,
   dependentCount = 0
 ): CareerLibrarySpecialism {
   const field = one(row.career_library_fields)
   const stage = one(row.career_library_stage_models)
+  const rawDescription = row.description ?? ''
+  const fromColumn = Array.isArray(row.disabled_stage_keys)
+    ? row.disabled_stage_keys.filter((k): k is string => typeof k === 'string' && k.trim() !== '')
+    : []
+  const fromMarker = parseDisabledStageKeysFromDescription(rawDescription)
   return {
     id: row.id,
     fieldId: row.field_id,
     name: row.name,
     slug: row.slug,
-    description: row.description ?? '',
+    description: stripDisabledStageMarker(rawDescription),
     stageModelId: row.stage_model_id,
+    disabledStageKeys: fromColumn.length ? fromColumn : fromMarker,
     regulatedProfession: Boolean(row.regulated_profession),
     professionalBody: row.professional_body,
     status: (row.status === 'approved' ? 'approved' : 'draft') as CareerLibraryPublishStatus,

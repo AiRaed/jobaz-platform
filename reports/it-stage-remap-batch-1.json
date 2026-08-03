@@ -1,0 +1,27 @@
+{
+  "dry_run": true,
+  "inspected": 860,
+  "already_ok": 860,
+  "remapped": 0,
+  "by_legacy": {},
+  "by_new": {
+    "entry_trainee": 0,
+    "junior": 0,
+    "practitioner": 0,
+    "experienced": 0,
+    "senior": 0,
+    "lead_principal": 0,
+    "architect_specialist": 0,
+    "manager_head": 0,
+    "director_executive": 0,
+    "academic_research": 0
+  },
+  "mapping_pairs": {},
+  "ambiguous_count": 0,
+  "ambiguous": [],
+  "post_check": {
+    "active_ok": 860,
+    "still_on_legacy": 0,
+    "orphan_stage": 0
+  }
+}

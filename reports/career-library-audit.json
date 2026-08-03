@@ -1,0 +1,4838 @@
+{
+  "generated_at": "2026-08-03T20:04:28.897Z",
+  "scope": "work_in_my_education",
+  "read_only": true,
+  "summary": {
+    "fields": 15,
+    "specialisms": 696,
+    "roles": 9083,
+    "critical": 40,
+    "high": 48,
+    "medium": 131,
+    "low": 0
+  },
+  "expected_fields": {
+    "expected": 15,
+    "present": 15,
+    "missing": []
+  },
+  "engineering_refactor": {
+    "fully_clean": true,
+    "academic_stage_roles_remaining": 0,
+    "on_professional_model": true,
+    "legacy_seed_scripts": [],
+    "remap_script_present": true,
+    "professional_migration_present": true
+  },
+  "coverage": [
+    {
+      "slug": "engineering",
+      "name": "Engineering",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 27,
+      "role_count": 810,
+      "stage_model_keys": [
+        "engineering_professional_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_engineering_support",
+          "label": "Foundation / Engineering Support",
+          "sort_order": 10,
+          "role_count": 6
+        },
+        {
+          "key": "apprentice_technician",
+          "label": "Apprentice / Technician",
+          "sort_order": 20,
+          "role_count": 27
+        },
+        {
+          "key": "graduate_engineer",
+          "label": "Graduate Engineer",
+          "sort_order": 30,
+          "role_count": 136
+        },
+        {
+          "key": "chartered_professional_engineer",
+          "label": "Chartered / Professional Engineer",
+          "sort_order": 40,
+          "role_count": 119
+        },
+        {
+          "key": "experienced_engineer",
+          "label": "Experienced Engineer",
+          "sort_order": 50,
+          "role_count": 274
+        },
+        {
+          "key": "engineering_management",
+          "label": "Engineering Management",
+          "sort_order": 60,
+          "role_count": 27
+        },
+        {
+          "key": "executive_leadership",
+          "label": "Executive Leadership",
+          "sort_order": 70,
+          "role_count": 18
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 80,
+          "role_count": 203
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "it-technology",
+      "name": "IT & Technology",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 30,
+      "role_count": 860,
+      "stage_model_keys": [
+        "it_skill_experience"
+      ],
+      "stages": [
+        {
+          "key": "entry_trainee",
+          "label": "Entry / Trainee",
+          "sort_order": 10,
+          "role_count": 118
+        },
+        {
+          "key": "junior",
+          "label": "Junior",
+          "sort_order": 20,
+          "role_count": 120
+        },
+        {
+          "key": "practitioner",
+          "label": "Practitioner",
+          "sort_order": 30,
+          "role_count": 137
+        },
+        {
+          "key": "experienced",
+          "label": "Experienced",
+          "sort_order": 40,
+          "role_count": 12
+        },
+        {
+          "key": "senior",
+          "label": "Senior",
+          "sort_order": 50,
+          "role_count": 111
+        },
+        {
+          "key": "lead_principal",
+          "label": "Lead / Principal",
+          "sort_order": 60,
+          "role_count": 92
+        },
+        {
+          "key": "architect_specialist",
+          "label": "Architect / Specialist",
+          "sort_order": 70,
+          "role_count": 100
+        },
+        {
+          "key": "manager_head",
+          "label": "Manager / Head",
+          "sort_order": 80,
+          "role_count": 88
+        },
+        {
+          "key": "director_executive",
+          "label": "Director / Executive",
+          "sort_order": 90,
+          "role_count": 67
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 100,
+          "role_count": 15
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "healthcare-medicine",
+      "name": "Healthcare & Medicine",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 20,
+      "role_count": 509,
+      "stage_model_keys": [
+        "healthcare_professional_route"
+      ],
+      "stages": [
+        {
+          "key": "qualification",
+          "label": "Qualification",
+          "sort_order": 10,
+          "role_count": 62
+        },
+        {
+          "key": "registration_licence",
+          "label": "Registration / Licence",
+          "sort_order": 20,
+          "role_count": 52
+        },
+        {
+          "key": "practitioner",
+          "label": "Practitioner",
+          "sort_order": 30,
+          "role_count": 74
+        },
+        {
+          "key": "experienced",
+          "label": "Experienced",
+          "sort_order": 40,
+          "role_count": 81
+        },
+        {
+          "key": "specialist",
+          "label": "Specialist",
+          "sort_order": 50,
+          "role_count": 74
+        },
+        {
+          "key": "advanced_practice_consultant",
+          "label": "Advanced Practice / Consultant",
+          "sort_order": 60,
+          "role_count": 52
+        },
+        {
+          "key": "leadership",
+          "label": "Leadership",
+          "sort_order": 70,
+          "role_count": 66
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 80,
+          "role_count": 48
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "natural-sciences-research",
+      "name": "Natural Sciences & Research",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 52,
+      "role_count": 831,
+      "stage_model_keys": [
+        "natural_sciences_research"
+      ],
+      "stages": [
+        {
+          "key": "foundation_technical_entry",
+          "label": "Foundation / Technical Entry",
+          "sort_order": 10,
+          "role_count": 89
+        },
+        {
+          "key": "graduate_entry",
+          "label": "Graduate Entry",
+          "sort_order": 20,
+          "role_count": 96
+        },
+        {
+          "key": "scientific_practitioner",
+          "label": "Scientific Practitioner",
+          "sort_order": 30,
+          "role_count": 112
+        },
+        {
+          "key": "experienced_scientist",
+          "label": "Experienced Scientist",
+          "sort_order": 40,
+          "role_count": 109
+        },
+        {
+          "key": "specialist_scientist",
+          "label": "Specialist Scientist",
+          "sort_order": 50,
+          "role_count": 103
+        },
+        {
+          "key": "senior_principal_scientist",
+          "label": "Senior / Principal Scientist",
+          "sort_order": 60,
+          "role_count": 102
+        },
+        {
+          "key": "research_lab_leadership",
+          "label": "Research Leadership / Laboratory Leadership",
+          "sort_order": 70,
+          "role_count": 91
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 80,
+          "role_count": 68
+        },
+        {
+          "key": "executive_scientific_director",
+          "label": "Executive / Scientific Director",
+          "sort_order": 90,
+          "role_count": 61
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "business-management",
+      "name": "Business & Management",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 62,
+      "role_count": 847,
+      "stage_model_keys": [
+        "business_management_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_business_support",
+          "label": "Foundation / Business Support",
+          "sort_order": 10,
+          "role_count": 112
+        },
+        {
+          "key": "graduate_entry",
+          "label": "Graduate / Entry",
+          "sort_order": 20,
+          "role_count": 88
+        },
+        {
+          "key": "junior_practitioner",
+          "label": "Junior Practitioner",
+          "sort_order": 30,
+          "role_count": 116
+        },
+        {
+          "key": "practitioner",
+          "label": "Practitioner",
+          "sort_order": 40,
+          "role_count": 144
+        },
+        {
+          "key": "experienced_manager",
+          "label": "Experienced / Manager",
+          "sort_order": 50,
+          "role_count": 88
+        },
+        {
+          "key": "senior_manager_specialist",
+          "label": "Senior Manager / Specialist",
+          "sort_order": 60,
+          "role_count": 75
+        },
+        {
+          "key": "head_programme_leadership",
+          "label": "Head / Programme Leadership",
+          "sort_order": 70,
+          "role_count": 45
+        },
+        {
+          "key": "director_executive",
+          "label": "Director / Executive",
+          "sort_order": 80,
+          "role_count": 65
+        },
+        {
+          "key": "consultant_independent",
+          "label": "Consultant / Independent",
+          "sort_order": 90,
+          "role_count": 53
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 100,
+          "role_count": 61
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "accounting-finance-banking",
+      "name": "Accounting, Finance & Banking",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 99,
+      "role_count": 817,
+      "stage_model_keys": [
+        "accounting_finance_banking_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_finance_support",
+          "label": "Foundation / Finance Support",
+          "sort_order": 10,
+          "role_count": 95
+        },
+        {
+          "key": "apprentice_technician",
+          "label": "Apprentice / Technician",
+          "sort_order": 20,
+          "role_count": 97
+        },
+        {
+          "key": "graduate_trainee",
+          "label": "Graduate / Trainee",
+          "sort_order": 30,
+          "role_count": 87
+        },
+        {
+          "key": "qualified_practitioner",
+          "label": "Qualified Practitioner",
+          "sort_order": 40,
+          "role_count": 94
+        },
+        {
+          "key": "experienced_specialist",
+          "label": "Experienced Specialist",
+          "sort_order": 50,
+          "role_count": 102
+        },
+        {
+          "key": "senior_manager",
+          "label": "Senior / Manager",
+          "sort_order": 60,
+          "role_count": 104
+        },
+        {
+          "key": "head_director",
+          "label": "Head / Director",
+          "sort_order": 70,
+          "role_count": 114
+        },
+        {
+          "key": "regulated_adviser_controlled",
+          "label": "Regulated Adviser / Controlled Function",
+          "sort_order": 80,
+          "role_count": 24
+        },
+        {
+          "key": "executive_partner",
+          "label": "Executive / Partner",
+          "sort_order": 90,
+          "role_count": 65
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 100,
+          "role_count": 35
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [
+        "accounting-research",
+        "finance-research",
+        "banking-research",
+        "investment-research",
+        "financial-economics-research"
+      ],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "law-legal-justice",
+      "name": "Law, Legal & Justice",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 56,
+      "role_count": 530,
+      "stage_model_keys": [
+        "law_legal_justice_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_legal_support",
+          "label": "Foundation / Legal Support",
+          "sort_order": 10,
+          "role_count": 64
+        },
+        {
+          "key": "graduate_academic_entry",
+          "label": "Graduate / Academic Entry",
+          "sort_order": 20,
+          "role_count": 94
+        },
+        {
+          "key": "qualified_legal_professional",
+          "label": "Qualified Legal Professional",
+          "sort_order": 30,
+          "role_count": 142
+        },
+        {
+          "key": "experienced_lawyer",
+          "label": "Experienced Lawyer",
+          "sort_order": 40,
+          "role_count": 53
+        },
+        {
+          "key": "senior_lawyer_specialist",
+          "label": "Senior Lawyer / Specialist",
+          "sort_order": 50,
+          "role_count": 44
+        },
+        {
+          "key": "partner_head",
+          "label": "Partner / Head",
+          "sort_order": 60,
+          "role_count": 54
+        },
+        {
+          "key": "judicial_kings_counsel",
+          "label": "Judicial / King's Counsel",
+          "sort_order": 70,
+          "role_count": 14
+        },
+        {
+          "key": "executive_leadership",
+          "label": "Executive Leadership",
+          "sort_order": 80,
+          "role_count": 47
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 90,
+          "role_count": 18
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [
+        "legal-research",
+        "legal-education",
+        "law-policy-research"
+      ],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "education-teaching",
+      "name": "Education & Teaching",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 20,
+      "role_count": 155,
+      "stage_model_keys": [
+        "education_teaching_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_education_support",
+          "label": "Foundation / Education Support",
+          "sort_order": 10,
+          "role_count": 25
+        },
+        {
+          "key": "graduate_teacher_entry",
+          "label": "Graduate / Teacher Entry",
+          "sort_order": 20,
+          "role_count": 21
+        },
+        {
+          "key": "qualified_teacher_practitioner",
+          "label": "Qualified Teacher / Practitioner",
+          "sort_order": 30,
+          "role_count": 20
+        },
+        {
+          "key": "experienced_teacher",
+          "label": "Experienced Teacher",
+          "sort_order": 40,
+          "role_count": 20
+        },
+        {
+          "key": "senior_teacher_specialist",
+          "label": "Senior Teacher / Specialist",
+          "sort_order": 50,
+          "role_count": 21
+        },
+        {
+          "key": "leadership_middle_senior",
+          "label": "Leadership (HoD / Assistant / Deputy Head)",
+          "sort_order": 60,
+          "role_count": 35
+        },
+        {
+          "key": "executive_leadership",
+          "label": "Executive Leadership (Headteacher / Principal)",
+          "sort_order": 70,
+          "role_count": 12
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 80,
+          "role_count": 1
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "arts-media-creative-industries",
+      "name": "Arts, Media & Creative Industries",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 32,
+      "role_count": 252,
+      "stage_model_keys": [
+        "arts_media_creative_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_creative_support",
+          "label": "Foundation / Creative Support",
+          "sort_order": 10,
+          "role_count": 32
+        },
+        {
+          "key": "graduate_creative_entry",
+          "label": "Graduate / Creative Entry",
+          "sort_order": 20,
+          "role_count": 32
+        },
+        {
+          "key": "junior_creative_professional",
+          "label": "Junior Creative Professional",
+          "sort_order": 30,
+          "role_count": 32
+        },
+        {
+          "key": "experienced_creative",
+          "label": "Experienced Creative",
+          "sort_order": 40,
+          "role_count": 32
+        },
+        {
+          "key": "senior_specialist",
+          "label": "Senior Specialist",
+          "sort_order": 50,
+          "role_count": 32
+        },
+        {
+          "key": "creative_leadership",
+          "label": "Creative Leadership",
+          "sort_order": 60,
+          "role_count": 51
+        },
+        {
+          "key": "executive_studio_director",
+          "label": "Executive / Studio Director",
+          "sort_order": 70,
+          "role_count": 32
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 80,
+          "role_count": 9
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "languages-literature",
+      "name": "Languages & Literature",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 21,
+      "role_count": 252,
+      "stage_model_keys": [
+        "languages_literature_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_language_support",
+          "label": "Foundation / Language Support",
+          "sort_order": 10,
+          "role_count": 21
+        },
+        {
+          "key": "graduate_language_entry",
+          "label": "Graduate / Language Entry",
+          "sort_order": 20,
+          "role_count": 21
+        },
+        {
+          "key": "professional_linguist",
+          "label": "Professional Linguist",
+          "sort_order": 30,
+          "role_count": 21
+        },
+        {
+          "key": "experienced_specialist",
+          "label": "Experienced Specialist",
+          "sort_order": 40,
+          "role_count": 21
+        },
+        {
+          "key": "senior_specialist",
+          "label": "Senior Specialist",
+          "sort_order": 50,
+          "role_count": 21
+        },
+        {
+          "key": "leadership",
+          "label": "Leadership",
+          "sort_order": 60,
+          "role_count": 21
+        },
+        {
+          "key": "executive_director",
+          "label": "Executive / Director",
+          "sort_order": 70,
+          "role_count": 21
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 80,
+          "role_count": 105
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "humanities-social-sciences",
+      "name": "Humanities & Social Sciences",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 20,
+      "role_count": 240,
+      "stage_model_keys": [
+        "humanities_social_sciences_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_social_support",
+          "label": "Foundation / Social Support",
+          "sort_order": 10,
+          "role_count": 20
+        },
+        {
+          "key": "graduate_social_sciences_entry",
+          "label": "Graduate / Social Sciences Entry",
+          "sort_order": 20,
+          "role_count": 20
+        },
+        {
+          "key": "professional_practitioner",
+          "label": "Professional Practitioner",
+          "sort_order": 30,
+          "role_count": 20
+        },
+        {
+          "key": "experienced_specialist",
+          "label": "Experienced Specialist",
+          "sort_order": 40,
+          "role_count": 20
+        },
+        {
+          "key": "senior_specialist",
+          "label": "Senior Specialist",
+          "sort_order": 50,
+          "role_count": 20
+        },
+        {
+          "key": "leadership",
+          "label": "Leadership",
+          "sort_order": 60,
+          "role_count": 20
+        },
+        {
+          "key": "executive_director",
+          "label": "Executive / Director",
+          "sort_order": 70,
+          "role_count": 20
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 80,
+          "role_count": 100
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "environment-agriculture-food",
+      "name": "Environment, Agriculture & Food",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 36,
+      "role_count": 432,
+      "stage_model_keys": [
+        "environment_agriculture_food_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_technical_support",
+          "label": "Foundation / Technical Support",
+          "sort_order": 10,
+          "role_count": 36
+        },
+        {
+          "key": "graduate_entry",
+          "label": "Graduate Entry",
+          "sort_order": 20,
+          "role_count": 36
+        },
+        {
+          "key": "professional_practitioner",
+          "label": "Professional Practitioner",
+          "sort_order": 30,
+          "role_count": 36
+        },
+        {
+          "key": "experienced_specialist",
+          "label": "Experienced Specialist",
+          "sort_order": 40,
+          "role_count": 36
+        },
+        {
+          "key": "senior_specialist",
+          "label": "Senior Specialist",
+          "sort_order": 50,
+          "role_count": 36
+        },
+        {
+          "key": "leadership_operations",
+          "label": "Leadership / Operations",
+          "sort_order": 60,
+          "role_count": 36
+        },
+        {
+          "key": "executive_director",
+          "label": "Executive / Director",
+          "sort_order": 70,
+          "role_count": 36
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 80,
+          "role_count": 180
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "government-public-policy-international-development",
+      "name": "Government, Public Policy & International Development",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 93,
+      "role_count": 1070,
+      "stage_model_keys": [
+        "government_public_policy_international_development_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_public_service_support",
+          "label": "Foundation / Public-Service Support",
+          "sort_order": 10,
+          "role_count": 93
+        },
+        {
+          "key": "graduate_public_service_entry",
+          "label": "Graduate / Public-Service Entry",
+          "sort_order": 20,
+          "role_count": 93
+        },
+        {
+          "key": "officer_analyst_practitioner",
+          "label": "Officer / Analyst / Practitioner",
+          "sort_order": 30,
+          "role_count": 108
+        },
+        {
+          "key": "experienced_adviser_programme",
+          "label": "Experienced Adviser / Programme Practitioner",
+          "sort_order": 40,
+          "role_count": 93
+        },
+        {
+          "key": "senior_adviser_specialist",
+          "label": "Senior Adviser / Specialist",
+          "sort_order": 50,
+          "role_count": 93
+        },
+        {
+          "key": "manager_principal",
+          "label": "Manager / Principal",
+          "sort_order": 60,
+          "role_count": 93
+        },
+        {
+          "key": "head_senior_civil_service",
+          "label": "Head / Senior Civil Service",
+          "sort_order": 70,
+          "role_count": 87
+        },
+        {
+          "key": "director_diplomatic_leadership",
+          "label": "Director / Diplomatic Leadership",
+          "sort_order": 80,
+          "role_count": 78
+        },
+        {
+          "key": "executive_public_service_leadership",
+          "label": "Executive / Public-Service Leadership",
+          "sort_order": 90,
+          "role_count": 11
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 100,
+          "role_count": 321
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "hospitality-tourism-events",
+      "name": "Hospitality, Tourism & Events",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 89,
+      "role_count": 1048,
+      "stage_model_keys": [
+        "hospitality_tourism_events_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_operational_support",
+          "label": "Foundation / Operational Support",
+          "sort_order": 10,
+          "role_count": 89
+        },
+        {
+          "key": "trainee_vocational_entry",
+          "label": "Trainee / Vocational Entry",
+          "sort_order": 20,
+          "role_count": 76
+        },
+        {
+          "key": "graduate_management_entry",
+          "label": "Graduate / Management Entry",
+          "sort_order": 30,
+          "role_count": 89
+        },
+        {
+          "key": "supervisor_coordinator",
+          "label": "Supervisor / Coordinator",
+          "sort_order": 40,
+          "role_count": 84
+        },
+        {
+          "key": "professional_practitioner_manager",
+          "label": "Professional Practitioner / Manager",
+          "sort_order": 50,
+          "role_count": 89
+        },
+        {
+          "key": "experienced_specialist_senior_manager",
+          "label": "Experienced Specialist / Senior Manager",
+          "sort_order": 60,
+          "role_count": 89
+        },
+        {
+          "key": "head_multisite_leadership",
+          "label": "Head / Multi-site Leadership",
+          "sort_order": 70,
+          "role_count": 84
+        },
+        {
+          "key": "director_general_management",
+          "label": "Director / General Management",
+          "sort_order": 80,
+          "role_count": 84
+        },
+        {
+          "key": "executive_ownership_consultancy",
+          "label": "Executive / Ownership / Consultancy",
+          "sort_order": 90,
+          "role_count": 87
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 100,
+          "role_count": 277
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    },
+    {
+      "slug": "logistics-supply-chain-transport-management",
+      "name": "Logistics, Supply Chain & Transport Management",
+      "status": "draft",
+      "active": true,
+      "specialism_count": 39,
+      "role_count": 430,
+      "stage_model_keys": [
+        "logistics_supply_chain_transport_management_route"
+      ],
+      "stages": [
+        {
+          "key": "foundation_logistics_support",
+          "label": "Foundation / Logistics Support",
+          "sort_order": 10,
+          "role_count": 39
+        },
+        {
+          "key": "apprentice_technical_entry",
+          "label": "Apprentice / Technical Entry",
+          "sort_order": 20,
+          "role_count": 38
+        },
+        {
+          "key": "graduate_management_entry",
+          "label": "Graduate / Management Entry",
+          "sort_order": 30,
+          "role_count": 39
+        },
+        {
+          "key": "professional_practitioner",
+          "label": "Professional Practitioner",
+          "sort_order": 40,
+          "role_count": 39
+        },
+        {
+          "key": "experienced_specialist",
+          "label": "Experienced Specialist",
+          "sort_order": 50,
+          "role_count": 39
+        },
+        {
+          "key": "senior_manager",
+          "label": "Senior Manager",
+          "sort_order": 60,
+          "role_count": 38
+        },
+        {
+          "key": "head_logistics_supply_chain",
+          "label": "Head of Logistics / Supply Chain",
+          "sort_order": 70,
+          "role_count": 38
+        },
+        {
+          "key": "director_executive",
+          "label": "Director / Executive",
+          "sort_order": 80,
+          "role_count": 41
+        },
+        {
+          "key": "academic_research",
+          "label": "Academic / Research",
+          "sort_order": 90,
+          "role_count": 119
+        }
+      ],
+      "empty_specialisms": [],
+      "single_stage_specialisms": [],
+      "academic_stage_keys_present": []
+    }
+  ],
+  "duplicate_summary": {
+    "confirmed": 0,
+    "probable": 0,
+    "legitimate_overlap_samples": 0,
+    "manual_review": 0
+  },
+  "low_barrier_operational_hits": 0,
+  "integration_readiness": {
+    "safe_to_proceed": false,
+    "blockers": [
+      "40 critical findings"
+    ],
+    "recommended_fix_order": [
+      "1. Resolve all critical structure/FK/orphan findings",
+      "2. Clear remaining Engineering academic-stage mismatches (if any) and rewrite legacy populate scripts",
+      "3. Fix high: senior-immediate fit, manager-zero-experience, registration gaps, confirmed duplicates",
+      "4. Address medium: stage coverage gaps, probable duplicates, cross-field boundary reviews",
+      "5. Low: naming/terminology polish before publish"
+    ]
+  },
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-research",
+      "role_id": "edda32d3-6130-47c9-99ae-12ccb713e646",
+      "role_title": "NIHR Pre-Doctoral Clinical Research Fellow",
+      "stage": "registration_licence",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": true,
+        "academic_requirement": "accredited_degree_preferred"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-research",
+      "role_id": "099275a5-fe04-4730-b9bd-cd92321ccc40",
+      "role_title": "Senior Clinical Research Fellow (NIHR)",
+      "stage": "advanced_practice_consultant",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.senior_title_on_entry_stage",
+      "field": "business-management",
+      "specialism": "business-development",
+      "role_id": "501b70d1-801c-4753-9d64-6941aa8a6061",
+      "role_title": "Junior Business Development Executive",
+      "stage": "junior_practitioner",
+      "description": "Senior/director title mapped to entry/foundation stage",
+      "evidence": {
+        "stage_label": "Junior Practitioner",
+        "years": 1,
+        "fit": "immediate"
+      },
+      "recommended_action": "Remap to senior/management/executive stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.senior_title_on_entry_stage",
+      "field": "business-management",
+      "specialism": "international-business",
+      "role_id": "b9fc721b-8c51-46b7-a963-cd151c5d0f9d",
+      "role_title": "Junior International Business Executive",
+      "stage": "junior_practitioner",
+      "description": "Senior/director title mapped to entry/foundation stage",
+      "evidence": {
+        "stage_label": "Junior Practitioner",
+        "years": 1,
+        "fit": "immediate"
+      },
+      "recommended_action": "Remap to senior/management/executive stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.senior_title_on_entry_stage",
+      "field": "business-management",
+      "specialism": "executive-management",
+      "role_id": "13d374af-2d26-4f45-a181-eabe14b5a601",
+      "role_title": "Trainee Executive Development Coordinator",
+      "stage": "foundation_business_support",
+      "description": "Senior/director title mapped to entry/foundation stage",
+      "evidence": {
+        "stage_label": "Foundation / Business Support",
+        "years": 0,
+        "fit": "immediate"
+      },
+      "recommended_action": "Remap to senior/management/executive stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.senior_title_on_entry_stage",
+      "field": "business-management",
+      "specialism": "executive-management",
+      "role_id": "a3c76c67-eae0-4f74-bc0a-5b3e3b4a668f",
+      "role_title": "Junior Executive Manager",
+      "stage": "junior_practitioner",
+      "description": "Senior/director title mapped to entry/foundation stage",
+      "evidence": {
+        "stage_label": "Junior Practitioner",
+        "years": 1,
+        "fit": "immediate"
+      },
+      "recommended_action": "Remap to senior/management/executive stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.senior_title_on_entry_stage",
+      "field": "business-management",
+      "specialism": "executive-management",
+      "role_id": "2ae61c6f-a827-4754-9829-2dc0f14461ac",
+      "role_title": "Assistant Executive Manager",
+      "stage": "junior_practitioner",
+      "description": "Senior/director title mapped to entry/foundation stage",
+      "evidence": {
+        "stage_label": "Junior Practitioner",
+        "years": 1,
+        "fit": "immediate"
+      },
+      "recommended_action": "Remap to senior/management/executive stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.senior_title_on_entry_stage",
+      "field": "business-management",
+      "specialism": "executive-support",
+      "role_id": "54ee6826-c4dc-4a72-8dbf-00d0d3f87b18",
+      "role_title": "Executive Support Apprentice",
+      "stage": "foundation_business_support",
+      "description": "Senior/director title mapped to entry/foundation stage",
+      "evidence": {
+        "stage_label": "Foundation / Business Support",
+        "years": 0,
+        "fit": "immediate"
+      },
+      "recommended_action": "Remap to senior/management/executive stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "business-and-management-research",
+      "role_id": "a8e08973-ddfb-4e3d-8f39-08bd2ff34fd4",
+      "role_title": "Head of Department (Business School)",
+      "stage": "head_programme_leadership",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": false,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "business-and-management-research",
+      "role_id": "329fdba1-133f-41bb-8089-291d92a069b0",
+      "role_title": "Director of Research (Business School)",
+      "stage": "director_executive",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "organisational-behaviour",
+      "role_id": "a6fe7ad8-3645-46a4-8185-d87951ac97b5",
+      "role_title": "Director of Organisational Studies (Business School)",
+      "stage": "director_executive",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "organisational-behaviour",
+      "role_id": "66c96b1f-3ad2-4e11-8f52-c91031aa1f0b",
+      "role_title": "Head of Organisational Behaviour Research Group",
+      "stage": "head_programme_leadership",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "entrepreneurship-research",
+      "role_id": "463cd6df-6e74-411e-b9fa-c6e924a5ff4c",
+      "role_title": "Head of Entrepreneurship Research Centre",
+      "stage": "head_programme_leadership",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "entrepreneurship-research",
+      "role_id": "cd824779-5713-481d-b36d-a25fa622fe91",
+      "role_title": "Director of Entrepreneurship Research (Business School)",
+      "stage": "director_executive",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "strategy-research",
+      "role_id": "b479624d-7273-4da8-9a2c-ab91339c27ba",
+      "role_title": "Head of Strategy Research Group",
+      "stage": "head_programme_leadership",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "strategy-research",
+      "role_id": "d99ee5b6-b554-4ff7-b949-1bbb198eea33",
+      "role_title": "Director of Strategy Research (Business School)",
+      "stage": "director_executive",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "operations-management-research",
+      "role_id": "6583020d-2d0e-4d47-9312-ce03de21f2b5",
+      "role_title": "Director of Operations Research (Business School)",
+      "stage": "director_executive",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "business-management",
+      "specialism": "operations-management-research",
+      "role_id": "bc1411ec-a17a-43ac-933a-ded6c2a15e09",
+      "role_title": "Head of Operations Management Research",
+      "stage": "head_programme_leadership",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "primary-education",
+      "role_id": "d22b81c8-e957-4d65-ad84-9d604a4d7c8c",
+      "role_title": "Assistant Headteacher (Primary)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "secondary-education",
+      "role_id": "8f808591-8155-45e2-af63-6d59a6bb9067",
+      "role_title": "Assistant Headteacher (Secondary)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "early-years-education",
+      "role_id": "beda5d51-ab1a-44a2-911d-98187cca7db2",
+      "role_title": "Assistant Headteacher (Early Years)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "education-teaching",
+      "specialism": "further-education",
+      "role_id": "e039916d-c3a6-410e-b7b5-d7242a148b35",
+      "role_title": "Further Education Trainee Lecturer / Tutor",
+      "stage": "graduate_teacher_entry",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": false,
+        "academic_requirement": "degree_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "education-teaching",
+      "specialism": "further-education",
+      "role_id": "54d7b5a5-8117-4b0c-ab18-36e8251651f6",
+      "role_title": "Further Education Lecturer / Tutor",
+      "stage": "qualified_teacher_practitioner",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": false,
+        "academic_requirement": "degree_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "education-teaching",
+      "specialism": "further-education",
+      "role_id": "2e19fb46-a2b8-4091-8d2d-69d99b193ddd",
+      "role_title": "Experienced Further Education Lecturer",
+      "stage": "experienced_teacher",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": false,
+        "academic_requirement": "accredited_degree_preferred"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "education-teaching",
+      "specialism": "higher-education",
+      "role_id": "1958c58c-c077-40f0-b568-e5ad4535fd93",
+      "role_title": "Lecturer in Education / Subject Pedagogy",
+      "stage": "experienced_teacher",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": false,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "education-teaching",
+      "specialism": "higher-education",
+      "role_id": "86430ebf-a981-4a7e-a5c1-c6adbbf2a33c",
+      "role_title": "Senior Lecturer (Higher Education)",
+      "stage": "senior_teacher_specialist",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": true,
+        "is_research_role": false,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "special-educational-needs-sen",
+      "role_id": "86feffc5-16fa-42e6-ad17-8eeff56764fe",
+      "role_title": "Assistant Headteacher (Inclusion / SEN)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "teaching-english",
+      "role_id": "b339bfe7-d2c3-41b8-82c4-de2cde2dfd29",
+      "role_title": "Assistant Headteacher (English curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "mathematics-education",
+      "role_id": "30e63fff-86f2-4d65-b1fd-76bf1f87dcac",
+      "role_title": "Assistant Headteacher (Mathematics curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "science-education",
+      "role_id": "40daa437-1b97-4c61-bebd-725cce3eed72",
+      "role_title": "Assistant Headteacher (Science curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "computing-education",
+      "role_id": "ab188f28-2e1f-4b37-8924-d7b746f6b48b",
+      "role_title": "Assistant Headteacher (Computing curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "physical-education",
+      "role_id": "afcdc308-2711-4331-964d-581aa1cdac4c",
+      "role_title": "Assistant Headteacher (Physical Education curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "arts-education",
+      "role_id": "6296178c-3a94-41df-bf47-814ad87fce33",
+      "role_title": "Assistant Headteacher (Arts curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "music-education",
+      "role_id": "8b157a36-6e8a-40ba-8a29-53b05e2aca7d",
+      "role_title": "Assistant Headteacher (Music curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "educational-leadership",
+      "role_id": "8b3d250a-104f-4599-8120-15c578ae1ee0",
+      "role_title": "Assistant Headteacher",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "education-teaching",
+      "specialism": "adult-education",
+      "role_id": "0b4e6984-c8cd-4cbd-a4a2-7767dd798ddc",
+      "role_title": "Experienced Adult Education Lecturer",
+      "stage": "experienced_teacher",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": false,
+        "academic_requirement": "accredited_degree_preferred"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "education-teaching",
+      "specialism": "adult-education",
+      "role_id": "0995c993-cc5e-43cd-a162-89d6ee02c477",
+      "role_title": "Adult Education Trainee Lecturer / Tutor",
+      "stage": "graduate_teacher_entry",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": false,
+        "academic_requirement": "degree_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "education-teaching",
+      "specialism": "adult-education",
+      "role_id": "b024b6b2-b3d2-4ecb-9e0a-adcd6dd660ca",
+      "role_title": "Adult Education Lecturer / Tutor",
+      "stage": "qualified_teacher_practitioner",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": false,
+        "academic_requirement": "degree_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.entry_title_on_leadership_stage",
+      "field": "education-teaching",
+      "specialism": "learning-support",
+      "role_id": "bd118e5b-53a9-4434-9149-a2377f53e386",
+      "role_title": "Assistant Headteacher (Learning Support)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/assistant/graduate/trainee title mapped to leadership stage",
+      "evidence": {
+        "stage_label": "Leadership (HoD / Assistant / Deputy Head)",
+        "years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Remap to foundation/graduate/practitioner stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "stage.senior_title_on_entry_stage",
+      "field": "arts-media-creative-industries",
+      "specialism": "creative-direction",
+      "role_id": "be0c1918-3e45-4bb2-9a60-5ee349237c0b",
+      "role_title": "Junior Creative Direction Director",
+      "stage": "junior_creative_professional",
+      "description": "Senior/director title mapped to entry/foundation stage",
+      "evidence": {
+        "stage_label": "Junior Creative Professional",
+        "years": 1,
+        "fit": "immediate"
+      },
+      "recommended_action": "Remap to senior/management/executive stage",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "government-public-policy-international-development",
+      "specialism": "public-policy-research",
+      "role_id": "26f3d544-f6c9-4f34-a48b-39932545a355",
+      "role_title": "Public Policy Research Research Fellow (Applied)",
+      "stage": "experienced_adviser_programme",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "government-public-policy-international-development",
+      "specialism": "political-science-research",
+      "role_id": "0d57f9d0-f62f-4b33-886b-86acb6793ac8",
+      "role_title": "Political Science Research Research Fellow (Applied)",
+      "stage": "experienced_adviser_programme",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "government-public-policy-international-development",
+      "specialism": "public-administration-research",
+      "role_id": "6437e0d0-aedb-4205-a0b8-9afb324c0419",
+      "role_title": "Public Administration Research Research Fellow (Applied)",
+      "stage": "experienced_adviser_programme",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "government-public-policy-international-development",
+      "specialism": "international-development-research",
+      "role_id": "40e806da-4bec-4047-bbc6-95d48b254d8e",
+      "role_title": "International Development Research Research Fellow (Applied)",
+      "stage": "experienced_adviser_programme",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "government-public-policy-international-development",
+      "specialism": "international-relations-research",
+      "role_id": "bc839431-2853-4661-80a3-d349a0cbed1b",
+      "role_title": "International Relations Research Research Fellow (Applied)",
+      "stage": "experienced_adviser_programme",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "stage.academic_role_not_on_academic_stage",
+      "field": "government-public-policy-international-development",
+      "specialism": "governance-research",
+      "role_id": "896c2304-cf15-4194-b1e7-7b77a9877919",
+      "role_title": "Governance Research Research Fellow (Applied)",
+      "stage": "experienced_adviser_programme",
+      "description": "Academic/research role not on Academic/Research stage",
+      "evidence": {
+        "is_academic_role": false,
+        "is_research_role": true,
+        "academic_requirement": "phd_relevant"
+      },
+      "recommended_action": "Move to academic_research stage or justify industry research placement",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "mechanical-engineering",
+      "role_id": "e011da09-606f-488c-ac33-7f15be25c6d2",
+      "role_title": "Principal / Specialist Mechanical Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "mechanical-engineering",
+      "role_id": "f97ab876-a82c-494b-aba5-8c0747f1d5e6",
+      "role_title": "Technical Authority / Expert Witness (Mechanical Engineering)",
+      "stage": "engineering_management",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "electrical-engineering",
+      "role_id": "25731e8d-28c2-4396-8a53-1a6792706744",
+      "role_title": "Technical Authority / Expert Witness (Electrical Engineering)",
+      "stage": "engineering_management",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "petroleum-engineering",
+      "role_id": "2a248d1c-a3b7-4cd3-9642-f89c00dd3f3a",
+      "role_title": "Petroleum Asset Manager / Technical Authority",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "petroleum-engineering",
+      "role_id": "95dbb36f-983b-4e0b-816b-5f5a1c6d74d1",
+      "role_title": "Decommissioning Engineering Specialist (Oil & Gas)",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "architecture",
+      "role_id": "3b326574-5a8a-4e58-a75a-56f47002811e",
+      "role_title": "Planning and Design Consultant (Architecture)",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "medicine",
+      "role_id": "d9d5a15a-0679-438f-9c5b-fa55081debba",
+      "role_title": "Foundation Year 1 Doctor (FY1)",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "FY1 medicine — GMC registration required; not FY-equivalent in other regulated professions."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "medicine",
+      "role_id": "7a1f7055-7fb3-432d-b15c-a6283d3c9cb5",
+      "role_title": "Foundation Year 2 Doctor (FY2)",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "FY2 medicine — foundation programme completion; not dental or pharmacy foundation roles."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "structural-engineering",
+      "role_id": "b193ce81-35c1-406f-a159-4b4ff99f4216",
+      "role_title": "Forensic Structural Engineer",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "structural-engineering",
+      "role_id": "36b702a9-07da-43a3-bad0-c64097500b13",
+      "role_title": "Principal / Specialist Structural Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "geotechnical-engineering",
+      "role_id": "59400cb3-e28e-4955-b207-65965ffe8056",
+      "role_title": "Principal Ground Engineering Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "geotechnical-engineering",
+      "role_id": "6a68f9ce-0acb-422a-b698-899c1090f4f0",
+      "role_title": "Technical Authority / Expert Witness (Geotechnical Engineering)",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "medicine",
+      "role_id": "de26f0c0-4e37-438a-804a-4fe71889466b",
+      "role_title": "Trust Doctor",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Trust-grade junior doctor — medicine only; not Trust Nurse or equivalent."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "healthcare-medicine",
+      "specialism": "medicine",
+      "role_id": "9c311333-5d1d-4a87-b2ad-3d1004169217",
+      "role_title": "GP Trainee",
+      "stage": "specialist",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 3
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "healthcare-medicine",
+      "specialism": "medicine",
+      "role_id": "10d4c7c0-140f-48cf-931a-a165c89d6102",
+      "role_title": "Higher Specialty Trainee",
+      "stage": "specialist",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 3
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "healthcare-medicine",
+      "specialism": "medicine",
+      "role_id": "9e8968dc-22b6-4680-bdb1-cbf8e52a59e6",
+      "role_title": "Clinical Oncology Trainee",
+      "stage": "specialist",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 3
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "naval-architecture",
+      "role_id": "f13d7e67-36cc-41c0-a19e-75285a0f51b5",
+      "role_title": "Technical Authority / Expert Witness (Naval Architecture)",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "renewable-energy-engineering",
+      "role_id": "c4a8bdf7-9c7a-401b-b4fb-04eccdd4a39f",
+      "role_title": "Principal / Specialist Renewable Energy Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "nuclear-engineering",
+      "role_id": "13c001d8-d3c5-44da-bef2-4d59ed009532",
+      "role_title": "Technical Authority / Expert Witness (Nuclear Safety)",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "nursing",
+      "role_id": "7efecbe6-9640-401e-b61c-484ef9406207",
+      "role_title": "Preceptorship Nurse",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Preceptorship nurse — early registered nursing; not Preceptorship Midwife."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "nursing",
+      "role_id": "48f6fa86-2794-4110-b00f-8bba120d80be",
+      "role_title": "Staff Nurse",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Staff nurse — core nursing practitioner; not Staff Grade Doctor or pharmacy staff."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "nuclear-engineering",
+      "role_id": "fb8beaa4-e103-497e-9cec-328129ee6d84",
+      "role_title": "Principal / Specialist Nuclear Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "mining-engineering",
+      "role_id": "d0d54faf-a074-4042-b665-fd85521899d3",
+      "role_title": "Principal / Specialist Mining Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "railway-engineering",
+      "role_id": "e35bd753-e96d-4d54-8456-a311c66b5633",
+      "role_title": "Principal / Specialist Railway Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "railway-engineering",
+      "role_id": "46e770c0-c9c8-4511-933b-b24efe5cd7d8",
+      "role_title": "Technical Authority / Expert Witness (Railway Engineering)",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "nursing",
+      "role_id": "40c86f71-1584-469d-a338-cc6ffdc5a0a0",
+      "role_title": "Community Staff Nurse",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Community staff nurse — nursing in community settings; not Community Midwife or GP."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "nursing",
+      "role_id": "8d2d60af-0a9b-4101-a59f-21200948394c",
+      "role_title": "Mental Health Staff Nurse",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Mental health staff nurse — nursing specialism; not Mental Health Pharmacist."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "nursing",
+      "role_id": "6340f69d-5b58-457f-b37d-6146d5ed081c",
+      "role_title": "Theatre Nurse",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Theatre nurse — perioperative nursing; not ODP or medical trainee surgical roles."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "fire-engineering",
+      "role_id": "f13a8ebc-0836-42b9-95a8-0f3c8d532e07",
+      "role_title": "Principal / Specialist Fire Engineering Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "nursing",
+      "role_id": "129081e6-8cf7-4ddb-8d06-8cd7d751ffb2",
+      "role_title": "Neonatal Nurse",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Neonatal nurse — nursing practitioner; not Neonatal Midwife specialist midwifery role."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "fire-engineering",
+      "role_id": "0d5b840d-a1a1-4289-aeb5-44c8cbc6e358",
+      "role_title": "Technical Authority / Expert Witness (Fire Engineering)",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "building-services-engineering",
+      "role_id": "b915d3f0-dc68-4dd8-b6d1-000c55a2a59b",
+      "role_title": "Technical Authority / Expert Witness (Building Services Engineering)",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "other-engineering",
+      "role_id": "6c188c56-cc32-458a-a8e8-9ad2ec0e8f2c",
+      "role_title": "Technical Authority (Cross-Disciplinary Engineering)",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "other-engineering",
+      "role_id": "bd6a3fc3-8a86-4edc-8b02-7047cd18420a",
+      "role_title": "Principal / Specialist Multidisciplinary Engineering Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "commercial-management",
+      "role_id": "559d3d32-5ca7-49b2-a7c0-4617247005c6",
+      "role_title": "Research Fellow (Commercial and Contract Practice)",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "realistic_next",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": false
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "pharmacy",
+      "role_id": "a536bcf9-9abd-4409-aa9c-db43fddff893",
+      "role_title": "Foundation Pharmacist",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Foundation pharmacist — GPhC registration required; not Foundation Doctor or Foundation Dentist."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "pharmacy",
+      "role_id": "7e381bf2-3ccb-4af6-a13c-5afd48d376c8",
+      "role_title": "Pre-registration Pharmacist",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Pre-registration pharmacist — final training year; distinct from Foundation Pharmacist post-reg."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "pharmacy",
+      "role_id": "41f37a96-dbaf-4d3b-9863-909426339b6b",
+      "role_title": "Community Pharmacist",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Community pharmacist — primary community setting; not Community Staff Nurse or Midwife."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "pharmacy",
+      "role_id": "8d501102-03dd-4ad8-9dba-2263d8e91896",
+      "role_title": "Hospital Pharmacist",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Hospital pharmacist — NHS hospital practice; not Hospital Dentist or ward doctor."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "pharmacy",
+      "role_id": "4074cf66-d8d1-49a7-8e05-d960c36f3e62",
+      "role_title": "Primary Care Pharmacist",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Primary care pharmacist — PCN/GP context; not GP doctor or Practice Nurse."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "pharmacy",
+      "role_id": "76366f91-c489-4f09-a21d-ea6229b4d967",
+      "role_title": "Locum Pharmacist",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Locum pharmacist — temporary pharmacy cover; not Locum Consultant doctor."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "pharmacy",
+      "role_id": "b5bd05d6-35c7-43fd-b081-b0d6a5d7167a",
+      "role_title": "Industrial Pharmacist",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Industrial pharmacist — private sector pharmacy; not NHS clinical pharmacist ward role."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "dentistry",
+      "role_id": "c71a4dc6-024f-4448-ba78-35341aec4f10",
+      "role_title": "Foundation Dentist",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Foundation dentist — early GDC-registered practice; not Foundation Year doctor or pharmacist."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "dentistry",
+      "role_id": "b632f3a5-e2b2-4bcc-9c3b-a5e9721bc389",
+      "role_title": "Associate Dentist",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Associate dentist — practitioner GDP pathway; not Associate Medical Director or nurse associate."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "dentistry",
+      "role_id": "93f13255-8d64-4ba6-8011-47a7a23f14f3",
+      "role_title": "General Dental Practitioner (GDP)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "GDP — core general dentistry; not GP doctor or general pharmacy practice."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "dentistry",
+      "role_id": "c1a03b64-781a-46fe-b948-605b4f57b03c",
+      "role_title": "Community Dentist",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Community dentist — primary dental services; not Community Staff Nurse or Midwife."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "dentistry",
+      "role_id": "0d6a2c08-bbbc-4d55-b848-ab2554e474ca",
+      "role_title": "Community Dental Officer",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Community dental officer — dentistry public health delivery; not medical public health consultant only."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "midwifery",
+      "role_id": "fd2fb8fe-af8f-465c-b5ac-f3a39a82278a",
+      "role_title": "Preceptorship Midwife",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Preceptorship midwife — early registered midwifery; not Preceptorship Nurse."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "midwifery",
+      "role_id": "a736b727-272d-45cd-90a7-230e7baca1d6",
+      "role_title": "Midwife",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Midwife — core midwifery practitioner; protected title; not Staff Nurse or generic nurse."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "midwifery",
+      "role_id": "c9fd993e-0524-4309-ba50-e12571c2e90f",
+      "role_title": "Community Midwife",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Community midwife — midwifery in community; not Community Staff Nurse or Community Dentist."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "midwifery",
+      "role_id": "9397c536-4267-4555-ae4a-1493c32cd54d",
+      "role_title": "Labour Ward Midwife",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Labour ward midwife — intrapartum focus; not Theatre Nurse or obstetric doctor trainee."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "midwifery",
+      "role_id": "8500a7b7-9117-4bfa-805e-2d3f086d96f2",
+      "role_title": "Home Birth Midwife",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Home birth midwife — community/independent midwifery practice; not independent nurse."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "physiotherapy",
+      "role_id": "648c2bae-b745-4694-9061-e8b005cda078",
+      "role_title": "Rotational Physiotherapist (Preceptorship)",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Preceptorship rotation — not occupational therapy or radiography preceptorship."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "physiotherapy",
+      "role_id": "051ca9e6-e246-4255-ab04-d41020e50455",
+      "role_title": "Physiotherapist (Musculoskeletal)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "MSK practice focus — not MSK occupational therapy or sports therapy unregulated routes."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "physiotherapy",
+      "role_id": "2e4e3fff-ddf0-4b6d-a9ff-353f09f2a3f3",
+      "role_title": "Physiotherapist (Community Rehabilitation)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Community physiotherapy — not community OT or district nursing roles."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "physiotherapy",
+      "role_id": "0037b056-d7d4-498a-943e-b394c1624ada",
+      "role_title": "Band 5 Physiotherapist (Ward-Based Acute)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Ward-based Band 5 — not Band 6 senior ward physiotherapist."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "occupational-therapy",
+      "role_id": "d327bb45-a831-4504-9961-a08fb8ac82d3",
+      "role_title": "Rotational Occupational Therapist (Preceptorship)",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "OT preceptorship — not physiotherapy rotational preceptorship."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "occupational-therapy",
+      "role_id": "58b1ac2d-5a2e-4382-aecd-6a2a4f1e0c1c",
+      "role_title": "Occupational Therapist (Mental Health)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Mental health OT — not mental health nursing or clinical psychology."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "occupational-therapy",
+      "role_id": "be6cfa57-0023-4a4b-a4c6-cb4bd7687f48",
+      "role_title": "Occupational Therapist (Community & Social Care)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Community OT — not social worker or physiotherapy community roles."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "occupational-therapy",
+      "role_id": "2b96eb0a-0445-4bd3-8a19-bd6bee1f1cd1",
+      "role_title": "Band 5 Occupational Therapist (Acute Hospital)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Acute Band 5 OT — not Band 6 senior acute OT."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "radiography",
+      "role_id": "e589913c-e445-476b-9721-82721faa22f9",
+      "role_title": "Diagnostic Radiographer (General Imaging)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "General imaging diagnostic — not CT/MRI specialist or therapeutic treatment delivery."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "radiography",
+      "role_id": "4c6d7f53-db8c-47d6-bbd4-55b87242df99",
+      "role_title": "Therapeutic Radiographer (Treatment Delivery)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Treatment delivery therapeutic — not diagnostic imaging or oncology nursing."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "radiography",
+      "role_id": "4222b6d7-7523-48c7-9104-8e4d149d5c81",
+      "role_title": "Band 5 Radiographer (Interventional Support)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Interventional support Band 5 — not interventional radiologist (medical doctor)."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "paramedic-science",
+      "role_id": "3eb3449b-105c-4a8b-92a0-8fdc24116177",
+      "role_title": "Newly Registered Paramedic (HCPC)",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Newly registered paramedic — not newly registered physiotherapist or nurse."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "paramedic-science",
+      "role_id": "3e09506a-0fe2-4c76-99c4-108ed3ccefd7",
+      "role_title": "Paramedic (Preceptorship Year)",
+      "stage": "registration_licence",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Paramedic preceptorship — not OT or radiography preceptorship titles."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "critical",
+      "category": "registration.regulated_immediate_without_pathway_clarity",
+      "field": "healthcare-medicine",
+      "specialism": "paramedic-science",
+      "role_id": "936c5245-ea0b-4014-a45f-4de974874d85",
+      "role_title": "Paramedic (Emergency Ambulance)",
+      "stage": "practitioner",
+      "description": "Regulated field role marked immediate with registration required and little experience — verify pathway",
+      "evidence": {
+        "registration": "required",
+        "fit": "immediate",
+        "years": 0,
+        "eligibility_note": "Emergency ambulance paramedic — not HART specialist or urgent care practitioner yet."
+      },
+      "recommended_action": "Ensure eligibility notes describe legal/professional pathway; adjust fit if needed",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-psychology",
+      "role_id": "4006560d-d861-4299-a173-11c3be9eb5f9",
+      "role_title": "Clinical Psychology Doctorate Trainee (DClinPsy)",
+      "stage": "qualification",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-psychology",
+      "role_id": "3d1952f8-92d3-4862-8ca4-5cb65927fb2f",
+      "role_title": "HCPC Registered Clinical Psychologist (Newly Qualified)",
+      "stage": "registration_licence",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-psychology",
+      "role_id": "e4b868a8-bfd5-49e0-9768-95ca834db24e",
+      "role_title": "Chartered Clinical Psychologist (BPS, Post-DClinPsy)",
+      "stage": "registration_licence",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-psychology",
+      "role_id": "abd8577a-a999-4dc7-bfa4-b30992f421c2",
+      "role_title": "Newly Qualified Clinical Psychologist (NHS)",
+      "stage": "registration_licence",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-psychology",
+      "role_id": "b413a062-d1b1-4606-af79-bf7b56b26e61",
+      "role_title": "Consultant Clinical Psychologist (NHS)",
+      "stage": "advanced_practice_consultant",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-psychology",
+      "role_id": "8e384e1c-8fef-450d-9d40-6bd17d4d437b",
+      "role_title": "Principal Clinical Psychologist (Complex Cases)",
+      "stage": "advanced_practice_consultant",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.manager_zero_experience",
+      "field": "healthcare-medicine",
+      "specialism": "healthcare-management",
+      "role_id": "78ed87c0-39f8-462a-a378-b703cfba297a",
+      "role_title": "Ward Manager (Healthcare Operations)",
+      "stage": "practitioner",
+      "description": "Manager/Head/Director/Consultant-style title with 0 years minimum experience",
+      "evidence": {
+        "minimum_experience_years": 0,
+        "seniority": "early_career",
+        "fit": "immediate"
+      },
+      "recommended_action": "Raise minimum experience or retitle if graduate/entry",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.manager_zero_experience",
+      "field": "healthcare-medicine",
+      "specialism": "healthcare-management",
+      "role_id": "368ae8df-5a5d-487b-8225-b20271027786",
+      "role_title": "Service Manager (NHS Acute Trust)",
+      "stage": "practitioner",
+      "description": "Manager/Head/Director/Consultant-style title with 0 years minimum experience",
+      "evidence": {
+        "minimum_experience_years": 0,
+        "seniority": "early_career",
+        "fit": "immediate"
+      },
+      "recommended_action": "Raise minimum experience or retitle if graduate/entry",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.manager_zero_experience",
+      "field": "healthcare-medicine",
+      "specialism": "healthcare-management",
+      "role_id": "e754d6e2-62df-4336-84cc-c06eb8e0995a",
+      "role_title": "Operations Manager (Community Healthcare)",
+      "stage": "practitioner",
+      "description": "Manager/Head/Director/Consultant-style title with 0 years minimum experience",
+      "evidence": {
+        "minimum_experience_years": 0,
+        "seniority": "early_career",
+        "fit": "immediate"
+      },
+      "recommended_action": "Raise minimum experience or retitle if graduate/entry",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.manager_zero_experience",
+      "field": "healthcare-medicine",
+      "specialism": "healthcare-management",
+      "role_id": "62f803a0-7200-4de9-a411-5bd489462494",
+      "role_title": "Practice Manager (GP Federation)",
+      "stage": "practitioner",
+      "description": "Manager/Head/Director/Consultant-style title with 0 years minimum experience",
+      "evidence": {
+        "minimum_experience_years": 0,
+        "seniority": "early_career",
+        "fit": "immediate"
+      },
+      "recommended_action": "Raise minimum experience or retitle if graduate/entry",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.manager_zero_experience",
+      "field": "healthcare-medicine",
+      "specialism": "healthcare-management",
+      "role_id": "92bec919-e120-46e1-83da-f6b20efaa7b0",
+      "role_title": "Team Manager (Healthcare Support Services)",
+      "stage": "practitioner",
+      "description": "Manager/Head/Director/Consultant-style title with 0 years minimum experience",
+      "evidence": {
+        "minimum_experience_years": 0,
+        "seniority": "early_career",
+        "fit": "immediate"
+      },
+      "recommended_action": "Raise minimum experience or retitle if graduate/entry",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-research",
+      "role_id": "edda32d3-6130-47c9-99ae-12ccb713e646",
+      "role_title": "NIHR Pre-Doctoral Clinical Research Fellow",
+      "stage": "registration_licence",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "immediate",
+        "academic_requirement": "accredited_degree_preferred",
+        "is_academic_role": false
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "qualification.academic_missing_phd_metadata",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-research",
+      "role_id": "edda32d3-6130-47c9-99ae-12ccb713e646",
+      "role_title": "NIHR Pre-Doctoral Clinical Research Fellow",
+      "stage": "registration_licence",
+      "description": "Academic/research title without suitable postgraduate academic_requirement",
+      "evidence": {
+        "academic_requirement": "accredited_degree_preferred",
+        "current": "accredited_degree_preferred",
+        "suspected_correction": "phd_relevant"
+      },
+      "recommended_action": "Set academic_requirement to phd_relevant (or justify)",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "healthcare-medicine",
+      "specialism": "clinical-research",
+      "role_id": "099275a5-fe04-4730-b9bd-cd92321ccc40",
+      "role_title": "Senior Clinical Research Fellow (NIHR)",
+      "stage": "advanced_practice_consultant",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": false
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "qualification.academic_missing_phd_metadata",
+      "field": "natural-sciences-research",
+      "specialism": "scientific-research",
+      "role_id": "904b91ea-faff-4094-844c-7c06e70de41e",
+      "role_title": "Doctoral Researcher",
+      "stage": "academic_research",
+      "description": "Academic/research title without suitable postgraduate academic_requirement",
+      "evidence": {
+        "academic_requirement": "degree_relevant",
+        "current": "degree_relevant",
+        "suspected_correction": "phd_relevant"
+      },
+      "recommended_action": "Set academic_requirement to phd_relevant (or justify)",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "business-management",
+      "specialism": "executive-support",
+      "role_id": "75a771e3-d86d-4732-8b95-18199086afd6",
+      "role_title": "Private Personal Assistant",
+      "stage": "consultant_independent",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 5,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "business-management",
+      "specialism": "executive-support",
+      "role_id": "75a771e3-d86d-4732-8b95-18199086afd6",
+      "role_title": "Private Personal Assistant",
+      "stage": "consultant_independent",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 5
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "business-and-management-research",
+      "role_id": "a8e08973-ddfb-4e3d-8f39-08bd2ff34fd4",
+      "role_title": "Head of Department (Business School)",
+      "stage": "head_programme_leadership",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "business-and-management-research",
+      "role_id": "329fdba1-133f-41bb-8089-291d92a069b0",
+      "role_title": "Director of Research (Business School)",
+      "stage": "director_executive",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "organisational-behaviour",
+      "role_id": "a6fe7ad8-3645-46a4-8185-d87951ac97b5",
+      "role_title": "Director of Organisational Studies (Business School)",
+      "stage": "director_executive",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "organisational-behaviour",
+      "role_id": "66c96b1f-3ad2-4e11-8f52-c91031aa1f0b",
+      "role_title": "Head of Organisational Behaviour Research Group",
+      "stage": "head_programme_leadership",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "entrepreneurship-research",
+      "role_id": "463cd6df-6e74-411e-b9fa-c6e924a5ff4c",
+      "role_title": "Head of Entrepreneurship Research Centre",
+      "stage": "head_programme_leadership",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "entrepreneurship-research",
+      "role_id": "cd824779-5713-481d-b36d-a25fa622fe91",
+      "role_title": "Director of Entrepreneurship Research (Business School)",
+      "stage": "director_executive",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "strategy-research",
+      "role_id": "b479624d-7273-4da8-9a2c-ab91339c27ba",
+      "role_title": "Head of Strategy Research Group",
+      "stage": "head_programme_leadership",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "strategy-research",
+      "role_id": "d99ee5b6-b554-4ff7-b949-1bbb198eea33",
+      "role_title": "Director of Strategy Research (Business School)",
+      "stage": "director_executive",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "operations-management-research",
+      "role_id": "6583020d-2d0e-4d47-9312-ce03de21f2b5",
+      "role_title": "Director of Operations Research (Business School)",
+      "stage": "director_executive",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "business-management",
+      "specialism": "operations-management-research",
+      "role_id": "bc1411ec-a17a-43ac-933a-ded6c2a15e09",
+      "role_title": "Head of Operations Management Research",
+      "stage": "head_programme_leadership",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "accounting-finance-banking",
+      "specialism": "accounting-research",
+      "role_id": "1cd073db-6f93-420a-b9a7-fbe38fd80ae0",
+      "role_title": "Professor of Accounting",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "accounting-finance-banking",
+      "specialism": "investment-research",
+      "role_id": "3fd46d0e-1c9b-49de-a76f-64fa8ff25668",
+      "role_title": "Professor of Investments",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "accounting-finance-banking",
+      "specialism": "banking-research",
+      "role_id": "057177c8-08d3-4ff8-b75f-ae57a6ddbcf8",
+      "role_title": "Professor of Banking",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "accounting-finance-banking",
+      "specialism": "financial-economics-research",
+      "role_id": "1e15cd1c-caee-49ea-9683-613059bd1bc4",
+      "role_title": "Professor of Financial Economics",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "accounting-finance-banking",
+      "specialism": "finance-research",
+      "role_id": "9741cfa3-c7b4-47b4-8a7d-112a8f7bbbea",
+      "role_title": "Professor of Finance",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "law-legal-justice",
+      "specialism": "barrister-practice",
+      "role_id": "5c34b1c5-e530-43ba-b3c1-0da21d85e23c",
+      "role_title": "Senior Junior Barrister",
+      "stage": "experienced_lawyer",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 5,
+        "fit": "realistic_next"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "law-legal-justice",
+      "specialism": "legal-research",
+      "role_id": "7c9a29e7-5b68-41be-b7a5-365d5c2b440d",
+      "role_title": "Professor of Law",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "law-legal-justice",
+      "specialism": "legal-education",
+      "role_id": "7071508c-ce72-4279-a311-ebeb6eade6f7",
+      "role_title": "Professor of Legal Education",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "law-legal-justice",
+      "specialism": "law-policy-research",
+      "role_id": "2d47bc08-2aaa-46d3-8e22-b909974c4b88",
+      "role_title": "Professor of Law Policy",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "primary-education",
+      "role_id": "d22b81c8-e957-4d65-ad84-9d604a4d7c8c",
+      "role_title": "Assistant Headteacher (Primary)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "primary-education",
+      "role_id": "d22b81c8-e957-4d65-ad84-9d604a4d7c8c",
+      "role_title": "Assistant Headteacher (Primary)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "secondary-education",
+      "role_id": "8f808591-8155-45e2-af63-6d59a6bb9067",
+      "role_title": "Assistant Headteacher (Secondary)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "secondary-education",
+      "role_id": "8f808591-8155-45e2-af63-6d59a6bb9067",
+      "role_title": "Assistant Headteacher (Secondary)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "education-teaching",
+      "specialism": "higher-education",
+      "role_id": "4af011ab-11a8-4482-89ab-6d3f2927b39e",
+      "role_title": "Head of School / Department (Education)",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "special-educational-needs-sen",
+      "role_id": "86feffc5-16fa-42e6-ad17-8eeff56764fe",
+      "role_title": "Assistant Headteacher (Inclusion / SEN)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "special-educational-needs-sen",
+      "role_id": "86feffc5-16fa-42e6-ad17-8eeff56764fe",
+      "role_title": "Assistant Headteacher (Inclusion / SEN)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "early-years-education",
+      "role_id": "beda5d51-ab1a-44a2-911d-98187cca7db2",
+      "role_title": "Assistant Headteacher (Early Years)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "early-years-education",
+      "role_id": "beda5d51-ab1a-44a2-911d-98187cca7db2",
+      "role_title": "Assistant Headteacher (Early Years)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "education-teaching",
+      "specialism": "higher-education",
+      "role_id": "617bfb82-f97d-428a-bedd-2c1ddab040a6",
+      "role_title": "Professor of Education",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "education-teaching",
+      "specialism": "further-education",
+      "role_id": "e039916d-c3a6-410e-b7b5-d7242a148b35",
+      "role_title": "Further Education Trainee Lecturer / Tutor",
+      "stage": "graduate_teacher_entry",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "immediate",
+        "academic_requirement": "degree_relevant",
+        "is_academic_role": false
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "qualification.academic_missing_phd_metadata",
+      "field": "education-teaching",
+      "specialism": "further-education",
+      "role_id": "e039916d-c3a6-410e-b7b5-d7242a148b35",
+      "role_title": "Further Education Trainee Lecturer / Tutor",
+      "stage": "graduate_teacher_entry",
+      "description": "Academic/research title without suitable postgraduate academic_requirement",
+      "evidence": {
+        "academic_requirement": "degree_relevant",
+        "current": "degree_relevant",
+        "suspected_correction": "phd_relevant"
+      },
+      "recommended_action": "Set academic_requirement to phd_relevant (or justify)",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "education-teaching",
+      "specialism": "educational-psychology",
+      "role_id": "5632f1b6-28cd-43ef-b17d-9abf383594bf",
+      "role_title": "Senior Educational Psychologist",
+      "stage": "experienced_teacher",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "education-teaching",
+      "specialism": "further-education",
+      "role_id": "54d7b5a5-8117-4b0c-ab18-36e8251651f6",
+      "role_title": "Further Education Lecturer / Tutor",
+      "stage": "qualified_teacher_practitioner",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "realistic_next",
+        "academic_requirement": "degree_relevant",
+        "is_academic_role": false
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "qualification.academic_missing_phd_metadata",
+      "field": "education-teaching",
+      "specialism": "further-education",
+      "role_id": "54d7b5a5-8117-4b0c-ab18-36e8251651f6",
+      "role_title": "Further Education Lecturer / Tutor",
+      "stage": "qualified_teacher_practitioner",
+      "description": "Academic/research title without suitable postgraduate academic_requirement",
+      "evidence": {
+        "academic_requirement": "degree_relevant",
+        "current": "degree_relevant",
+        "suspected_correction": "phd_relevant"
+      },
+      "recommended_action": "Set academic_requirement to phd_relevant (or justify)",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "education-teaching",
+      "specialism": "higher-education",
+      "role_id": "1958c58c-c077-40f0-b568-e5ad4535fd93",
+      "role_title": "Lecturer in Education / Subject Pedagogy",
+      "stage": "experienced_teacher",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "realistic_next",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "education-teaching",
+      "specialism": "educational-psychology",
+      "role_id": "fd4a8cf5-147c-48b3-9e87-7479218282a5",
+      "role_title": "Principal Educational Psychologist",
+      "stage": "senior_teacher_specialist",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "education-teaching",
+      "specialism": "further-education",
+      "role_id": "2e19fb46-a2b8-4091-8d2d-69d99b193ddd",
+      "role_title": "Experienced Further Education Lecturer",
+      "stage": "experienced_teacher",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "realistic_next",
+        "academic_requirement": "accredited_degree_preferred",
+        "is_academic_role": false
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "qualification.academic_missing_phd_metadata",
+      "field": "education-teaching",
+      "specialism": "further-education",
+      "role_id": "2e19fb46-a2b8-4091-8d2d-69d99b193ddd",
+      "role_title": "Experienced Further Education Lecturer",
+      "stage": "experienced_teacher",
+      "description": "Academic/research title without suitable postgraduate academic_requirement",
+      "evidence": {
+        "academic_requirement": "accredited_degree_preferred",
+        "current": "accredited_degree_preferred",
+        "suspected_correction": "phd_relevant"
+      },
+      "recommended_action": "Set academic_requirement to phd_relevant (or justify)",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "education-teaching",
+      "specialism": "higher-education",
+      "role_id": "86430ebf-a981-4a7e-a5c1-c6adbbf2a33c",
+      "role_title": "Senior Lecturer (Higher Education)",
+      "stage": "senior_teacher_specialist",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "education-teaching",
+      "specialism": "educational-psychology",
+      "role_id": "1150b857-2998-4f2f-9ff3-dfaad7c2494e",
+      "role_title": "Head of Educational Psychology Service",
+      "stage": "executive_leadership",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "education-teaching",
+      "specialism": "higher-education",
+      "role_id": "7b6af39a-62f5-4039-af64-fc2fe441abc0",
+      "role_title": "Programme Leader (HE Education)",
+      "stage": "leadership_middle_senior",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "education-teaching",
+      "specialism": "educational-psychology",
+      "role_id": "e7b403aa-70cb-48b7-aecd-778153833ab9",
+      "role_title": "Trainee Educational Psychologist",
+      "stage": "graduate_teacher_entry",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "mathematics-education",
+      "role_id": "30e63fff-86f2-4d65-b1fd-76bf1f87dcac",
+      "role_title": "Assistant Headteacher (Mathematics curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "mathematics-education",
+      "role_id": "30e63fff-86f2-4d65-b1fd-76bf1f87dcac",
+      "role_title": "Assistant Headteacher (Mathematics curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "science-education",
+      "role_id": "40daa437-1b97-4c61-bebd-725cce3eed72",
+      "role_title": "Assistant Headteacher (Science curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "science-education",
+      "role_id": "40daa437-1b97-4c61-bebd-725cce3eed72",
+      "role_title": "Assistant Headteacher (Science curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "education-teaching",
+      "specialism": "educational-psychology",
+      "role_id": "c1e87ad1-0582-4f57-88ed-5178af9fcf4a",
+      "role_title": "Educational Psychologist",
+      "stage": "qualified_teacher_practitioner",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "teaching-english",
+      "role_id": "b339bfe7-d2c3-41b8-82c4-de2cde2dfd29",
+      "role_title": "Assistant Headteacher (English curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "teaching-english",
+      "role_id": "b339bfe7-d2c3-41b8-82c4-de2cde2dfd29",
+      "role_title": "Assistant Headteacher (English curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "physical-education",
+      "role_id": "afcdc308-2711-4331-964d-581aa1cdac4c",
+      "role_title": "Assistant Headteacher (Physical Education curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "physical-education",
+      "role_id": "afcdc308-2711-4331-964d-581aa1cdac4c",
+      "role_title": "Assistant Headteacher (Physical Education curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "computing-education",
+      "role_id": "ab188f28-2e1f-4b37-8924-d7b746f6b48b",
+      "role_title": "Assistant Headteacher (Computing curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "computing-education",
+      "role_id": "ab188f28-2e1f-4b37-8924-d7b746f6b48b",
+      "role_title": "Assistant Headteacher (Computing curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "educational-leadership",
+      "role_id": "8b3d250a-104f-4599-8120-15c578ae1ee0",
+      "role_title": "Assistant Headteacher",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "educational-leadership",
+      "role_id": "8b3d250a-104f-4599-8120-15c578ae1ee0",
+      "role_title": "Assistant Headteacher",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "arts-education",
+      "role_id": "6296178c-3a94-41df-bf47-814ad87fce33",
+      "role_title": "Assistant Headteacher (Arts curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "arts-education",
+      "role_id": "6296178c-3a94-41df-bf47-814ad87fce33",
+      "role_title": "Assistant Headteacher (Arts curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "music-education",
+      "role_id": "8b157a36-6e8a-40ba-8a29-53b05e2aca7d",
+      "role_title": "Assistant Headteacher (Music curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "music-education",
+      "role_id": "8b157a36-6e8a-40ba-8a29-53b05e2aca7d",
+      "role_title": "Assistant Headteacher (Music curriculum)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "education-teaching",
+      "specialism": "adult-education",
+      "role_id": "0b4e6984-c8cd-4cbd-a4a2-7767dd798ddc",
+      "role_title": "Experienced Adult Education Lecturer",
+      "stage": "experienced_teacher",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "realistic_next",
+        "academic_requirement": "accredited_degree_preferred",
+        "is_academic_role": false
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "qualification.academic_missing_phd_metadata",
+      "field": "education-teaching",
+      "specialism": "adult-education",
+      "role_id": "0b4e6984-c8cd-4cbd-a4a2-7767dd798ddc",
+      "role_title": "Experienced Adult Education Lecturer",
+      "stage": "experienced_teacher",
+      "description": "Academic/research title without suitable postgraduate academic_requirement",
+      "evidence": {
+        "academic_requirement": "accredited_degree_preferred",
+        "current": "accredited_degree_preferred",
+        "suspected_correction": "phd_relevant"
+      },
+      "recommended_action": "Set academic_requirement to phd_relevant (or justify)",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "education-teaching",
+      "specialism": "adult-education",
+      "role_id": "0995c993-cc5e-43cd-a162-89d6ee02c477",
+      "role_title": "Adult Education Trainee Lecturer / Tutor",
+      "stage": "graduate_teacher_entry",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "immediate",
+        "academic_requirement": "degree_relevant",
+        "is_academic_role": false
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "qualification.academic_missing_phd_metadata",
+      "field": "education-teaching",
+      "specialism": "adult-education",
+      "role_id": "0995c993-cc5e-43cd-a162-89d6ee02c477",
+      "role_title": "Adult Education Trainee Lecturer / Tutor",
+      "stage": "graduate_teacher_entry",
+      "description": "Academic/research title without suitable postgraduate academic_requirement",
+      "evidence": {
+        "academic_requirement": "degree_relevant",
+        "current": "degree_relevant",
+        "suspected_correction": "phd_relevant"
+      },
+      "recommended_action": "Set academic_requirement to phd_relevant (or justify)",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "education-teaching",
+      "specialism": "adult-education",
+      "role_id": "b024b6b2-b3d2-4ecb-9e0a-adcd6dd660ca",
+      "role_title": "Adult Education Lecturer / Tutor",
+      "stage": "qualified_teacher_practitioner",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "realistic_next",
+        "academic_requirement": "degree_relevant",
+        "is_academic_role": false
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "qualification.academic_missing_phd_metadata",
+      "field": "education-teaching",
+      "specialism": "adult-education",
+      "role_id": "b024b6b2-b3d2-4ecb-9e0a-adcd6dd660ca",
+      "role_title": "Adult Education Lecturer / Tutor",
+      "stage": "qualified_teacher_practitioner",
+      "description": "Academic/research title without suitable postgraduate academic_requirement",
+      "evidence": {
+        "academic_requirement": "degree_relevant",
+        "current": "degree_relevant",
+        "suspected_correction": "phd_relevant"
+      },
+      "recommended_action": "Set academic_requirement to phd_relevant (or justify)",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "high",
+      "category": "quality.entry_title_high_experience",
+      "field": "education-teaching",
+      "specialism": "learning-support",
+      "role_id": "bd118e5b-53a9-4434-9149-a2377f53e386",
+      "role_title": "Assistant Headteacher (Learning Support)",
+      "stage": "leadership_middle_senior",
+      "description": "Apprentice/Assistant/Trainee/Graduate title requiring 5+ years",
+      "evidence": {
+        "minimum_experience_years": 6,
+        "fit": "future_progression"
+      },
+      "recommended_action": "Lower experience requirement or retitle",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.entry_marked_future_progression",
+      "field": "education-teaching",
+      "specialism": "learning-support",
+      "role_id": "bd118e5b-53a9-4434-9149-a2377f53e386",
+      "role_title": "Assistant Headteacher (Learning Support)",
+      "stage": "leadership_middle_senior",
+      "description": "Entry-style title marked future_progression",
+      "evidence": {
+        "fit": "future_progression",
+        "years": 6
+      },
+      "recommended_action": "Usually immediate or realistic_next unless justified",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "english-language",
+      "role_id": "4941ddb2-ce6a-40b9-91ac-bfa2f3a419f8",
+      "role_title": "Professor of English Language",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "english-literature",
+      "role_id": "5e5ea9c1-59cb-4f88-a37f-8cbc440bf305",
+      "role_title": "Professor of English Literature",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "linguistics",
+      "role_id": "fcbd4f25-e95b-4855-bcb5-9f68a2f0c49f",
+      "role_title": "Professor of Linguistics",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "creative-writing",
+      "role_id": "b0f06a11-7c15-4ea2-ab61-2c2a2a878869",
+      "role_title": "Professor of Creative Writing",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "applied-linguistics",
+      "role_id": "d7c197e8-1a1b-4914-b18f-9b8311f9f4b5",
+      "role_title": "Professor of Applied Linguistics",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "translation",
+      "role_id": "dcdbd914-3364-4c4a-b73a-ac496295fbf6",
+      "role_title": "Professor of Translation",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "tesol",
+      "role_id": "fbb05d58-2ed4-4091-b8a2-566f18f2c2bc",
+      "role_title": "Professor of TESOL",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "interpreting",
+      "role_id": "8636be5b-1626-4bab-93a8-78f8ff8e5d36",
+      "role_title": "Professor of Interpreting",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "tefl",
+      "role_id": "3daae7c8-0b44-45da-b54b-63264d3c6ca9",
+      "role_title": "Professor of TEFL",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "fit.academic_not_academic_or_research",
+      "field": "languages-literature",
+      "specialism": "arabic",
+      "role_id": "f73f551d-fe5a-4538-a943-707741e92c3a",
+      "role_title": "Professor of Arabic",
+      "stage": "academic_research",
+      "description": "Academic role fit is not academic_or_research",
+      "evidence": {
+        "fit": "future_progression",
+        "academic_requirement": "phd_relevant",
+        "is_academic_role": true
+      },
+      "recommended_action": "Set fit_classification to academic_or_research",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "civil-engineering",
+      "role_id": "3b324495-8b4a-42a5-8bbf-bd14d14e6d63",
+      "role_title": "Principal / Specialist Geotechnical Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "civil-engineering",
+      "role_id": "4e6cb620-1579-4ad0-82dc-e240bed10930",
+      "role_title": "Technical Authority / Expert Witness (Civil Engineering)",
+      "stage": "engineering_management",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "electrical-engineering",
+      "role_id": "9ef1035e-d700-4f41-bf06-dec89d84cd93",
+      "role_title": "Principal / Specialist Power Systems Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "electronic-engineering",
+      "role_id": "ff28459a-283b-4698-a134-340419e483dc",
+      "role_title": "Technical Authority / Expert Witness (Electronic Engineering)",
+      "stage": "engineering_management",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "qualification.phd_on_non_research_role",
+      "field": "engineering",
+      "specialism": "electronic-engineering",
+      "role_id": "91431e9c-0cce-470b-ac1d-e71d7f6f29e2",
+      "role_title": "Principal / Specialist Electronics Consultant",
+      "stage": "experienced_engineer",
+      "description": "PhD-relevant requirement on role that does not look academic/research",
+      "evidence": {
+        "academic_requirement": "phd_relevant",
+        "is_research_role": false,
+        "is_academic_role": false,
+        "suspected_correction": "degree_relevant or masters_relevant"
+      },
+      "recommended_action": "Confirm whether PhD is genuinely required",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "coverage.specialism_single_stage_only",
+      "field": "accounting-finance-banking",
+      "specialism": "accounting-research",
+      "role_id": "",
+      "role_title": "",
+      "stage": "",
+      "description": "Specialism roles only occupy a single stage",
+      "evidence": {},
+      "recommended_action": "Add progression roles if appropriate",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "coverage.specialism_single_stage_only",
+      "field": "accounting-finance-banking",
+      "specialism": "finance-research",
+      "role_id": "",
+      "role_title": "",
+      "stage": "",
+      "description": "Specialism roles only occupy a single stage",
+      "evidence": {},
+      "recommended_action": "Add progression roles if appropriate",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "coverage.specialism_single_stage_only",
+      "field": "accounting-finance-banking",
+      "specialism": "banking-research",
+      "role_id": "",
+      "role_title": "",
+      "stage": "",
+      "description": "Specialism roles only occupy a single stage",
+      "evidence": {},
+      "recommended_action": "Add progression roles if appropriate",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "coverage.specialism_single_stage_only",
+      "field": "accounting-finance-banking",
+      "specialism": "investment-research",
+      "role_id": "",
+      "role_title": "",
+      "stage": "",
+      "description": "Specialism roles only occupy a single stage",
+      "evidence": {},
+      "recommended_action": "Add progression roles if appropriate",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "coverage.specialism_single_stage_only",
+      "field": "accounting-finance-banking",
+      "specialism": "financial-economics-research",
+      "role_id": "",
+      "role_title": "",
+      "stage": "",
+      "description": "Specialism roles only occupy a single stage",
+      "evidence": {},
+      "recommended_action": "Add progression roles if appropriate",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "coverage.specialism_single_stage_only",
+      "field": "law-legal-justice",
+      "specialism": "legal-research",
+      "role_id": "",
+      "role_title": "",
+      "stage": "",
+      "description": "Specialism roles only occupy a single stage",
+      "evidence": {},
+      "recommended_action": "Add progression roles if appropriate",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "coverage.specialism_single_stage_only",
+      "field": "law-legal-justice",
+      "specialism": "legal-education",
+      "role_id": "",
+      "role_title": "",
+      "stage": "",
+      "description": "Specialism roles only occupy a single stage",
+      "evidence": {},
+      "recommended_action": "Add progression roles if appropriate",
+      "auto_fix_safe": false
+    },
+    {
+      "severity": "medium",
+      "category": "coverage.specialism_single_stage_only",
+      "field": "law-legal-justice",
+      "specialism": "law-policy-research",
+      "role_id": "",
+      "role_title": "",
+      "stage": "",
+      "description": "Specialism roles only occupy a single stage",
+      "evidence": {},
+      "recommended_action": "Add progression roles if appropriate",
+      "auto_fix_safe": false
+    }
+  ]
+}

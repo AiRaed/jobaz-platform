@@ -619,6 +619,7 @@ function SpecialismsPanel({
     status: 'draft' as CareerLibraryPublishStatus,
     sortOrder: 0,
     slugTouched: false,
+    disabledStageKeys: [] as string[],
   }
   const [form, setForm] = useState(emptyForm)
   const [editing, setEditing] = useState<CareerLibrarySpecialism | null>(null)
@@ -647,6 +648,7 @@ function SpecialismsPanel({
       status: editing.status,
       sortOrder: editing.sortOrder,
       slugTouched: true,
+      disabledStageKeys: editing.disabledStageKeys ?? [],
     })
   }, [editing])
 
@@ -667,6 +669,7 @@ function SpecialismsPanel({
         status: form.status,
         sortOrder: form.sortOrder,
         active: true,
+        disabledStageKeys: form.disabledStageKeys,
       }
       const res = await fetch(
         editing
@@ -783,7 +786,13 @@ function SpecialismsPanel({
                 <span>Stage model</span>
                 <select
                   value={form.stageModelId}
-                  onChange={(e) => setForm((f) => ({ ...f, stageModelId: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      stageModelId: e.target.value,
+                      disabledStageKeys: [],
+                    }))
+                  }
                   className="w-full rounded-xl border border-slate-700/70 bg-slate-900/70 px-3 py-2 text-sm text-slate-100"
                 >
                   {stageModels.map((m) => (
@@ -866,16 +875,45 @@ function SpecialismsPanel({
               </label>
             </div>
             {selectedModel && selectedModel.stages.length > 0 && (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">
-                  Stages from selected model (not stored on specialism)
+              <div className="rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2 space-y-2 md:col-span-2">
+                <p className="text-[11px] uppercase tracking-wider text-slate-500">
+                  Stages (uncheck to disable for this specialism)
                 </p>
-                <p className="text-xs text-slate-300">
+                <p className="text-xs text-slate-400">
                   {selectedModel.stages
                     .filter((s) => s.active)
                     .map((s) => s.label)
-                    .join(' → ') || 'No active stages'}
+                    .join(' → ')}
                 </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {selectedModel.stages
+                    .filter((s) => s.active)
+                    .map((stage) => {
+                      const disabled = form.disabledStageKeys.includes(stage.stageKey)
+                      return (
+                        <label
+                          key={stage.id}
+                          className="inline-flex items-center gap-1.5 text-xs text-slate-300"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!disabled}
+                            onChange={(e) => {
+                              const enable = e.target.checked
+                              setForm((f) => ({
+                                ...f,
+                                disabledStageKeys: enable
+                                  ? f.disabledStageKeys.filter((k) => k !== stage.stageKey)
+                                  : [...new Set([...f.disabledStageKeys, stage.stageKey])],
+                              }))
+                            }}
+                            className="rounded border-slate-600"
+                          />
+                          {stage.label}
+                        </label>
+                      )
+                    })}
+                </div>
               </div>
             )}
             <div className="flex flex-wrap items-center gap-4">
@@ -925,6 +963,9 @@ function SpecialismsPanel({
                     <span className="font-mono text-slate-400">{item.slug}</span>
                     {item.stageModelName ? ` · ${item.stageModelName}` : ''}
                     {item.regulatedProfession ? ' · Regulated' : ''}
+                    {item.disabledStageKeys?.length
+                      ? ` · Disabled: ${item.disabledStageKeys.join(', ')}`
+                      : ''}
                   </p>
                   {item.description ? (
                     <p className="text-xs text-slate-500 mt-1">{item.description}</p>

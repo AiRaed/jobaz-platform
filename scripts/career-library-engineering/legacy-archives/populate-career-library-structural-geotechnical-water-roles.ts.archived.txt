@@ -1,0 +1,1872 @@
+/**
+ * ARCHIVED � NON-EXECUTABLE historical copy.
+ * DO NOT RUN. Degree / Master's / PhD must not be used as Engineering stages.
+ * Canonical path: scripts/populate-career-library-engineering.ts +
+ *   scripts/remap-engineering-professional-stages.ts
+ * See scripts/career-library-engineering/legacy-archives/README.md
+ */
+import { refuseLegacyEngineeringAcademicPopulate } from '../refuseLegacyAcademicPopulate'
+refuseLegacyEngineeringAcademicPopulate('legacy-archives/' + (typeof __filename !== 'undefined' ? __filename : 'archived-script'))
+
+/* ===== ORIGINAL LEGACY BODY BELOW (unreachable) ===== */
+/**
+ * Populate Career Knowledge Library roles for THREE specialisms in one run:
+ *   1) Structural Engineering
+ *   2) Geotechnical Engineering
+ *   3) Water Engineering
+ *
+ * Each specialism: ~30 draft roles (Degree / Master's / PhD).
+ * Titles are unique across the three batches and skip exact overlaps with
+ * Civil, Environmental, Chemical, Architecture and related siblings.
+ *
+ *   npx tsx scripts/populate-career-library-structural-geotechnical-water-roles.ts
+ */
+
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { normalizeSlug } from '../lib/admin/career-library/guards'
+import type {
+  CareerLibraryAcademicRequirement,
+  CareerLibraryFitClassification,
+  CareerLibraryRegistrationRequirement,
+  CareerLibraryRoleCategory,
+  CareerLibrarySeniorityLevel,
+} from '../lib/admin/career-library/types'
+
+function loadEnvLocal() {
+  const envPath = resolve(process.cwd(), '.env.local')
+  if (!existsSync(envPath)) return
+  const text = readFileSync(envPath, 'utf8')
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim()
+    let val = trimmed.slice(eq + 1).trim()
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
+
+type StageKey = 'degree' | 'masters' | 'phd'
+
+type RoleSeed = {
+  name: string
+  description: string
+  roleCategory: CareerLibraryRoleCategory
+  seniorityLevel: CareerLibrarySeniorityLevel
+  minimumExperienceYears: number
+  experienceRequirementLabel: string
+  professionalRegistrationRequirement: CareerLibraryRegistrationRequirement
+  professionalMembershipRequirement: CareerLibraryRegistrationRequirement
+  academicRequirement: CareerLibraryAcademicRequirement
+  isResearchRole: boolean
+  isAcademicRole: boolean
+  isRegulatedOrRestricted: boolean
+  eligibilityNote: string
+  fitClassification: CareerLibraryFitClassification
+  priority: number
+}
+
+type SpecialismPack = {
+  slug: string
+  label: string
+  professionalBody: string
+  relatedBodies: string[]
+  sources: string[]
+  siblingSlugs: string[]
+  degree: RoleSeed[]
+  masters: RoleSeed[]
+  phd: RoleSeed[]
+}
+
+function role(
+  partial: Omit<
+    RoleSeed,
+    | 'professionalRegistrationRequirement'
+    | 'professionalMembershipRequirement'
+    | 'isResearchRole'
+    | 'isAcademicRole'
+    | 'isRegulatedOrRestricted'
+  > &
+    Partial<
+      Pick<
+        RoleSeed,
+        | 'professionalRegistrationRequirement'
+        | 'professionalMembershipRequirement'
+        | 'isResearchRole'
+        | 'isAcademicRole'
+        | 'isRegulatedOrRestricted'
+      >
+    >
+): RoleSeed {
+  return {
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    ...partial,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 1) Structural Engineering — IStructE / ICE
+// ---------------------------------------------------------------------------
+const STRUCTURAL: SpecialismPack = {
+  slug: 'structural-engineering',
+  label: 'Structural Engineering',
+  professionalBody: 'Institution of Structural Engineers (IStructE)',
+  relatedBodies: ['Institution of Civil Engineers (ICE)', 'Engineering Council'],
+  sources: [
+    'prospects_structural_engineer',
+    'istructe_become_a_structural_engineer',
+    'ice_professional_qualification',
+    'engineering_council_ceng_pathway',
+  ],
+  siblingSlugs: [
+    'civil-engineering',
+    'architecture',
+    'geotechnical-engineering',
+    'water-engineering',
+    'mechanical-engineering',
+    'building-services-engineering',
+  ],
+  degree: [
+    role({
+      name: 'Graduate Structural Engineer',
+      description:
+        'Entry UK role on a consultancy or contractor graduate scheme supporting structural calculations, drawings and design under senior structural engineers toward IStructE/ICE professional development.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior industry experience required',
+      academicRequirement: 'accredited_degree_preferred',
+      eligibilityNote:
+        'Immediate graduate-entry structural pathway. IStructE/ICE chartership is a later goal, not a start gate.',
+      fitClassification: 'immediate',
+      priority: 10,
+    }),
+    role({
+      name: 'Structural Design Engineer (Graduate)',
+      description:
+        'Supports structural sizing, load paths and detailing for buildings or infrastructure under supervised design checks.',
+      roleCategory: 'design',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; placement helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate structural design support — distinct from Architecture design and Civil generalist site roles.',
+      fitClassification: 'immediate',
+      priority: 20,
+    }),
+    role({
+      name: 'Steel Structures Engineer (Junior)',
+      description:
+        'Supports steel frame analysis, connection concepts and fabrication interfaces for buildings and industrial structures.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years steel design experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Realistic next after graduate structural exposure. Not Mechanical plant design.',
+      fitClassification: 'realistic_next',
+      priority: 30,
+    }),
+    role({
+      name: 'Concrete Structures Engineer (Junior)',
+      description:
+        'Supports reinforced/prestressed concrete member design, detailing and construction-stage checks under senior engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years concrete structures experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Concrete structural design focus — not Civil materials technology specialist titles.',
+      fitClassification: 'realistic_next',
+      priority: 40,
+    }),
+    role({
+      name: 'Structural Analysis Engineer (Graduate)',
+      description:
+        'Supports linear/nonlinear analysis models, load combinations and verification of structural behaviour for design teams.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; strong analysis modules helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate analysis pathway within Structural Engineering.',
+      fitClassification: 'immediate',
+      priority: 50,
+    }),
+    role({
+      name: 'Building Structures Engineer (Graduate)',
+      description:
+        'Supports structural schemes for residential, commercial or institutional buildings including stability and floor systems.',
+      roleCategory: 'design',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior industry experience required on graduate schemes',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Building structures focus — not Architecture space planning or Building Services.',
+      fitClassification: 'immediate',
+      priority: 60,
+    }),
+    role({
+      name: 'Temporary Works Engineer (Graduate)',
+      description:
+        'Supports design and checking of falsework, formwork, propping and construction-stage temporary structures under a temporary works coordinator/designer.',
+      roleCategory: 'site_delivery',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; site exposure common',
+      academicRequirement: 'degree_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Temporary works is safety-critical. Design responsibility grows with competence; not Construction Management site management alone.',
+      fitClassification: 'immediate',
+      priority: 70,
+    }),
+    role({
+      name: 'Structural Assessment Engineer (Junior)',
+      description:
+        'Supports appraisal of existing structures, capacity checks and strengthening options under senior assessment engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years structural design/assessment experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Realistic next after core structural design foundations.',
+      fitClassification: 'realistic_next',
+      priority: 80,
+    }),
+    role({
+      name: 'Assistant Bridge Structures Engineer',
+      description:
+        'Supports bridge structural analysis, detailing and assessment packages under senior bridge engineers.',
+      roleCategory: 'design',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–2 years structural or bridge support experience',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Bridge structures pathway — titled to avoid Civil Engineering “Bridge Engineer” duplicate.',
+      fitClassification: 'realistic_next',
+      priority: 90,
+    }),
+    role({
+      name: 'Structural Engineering Technician / EngTech pathway',
+      description:
+        'Provides drawing, modelling and design-support production; may align with EngTech development via IStructE or ICE.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior experience required; EngTech/IEng pathway available',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate technical pathway. Professional registration is a later goal, not an entry gate.',
+      fitClassification: 'immediate',
+      priority: 100,
+    }),
+  ],
+  masters: [
+    role({
+      name: 'Structural Design Engineer',
+      description:
+        'Designs structural systems for buildings or infrastructure, producing calculations, models and coordinated design deliverables.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years structural design experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Master’s-relevant design ownership needs demonstrated project experience. Not Architecture design lead.',
+      fitClassification: 'realistic_next',
+      priority: 10,
+    }),
+    role({
+      name: 'Bridge Structural Design Engineer',
+      description:
+        'Designs and assesses bridge superstructures/substructures, load models and construction-stage structural behaviour.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years bridge structural experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Structural bridge design specialism — distinct from Civil general bridge/project titles.',
+      fitClassification: 'realistic_next',
+      priority: 20,
+    }),
+    role({
+      name: 'Seismic / Earthquake Structural Engineer',
+      description:
+        'Applies seismic analysis, ductile detailing and performance-based assessment for structures in seismic design contexts.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years structural analysis experience; MSc often valued',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'desirable',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Specialist seismic pathway. Academic stage alone is not automatic seniority.',
+      fitClassification: 'realistic_next',
+      priority: 30,
+    }),
+    role({
+      name: 'Temporary Works Design Engineer',
+      description:
+        'Designs temporary works schemes and coordinates with site teams on falsework, excavation support interfaces and construction sequencing risks.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years temporary works design experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      isRegulatedOrRestricted: true,
+      eligibilityNote:
+        'Safety-critical temporary works design. Competence and experience outweigh academic stage.',
+      fitClassification: 'realistic_next',
+      priority: 40,
+    }),
+    role({
+      name: 'Structural Assessment / Appraisal Engineer',
+      description:
+        'Leads structural appraisals, load capacity reviews and strengthening strategies for existing buildings and infrastructure.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 4,
+      experienceRequirementLabel: 'Typically 4–8 years structural assessment experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Experience-led assessment ownership. Not Building Surveying property condition surveying.',
+      fitClassification: 'future_progression',
+      priority: 50,
+    }),
+    role({
+      name: 'Advanced Steel Design Engineer',
+      description:
+        'Leads complex steelwork design including stability, connections and fabrication-led optimisation for major structures.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years steel structural design experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Advanced steel structures focus within Structural Engineering.',
+      fitClassification: 'realistic_next',
+      priority: 60,
+    }),
+    role({
+      name: 'Reinforced / Prestressed Concrete Design Engineer',
+      description:
+        'Designs complex RC/PC structures including serviceability, durability and detailing coordination with construction methods.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years concrete structural design experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Concrete structural design — not Materials Engineering materials science roles.',
+      fitClassification: 'realistic_next',
+      priority: 70,
+    }),
+    role({
+      name: 'Tall Buildings Structural Engineer',
+      description:
+        'Designs stability systems, wind/dynamic response and vertical load paths for high-rise and complex building structures.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 4,
+      experienceRequirementLabel: 'Typically 4–8 years building structures experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Specialist tall-building structural pathway needing substantial design experience.',
+      fitClassification: 'future_progression',
+      priority: 80,
+    }),
+    role({
+      name: 'Senior Structural Design Engineer',
+      description:
+        'Leads structural design packages, reviews junior work and assures code compliance and buildability on complex projects.',
+      roleCategory: 'design',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 6,
+      experienceRequirementLabel: 'Typically 6+ years structural design experience; CEng commonly expected',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Seniority requires significant delivery experience. Master’s alone is not Senior status.',
+      fitClassification: 'future_progression',
+      priority: 90,
+    }),
+    role({
+      name: 'Lead Structural Engineer',
+      description:
+        'Leads multidisciplinary structural coordination, design standards and client technical engagement for major commissions.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years structural engineering leadership experience',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Leadership progression is experience-led; academic stage is not automatic seniority.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+  phd: [
+    role({
+      name: 'Research Associate / Postdoctoral Researcher (Structural Engineering)',
+      description:
+        'Conducts postdoctoral research in structural analysis, materials–structure interaction or resilience in UK universities or research centres.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD (or near completion) in structural engineering or closely related field',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Academic/research fit. A PhD is not automatic industry Senior/Lead structural seniority.',
+      fitClassification: 'academic_or_research',
+      priority: 10,
+    }),
+    role({
+      name: 'University Lecturer / Assistant Professor (Structural Engineering)',
+      description:
+        'Delivers teaching and research in structural engineering programmes within UK higher education.',
+      roleCategory: 'academic',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD typically required; teaching/research track record expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      isAcademicRole: true,
+      eligibilityNote:
+        'Academic pathway. Not an industry chartered-engineer seniority substitute.',
+      fitClassification: 'academic_or_research',
+      priority: 20,
+    }),
+    role({
+      name: 'Computational Structural Mechanics Specialist',
+      description:
+        'Advances FEA, nonlinear analysis or digital twin methods for structural performance and design research.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with strong computational structural mechanics research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Research specialist fit — distinct from Civil general computational modelling titles.',
+      fitClassification: 'academic_or_research',
+      priority: 30,
+    }),
+    role({
+      name: 'Seismic Engineering Research Specialist',
+      description:
+        'Researches earthquake engineering, seismic risk and performance-based structural design methods.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with seismic/earthquake engineering research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Academic/research seismic focus. Industry principal roles additionally need project delivery experience.',
+      fitClassification: 'academic_or_research',
+      priority: 40,
+    }),
+    role({
+      name: 'Structural Health Monitoring Research Specialist',
+      description:
+        'Develops sensing, monitoring and assessment methods for the health and residual life of structures.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with SHM or structural monitoring research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Research specialist pathway within Structural Engineering.',
+      fitClassification: 'academic_or_research',
+      priority: 50,
+    }),
+    role({
+      name: 'Advanced Concrete Structures Research Specialist',
+      description:
+        'Researches advanced concrete behaviour, durability and structural applications including novel concretes.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with concrete structures research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Concrete structural research — not Civil materials/concrete technology specialist titles.',
+      fitClassification: 'academic_or_research',
+      priority: 60,
+    }),
+    role({
+      name: 'Forensic Structural Engineer',
+      description:
+        'Investigates structural failures, damage mechanisms and remedial strategies for insurers, clients and expert work.',
+      roleCategory: 'consultancy',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years structural practice; forensic case experience required',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Experience-led specialist consultancy. PhD helps but does not replace forensic project experience.',
+      fitClassification: 'future_progression',
+      priority: 70,
+    }),
+    role({
+      name: 'Principal / Specialist Structural Consultant',
+      description:
+        'Provides expert structural advisory on complex designs, assessments and technical assurance for major projects.',
+      roleCategory: 'consultancy',
+      seniorityLevel: 'principal',
+      minimumExperienceYears: 10,
+      experienceRequirementLabel: 'Typically 10+ years structural delivery; deep domain expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Principal consultancy needs track record beyond doctoral study. CEng MIStructE commonly expected.',
+      fitClassification: 'future_progression',
+      priority: 80,
+    }),
+    role({
+      name: 'Technical Authority / Expert Witness (Structural Engineering)',
+      description:
+        'Sets structural technical standards and may provide expert evidence on structural engineering disputes or inquiries.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 12,
+      experienceRequirementLabel: 'Typically 12+ years structural leadership and specialist expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Leadership/expert roles require extensive experience. Academic stage alone is insufficient.',
+      fitClassification: 'future_progression',
+      priority: 90,
+    }),
+    role({
+      name: 'Research & Innovation Manager (Structural Systems)',
+      description:
+        'Manages research portfolios and innovation programmes spanning structural systems, resilience and advanced analysis.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years research/innovation leadership in structural engineering',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Management of research programmes needs leadership experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// 2) Geotechnical Engineering — ICE / IOM3 / Geological Society
+// ---------------------------------------------------------------------------
+const GEOTECHNICAL: SpecialismPack = {
+  slug: 'geotechnical-engineering',
+  label: 'Geotechnical Engineering',
+  professionalBody: 'Institution of Civil Engineers (ICE)',
+  relatedBodies: [
+    'Institute of Materials, Minerals and Mining (IOM3)',
+    'Geological Society of London',
+    'Engineering Council',
+  ],
+  sources: [
+    'prospects_geotechnical_engineer',
+    'ground_engineering_career_routes',
+    'ice_professional_qualification',
+    'iom3_chartership_pathway',
+    'engineering_council_ceng_pathway',
+  ],
+  siblingSlugs: [
+    'civil-engineering',
+    'structural-engineering',
+    'water-engineering',
+    'environmental-engineering',
+    'mining-engineering',
+    'petroleum-engineering',
+  ],
+  degree: [
+    role({
+      name: 'Graduate Geotechnical / Ground Engineer',
+      description:
+        'Entry UK role supporting ground investigation interpretation, foundation concepts and earthworks design under senior geotechnical engineers toward ICE/IOM3 development.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior industry experience required',
+      academicRequirement: 'accredited_degree_preferred',
+      eligibilityNote:
+        'Immediate graduate-entry ground engineering pathway. Titled to avoid exact Civil “Geotechnical Engineer” duplicate.',
+      fitClassification: 'immediate',
+      priority: 10,
+    }),
+    role({
+      name: 'Site Investigation Engineer (Graduate)',
+      description:
+        'Supports ground investigation scoping, logging coordination, scheduling and factual/interpretative reporting under senior staff.',
+      roleCategory: 'site_delivery',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; site exposure common',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate site investigation pathway within Geotechnical Engineering.',
+      fitClassification: 'immediate',
+      priority: 20,
+    }),
+    role({
+      name: 'Junior Foundations Engineer',
+      description:
+        'Supports shallow/deep foundation calculations, pile schedules and geotechnical design checks under senior foundation engineers.',
+      roleCategory: 'design',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years foundations/geotechnical experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Realistic next after graduate ground engineering exposure. Not Structural building frame design.',
+      fitClassification: 'realistic_next',
+      priority: 30,
+    }),
+    role({
+      name: 'Earthworks Engineer (Graduate)',
+      description:
+        'Supports earthworks design, slope assessment basics, fill specifications and construction-stage geotechnical advice.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes in consultancy or contracting',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate earthworks pathway — not Civil highways generalist titles.',
+      fitClassification: 'immediate',
+      priority: 40,
+    }),
+    role({
+      name: 'Geotechnical Design Support Engineer',
+      description:
+        'Assists with soil parameters, retaining wall concepts, settlement estimates and geotechnical design notes under supervision.',
+      roleCategory: 'design',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–2 years geotechnical support experience',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Support-level geotechnical design. Independent design ownership needs further experience.',
+      fitClassification: 'realistic_next',
+      priority: 50,
+    }),
+    role({
+      name: 'Soil Mechanics Testing / Laboratory Engineer (Junior)',
+      description:
+        'Supports laboratory and in-situ testing programmes, data quality checks and parameter derivation for design teams.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry possible; laboratory/placement experience helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate soil mechanics testing pathway within Geotechnical Engineering.',
+      fitClassification: 'immediate',
+      priority: 60,
+    }),
+    role({
+      name: 'Assistant Tunnel Geotechnical Engineer',
+      description:
+        'Supports ground models, face-support concepts and monitoring interpretation for tunnelling projects under senior tunnel geotechnical engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years geotechnical or tunnelling support experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Tunnel ground engineering focus — not Structural temporary works or Civil general infrastructure titles.',
+      fitClassification: 'realistic_next',
+      priority: 70,
+    }),
+    role({
+      name: 'Geotechnical Risk Support Engineer (Junior)',
+      description:
+        'Supports geotechnical hazard registers, risk scoring and observational method inputs under senior geotechnical risk leads.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years geotechnical project experience',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Realistic next once core ground investigation/design foundations are in place.',
+      fitClassification: 'realistic_next',
+      priority: 80,
+    }),
+    role({
+      name: 'Rock Engineering Support Engineer (Graduate)',
+      description:
+        'Supports rock mass characterisation, discontinuity logging interpretation and basic rock engineering design inputs.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; geoscience background helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate rock engineering support pathway within Geotechnical Engineering.',
+      fitClassification: 'immediate',
+      priority: 90,
+    }),
+    role({
+      name: 'Geotechnical Engineering Technician / EngTech pathway',
+      description:
+        'Provides investigation, testing or design-support production; may align with EngTech development via ICE or IOM3.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior experience required; EngTech/IEng pathway available',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate technical pathway. Professional registration is a later goal, not an entry gate.',
+      fitClassification: 'immediate',
+      priority: 100,
+    }),
+  ],
+  masters: [
+    role({
+      name: 'Geotechnical Design Engineer',
+      description:
+        'Designs foundations, retaining structures and ground improvement schemes with interpretative geotechnical reporting for UK projects.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years geotechnical design experience; MSc often valued',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Master’s-relevant design ownership needs demonstrated ground engineering experience. Avoids exact Civil “Geotechnical Engineer” title.',
+      fitClassification: 'realistic_next',
+      priority: 10,
+    }),
+    role({
+      name: 'Foundations Design Engineer',
+      description:
+        'Leads shallow and deep foundation design, pile testing interpretation and construction-stage foundation advice.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years foundations experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Foundations specialism within Geotechnical Engineering — not Structural superstructure design.',
+      fitClassification: 'realistic_next',
+      priority: 20,
+    }),
+    role({
+      name: 'Ground Investigation Lead Engineer',
+      description:
+        'Plans and leads ground investigations, manages contractors and delivers interpretative geotechnical reporting.',
+      roleCategory: 'project_management',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years site investigation delivery experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Investigation leadership needs field and reporting experience beyond postgraduate study.',
+      fitClassification: 'realistic_next',
+      priority: 30,
+    }),
+    role({
+      name: 'Tunnel Geotechnical Engineer',
+      description:
+        'Provides ground models, support design interfaces and observational method advice for bored/mined tunnels and shafts.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 4,
+      experienceRequirementLabel: 'Typically 4–8 years tunnelling geotechnics experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Specialist tunnelling ground engineering pathway.',
+      fitClassification: 'future_progression',
+      priority: 40,
+    }),
+    role({
+      name: 'Rock Mechanics / Rock Engineering Engineer',
+      description:
+        'Designs rock slopes, underground excavations and rock reinforcement using rock mass characterisation and analysis.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years rock engineering experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'desirable',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Rock engineering focus — not Mining Engineering production/operations titles.',
+      fitClassification: 'realistic_next',
+      priority: 50,
+    }),
+    role({
+      name: 'Earthworks Design Engineer',
+      description:
+        'Designs cuttings, embankments, soil slopes and earthworks specifications including construction control advice.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years earthworks design experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Earthworks design ownership needs project experience beyond academic stage.',
+      fitClassification: 'realistic_next',
+      priority: 60,
+    }),
+    role({
+      name: 'Geotechnical Risk Engineer',
+      description:
+        'Leads geotechnical risk assessment, residual risk management and observational strategies for complex ground conditions.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 4,
+      experienceRequirementLabel: 'Typically 4–8 years geotechnical project risk experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Specialist risk pathway. Distinct from Environmental contaminated-land compliance roles.',
+      fitClassification: 'future_progression',
+      priority: 70,
+    }),
+    role({
+      name: 'Retaining Structures / Deep Excavation Engineer',
+      description:
+        'Designs embedded walls, anchors and deep excavation support with construction-stage monitoring interfaces.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years retaining/deep excavation experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Geotechnical retaining design — structural wall detailing may interface with Structural Engineering.',
+      fitClassification: 'realistic_next',
+      priority: 80,
+    }),
+    role({
+      name: 'Senior Geotechnical Design Engineer',
+      description:
+        'Leads complex geotechnical design packages, reviews junior work and assures ground-related technical quality.',
+      roleCategory: 'design',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 6,
+      experienceRequirementLabel: 'Typically 6+ years geotechnical design experience; CEng commonly expected',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Seniority requires significant industry experience. Master’s alone is not Senior status.',
+      fitClassification: 'future_progression',
+      priority: 90,
+    }),
+    role({
+      name: 'Lead Ground Engineering Engineer',
+      description:
+        'Leads ground engineering teams and multidisciplinary interfaces across investigation, design and construction advice.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years ground engineering leadership experience',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Leadership progression is experience-led; academic stage is not automatic seniority.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+  phd: [
+    role({
+      name: 'Research Associate / Postdoctoral Researcher (Geotechnical Engineering)',
+      description:
+        'Conducts postdoctoral research in soil/rock mechanics, foundations or underground construction in UK universities or research centres.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD (or near completion) in geotechnical engineering or closely related field',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Academic/research fit. A PhD is not automatic industry Senior/Lead geotechnical seniority.',
+      fitClassification: 'academic_or_research',
+      priority: 10,
+    }),
+    role({
+      name: 'University Lecturer / Assistant Professor (Geotechnical Engineering)',
+      description:
+        'Delivers teaching and research in geotechnical or ground engineering programmes within UK higher education.',
+      roleCategory: 'academic',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD typically required; teaching/research track record expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      isAcademicRole: true,
+      eligibilityNote:
+        'Academic pathway. Not an industry chartered-engineer seniority substitute.',
+      fitClassification: 'academic_or_research',
+      priority: 20,
+    }),
+    role({
+      name: 'Soil Mechanics Research Specialist',
+      description:
+        'Advances constitutive modelling, laboratory methods or soil behaviour research for geotechnical applications.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with soil mechanics research specialism',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Research specialist fit within Geotechnical Engineering.',
+      fitClassification: 'academic_or_research',
+      priority: 30,
+    }),
+    role({
+      name: 'Rock Engineering Research Specialist',
+      description:
+        'Researches rock mass behaviour, underground excavation stability and rock reinforcement methods.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with rock mechanics/engineering research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Rock engineering research — not Mining production research titles.',
+      fitClassification: 'academic_or_research',
+      priority: 40,
+    }),
+    role({
+      name: 'Tunnel / Underground Space Research Specialist',
+      description:
+        'Researches tunnelling ground response, support interaction and underground space geotechnics.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with tunnelling or underground geotechnics research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Research specialist pathway for underground geotechnics.',
+      fitClassification: 'academic_or_research',
+      priority: 50,
+    }),
+    role({
+      name: 'Geotechnical Numerical Modelling Specialist',
+      description:
+        'Specialises in advanced numerical modelling of soil–structure interaction, slopes and excavations for research or expert practice.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with geotechnical numerical modelling research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Geotechnical numerical modelling — distinct from Structural FEA specialist titles.',
+      fitClassification: 'academic_or_research',
+      priority: 60,
+    }),
+    role({
+      name: 'Innovation / Ground Engineering R&D Engineer',
+      description:
+        'Leads applied R&D for ground improvement, instrumentation or novel geotechnical design methods in industry.',
+      roleCategory: 'research',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 5,
+      experienceRequirementLabel: 'Typically 5+ years R&D or advanced geotechnical delivery; PhD often valued',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Industry R&D progression needs delivery experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 70,
+    }),
+    role({
+      name: 'Principal Ground Engineering Consultant',
+      description:
+        'Provides expert ground engineering advisory on complex foundations, earthworks, tunnels and geotechnical risk for major projects.',
+      roleCategory: 'consultancy',
+      seniorityLevel: 'principal',
+      minimumExperienceYears: 10,
+      experienceRequirementLabel: 'Typically 10+ years geotechnical delivery; deep domain expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Titled to avoid Civil “Principal / Specialist Geotechnical Consultant” duplicate. Experience-led principal status.',
+      fitClassification: 'future_progression',
+      priority: 80,
+    }),
+    role({
+      name: 'Technical Authority / Expert Witness (Geotechnical Engineering)',
+      description:
+        'Sets geotechnical technical standards and may provide expert evidence on ground engineering disputes or inquiries.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 12,
+      experienceRequirementLabel: 'Typically 12+ years geotechnical leadership and specialist expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Leadership/expert roles require extensive experience. Academic stage alone is insufficient.',
+      fitClassification: 'future_progression',
+      priority: 90,
+    }),
+    role({
+      name: 'Research & Innovation Manager (Geotechnics)',
+      description:
+        'Manages research portfolios and innovation programmes spanning soil/rock mechanics, foundations and underground construction.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years research/innovation leadership in geotechnics',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Management of research programmes needs leadership experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// 3) Water Engineering — CIWEM / ICE
+// ---------------------------------------------------------------------------
+const WATER: SpecialismPack = {
+  slug: 'water-engineering',
+  label: 'Water Engineering',
+  professionalBody: 'Chartered Institution of Water and Environmental Management (CIWEM)',
+  relatedBodies: ['Institution of Civil Engineers (ICE)', 'Engineering Council'],
+  sources: [
+    'prospects_water_engineer',
+    'ciwem_ceng_pathway',
+    'ice_professional_qualification',
+    'atkinsrealis_water_engineer_roles_context',
+    'engineering_council_ceng_pathway',
+  ],
+  siblingSlugs: [
+    'civil-engineering',
+    'environmental-engineering',
+    'chemical-engineering',
+    'structural-engineering',
+    'geotechnical-engineering',
+    'renewable-energy-engineering',
+  ],
+  degree: [
+    role({
+      name: 'Graduate Water Engineer',
+      description:
+        'Entry UK role with a water company, consultancy or regulator supporting clean water, wastewater or flood projects toward CIWEM/ICE professional development.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior industry experience required',
+      academicRequirement: 'accredited_degree_preferred',
+      eligibilityNote:
+        'Immediate graduate-entry water pathway. CIWEM/ICE chartership is a later goal, not a start gate.',
+      fitClassification: 'immediate',
+      priority: 10,
+    }),
+    role({
+      name: 'Water Resources Engineer (Graduate)',
+      description:
+        'Supports water resources planning, supply–demand assessments and resource scheme studies under senior water resources engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes in water resources teams',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate water resources pathway — not Environmental permitting-only roles.',
+      fitClassification: 'immediate',
+      priority: 20,
+    }),
+    role({
+      name: 'Wastewater Networks Engineer (Graduate)',
+      description:
+        'Supports sewer network modelling inputs, rehabilitation options and wastewater infrastructure project packages.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via water company or consultancy graduate schemes',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Wastewater networks focus — titled to avoid Civil “Water / Wastewater Engineer (Graduate)” duplicate.',
+      fitClassification: 'immediate',
+      priority: 30,
+    }),
+    role({
+      name: 'Drainage Design Engineer (Graduate)',
+      description:
+        'Supports surface water drainage design, SuDS concepts and drainage calculations for developments and infrastructure.',
+      roleCategory: 'design',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; placement helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Drainage design pathway — titled to avoid Civil “Drainage Engineer” duplicate. Not Environmental flood-support titles.',
+      fitClassification: 'immediate',
+      priority: 40,
+    }),
+    role({
+      name: 'Flood Risk Engineer (Graduate)',
+      description:
+        'Supports flood risk assessments, model inputs and mitigation optioneering under senior flood risk engineers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes; hydrology modules helpful',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate flood risk pathway — titled to avoid Civil “Flood Risk / Hydraulic Engineer” duplicate.',
+      fitClassification: 'immediate',
+      priority: 50,
+    }),
+    role({
+      name: 'Hydraulic Modelling Engineer (Junior)',
+      description:
+        'Supports 1D/2D hydraulic and network models for rivers, drainage or sewer systems under senior modellers.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–3 years hydraulic modelling experience',
+      professionalRegistrationRequirement: 'desirable',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Realistic next after graduate water/flood exposure. Not Civil senior flood modelling specialist titles.',
+      fitClassification: 'realistic_next',
+      priority: 60,
+    }),
+    role({
+      name: 'Water Treatment Works Engineer (Graduate)',
+      description:
+        'Supports clean-water treatment works design/operations interfaces, process unit checks and asset upgrade packages for water infrastructure.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via water company or consultancy graduate schemes',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Water infrastructure treatment focus — chemical process plant roles remain under Chemical Engineering.',
+      fitClassification: 'immediate',
+      priority: 70,
+    }),
+    role({
+      name: 'Sewer Networks Engineer (Graduate)',
+      description:
+        'Supports foul/combined sewer design, condition assessment and overflow-related infrastructure studies.',
+      roleCategory: 'design',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'Entry via graduate schemes in wastewater networks',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate sewer networks pathway within Water Engineering.',
+      fitClassification: 'immediate',
+      priority: 80,
+    }),
+    role({
+      name: 'Assistant Water Infrastructure Engineer',
+      description:
+        'Supports delivery of water mains, pumping stations and network upgrade projects under a project or discipline lead.',
+      roleCategory: 'project_management',
+      seniorityLevel: 'early_career',
+      minimumExperienceYears: 1,
+      experienceRequirementLabel: 'Typically 1–2 years water project support experience',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Assistant-level water infrastructure delivery. Full package ownership is not implied by academic stage alone.',
+      fitClassification: 'realistic_next',
+      priority: 90,
+    }),
+    role({
+      name: 'Water Engineering Technician / EngTech pathway',
+      description:
+        'Provides modelling, drawing or operations technical support; may align with EngTech development via CIWEM or ICE.',
+      roleCategory: 'graduate_entry',
+      seniorityLevel: 'entry',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'No prior experience required; EngTech/IEng pathway available',
+      academicRequirement: 'degree_relevant',
+      eligibilityNote:
+        'Immediate technical pathway. Professional registration is a later goal, not an entry gate.',
+      fitClassification: 'immediate',
+      priority: 100,
+    }),
+  ],
+  masters: [
+    role({
+      name: 'Water Resources Planning Engineer',
+      description:
+        'Develops water resources strategies, drought resilience options and resource scheme appraisals for water companies and regulators.',
+      roleCategory: 'technical_specialist',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years water resources experience; MSc often valued',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Master’s-relevant specialist role. Academic stage alone is not automatic seniority.',
+      fitClassification: 'realistic_next',
+      priority: 10,
+    }),
+    role({
+      name: 'Clean Water Treatment Engineer',
+      description:
+        'Designs or upgrades potable water treatment processes and works for UK water infrastructure AMP programmes.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years water treatment experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Potable water treatment infrastructure — not Chemical manufacturing process plant design.',
+      fitClassification: 'realistic_next',
+      priority: 20,
+    }),
+    role({
+      name: 'Wastewater Treatment Engineer',
+      description:
+        'Designs or optimises wastewater treatment works, sludge streams and discharge compliance interfaces for water companies.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years wastewater treatment experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Wastewater treatment engineering — distinct from Environmental pollution-control generalist titles.',
+      fitClassification: 'realistic_next',
+      priority: 30,
+    }),
+    role({
+      name: 'Flood Risk Management Engineer',
+      description:
+        'Delivers flood risk management schemes, appraisals and climate-resilient options for catchments and communities.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years flood risk management experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Flood management engineering — not Civil “Flood Risk / Hydraulic Engineer” or Environmental flood-support titles.',
+      fitClassification: 'realistic_next',
+      priority: 40,
+    }),
+    role({
+      name: 'Hydraulic Design Engineer',
+      description:
+        'Designs open-channel and pressurised hydraulic systems for rivers, culverts, pumping and conveyance infrastructure.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years hydraulic design experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Hydraulic engineering design within Water Engineering.',
+      fitClassification: 'realistic_next',
+      priority: 50,
+    }),
+    role({
+      name: 'River / Fluvial Engineer',
+      description:
+        'Designs river engineering works including channel modifications, erosion protection and natural flood management interfaces.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–7 years fluvial/river engineering experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'desirable',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'River engineering focus within Water Engineering.',
+      fitClassification: 'realistic_next',
+      priority: 60,
+    }),
+    role({
+      name: 'Urban Drainage / SuDS Design Engineer',
+      description:
+        'Designs urban drainage systems and SuDS to manage surface water quantity/quality for developments and highways interfaces.',
+      roleCategory: 'design',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years drainage/SuDS design experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Urban drainage/SuDS design — not Civil general Drainage Engineer title.',
+      fitClassification: 'realistic_next',
+      priority: 70,
+    }),
+    role({
+      name: 'Clean Water Networks Engineer',
+      description:
+        'Designs and manages clean water distribution networks, trunk mains and network resilience upgrades.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'mid_level',
+      minimumExperienceYears: 3,
+      experienceRequirementLabel: 'Typically 3–6 years clean water networks experience',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Clean water infrastructure pathway within Water Engineering.',
+      fitClassification: 'realistic_next',
+      priority: 80,
+    }),
+    role({
+      name: 'Senior Water Infrastructure Engineer',
+      description:
+        'Leads complex water infrastructure packages across treatment, networks or flood assets and mentors junior engineers.',
+      roleCategory: 'professional_practice',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 6,
+      experienceRequirementLabel: 'Typically 6+ years water engineering experience; CEng commonly expected',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Seniority requires significant industry experience. Master’s alone is not Senior status.',
+      fitClassification: 'future_progression',
+      priority: 90,
+    }),
+    role({
+      name: 'Lead Water Engineer',
+      description:
+        'Leads water discipline teams, technical standards and client delivery across water resources, treatment or flood portfolios.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years water engineering leadership experience',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'masters_relevant',
+      eligibilityNote:
+        'Leadership progression is experience-led; academic stage is not automatic seniority.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+  phd: [
+    role({
+      name: 'Research Associate / Postdoctoral Researcher (Water Engineering)',
+      description:
+        'Conducts postdoctoral research in hydrology, hydraulics, water treatment or flood systems in UK universities or research centres.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD (or near completion) in water engineering or closely related field',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Academic/research fit. A PhD is not automatic industry Senior/Lead water seniority.',
+      fitClassification: 'academic_or_research',
+      priority: 10,
+    }),
+    role({
+      name: 'University Lecturer / Assistant Professor (Water Engineering)',
+      description:
+        'Delivers teaching and research in water engineering, hydrology or wastewater systems programmes within UK higher education.',
+      roleCategory: 'academic',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD typically required; teaching/research track record expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      isAcademicRole: true,
+      eligibilityNote:
+        'Academic pathway. Not an industry chartered-engineer seniority substitute.',
+      fitClassification: 'academic_or_research',
+      priority: 20,
+    }),
+    role({
+      name: 'Hydrology / Water Resources Research Specialist',
+      description:
+        'Advances hydrological modelling, drought/resource reliability methods and climate-informed water resources research.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with hydrology or water resources research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Research specialist fit within Water Engineering.',
+      fitClassification: 'academic_or_research',
+      priority: 30,
+    }),
+    role({
+      name: 'Hydraulic Systems Research Specialist',
+      description:
+        'Researches open-channel/pressurised flow, hydraulic structures and advanced hydrodynamic modelling methods.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with hydraulic engineering research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Hydraulic research — distinct from Civil senior flood modelling specialist titles.',
+      fitClassification: 'academic_or_research',
+      priority: 40,
+    }),
+    role({
+      name: 'Flood Systems Research Specialist',
+      description:
+        'Researches flood generation, inundation modelling, natural flood management and climate adaptation for catchments.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with flood risk/systems research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Flood systems research within Water Engineering — not Environmental climate adaptation generalist titles.',
+      fitClassification: 'academic_or_research',
+      priority: 50,
+    }),
+    role({
+      name: 'Wastewater Systems Research Specialist',
+      description:
+        'Researches wastewater treatment, sewer network performance and emerging contaminant/process optimisation methods.',
+      roleCategory: 'research',
+      seniorityLevel: 'academic_research',
+      minimumExperienceYears: 0,
+      experienceRequirementLabel: 'PhD with wastewater systems research',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Wastewater systems research — not Chemical catalysis/process plant research roles.',
+      fitClassification: 'academic_or_research',
+      priority: 60,
+    }),
+    role({
+      name: 'Innovation / Water Systems R&D Engineer',
+      description:
+        'Leads applied R&D for water treatment, networks digitalisation or flood resilience technologies in industry.',
+      roleCategory: 'research',
+      seniorityLevel: 'senior',
+      minimumExperienceYears: 5,
+      experienceRequirementLabel: 'Typically 5+ years R&D or advanced water delivery; PhD often valued',
+      professionalRegistrationRequirement: 'desirable',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Industry R&D progression needs delivery experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 70,
+    }),
+    role({
+      name: 'Principal / Specialist Water Consultant',
+      description:
+        'Provides expert advisory on water resources, treatment, networks or flood management for clients and major programmes.',
+      roleCategory: 'consultancy',
+      seniorityLevel: 'principal',
+      minimumExperienceYears: 10,
+      experienceRequirementLabel: 'Typically 10+ years water engineering delivery; deep domain expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Principal consultancy needs track record beyond doctoral study. CEng via CIWEM/ICE commonly expected.',
+      fitClassification: 'future_progression',
+      priority: 80,
+    }),
+    role({
+      name: 'Technical Authority / Expert Witness (Water Engineering)',
+      description:
+        'Sets water engineering technical standards and may provide expert evidence on water infrastructure or flood disputes.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 12,
+      experienceRequirementLabel: 'Typically 12+ years water engineering leadership and specialist expertise',
+      professionalRegistrationRequirement: 'commonly_expected',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      eligibilityNote:
+        'Leadership/expert roles require extensive experience. Academic stage alone is insufficient.',
+      fitClassification: 'future_progression',
+      priority: 90,
+    }),
+    role({
+      name: 'Research & Innovation Manager (Water Systems)',
+      description:
+        'Manages research portfolios and innovation programmes spanning water resources, treatment, networks and flood systems.',
+      roleCategory: 'leadership',
+      seniorityLevel: 'leadership',
+      minimumExperienceYears: 8,
+      experienceRequirementLabel: 'Typically 8+ years research/innovation leadership in water systems',
+      professionalMembershipRequirement: 'commonly_expected',
+      academicRequirement: 'phd_relevant',
+      isResearchRole: true,
+      eligibilityNote:
+        'Management of research programmes needs leadership experience beyond the PhD award itself.',
+      fitClassification: 'future_progression',
+      priority: 100,
+    }),
+  ],
+}
+
+const PACKS = [STRUCTURAL, GEOTECHNICAL, WATER]
+
+async function insertRolesForStage(
+  supabase: SupabaseClient,
+  pack: SpecialismPack,
+  specialismId: string,
+  stage: { id: string; stage_key: string; label: string },
+  roles: RoleSeed[],
+  existingSlugs: Set<string>,
+  reservedNames: Set<string>
+): Promise<{ created: string[]; skipped: string[]; crossSkipped: string[] }> {
+  const created: string[] = []
+  const skipped: string[] = []
+  const crossSkipped: string[] = []
+
+  for (const seed of roles) {
+    const nameKey = seed.name.trim().toLowerCase()
+    if (reservedNames.has(nameKey)) {
+      crossSkipped.push(seed.name)
+      continue
+    }
+
+    const baseSlug = normalizeSlug(undefined, seed.name)
+    if (!baseSlug) {
+      skipped.push(seed.name)
+      continue
+    }
+    const slug = `${stage.stage_key}-${baseSlug}`
+
+    if (existingSlugs.has(slug)) {
+      skipped.push(seed.name)
+      continue
+    }
+
+    const { error } = await supabase.from('career_library_roles').insert({
+      specialism_id: specialismId,
+      stage_id: stage.id,
+      name: seed.name,
+      slug,
+      description: seed.description,
+      status: 'draft',
+      active: true,
+      sort_order: seed.priority,
+      priority: seed.priority,
+      role_category: seed.roleCategory,
+      seniority_level: seed.seniorityLevel,
+      minimum_experience_years: seed.minimumExperienceYears,
+      experience_requirement_label: seed.experienceRequirementLabel,
+      professional_registration_requirement: seed.professionalRegistrationRequirement,
+      professional_membership_requirement: seed.professionalMembershipRequirement,
+      academic_requirement: seed.academicRequirement,
+      is_research_role: seed.isResearchRole,
+      is_academic_role: seed.isAcademicRole,
+      is_regulated_or_restricted: seed.isRegulatedOrRestricted,
+      eligibility_note: seed.eligibilityNote,
+      fit_classification: seed.fitClassification,
+      metadata: {
+        stage_id: stage.id,
+        stage_key: stage.stage_key as StageKey,
+        stage_label: stage.label,
+        academic_level: stage.stage_key,
+        specialism_slug: pack.slug,
+        country_focus: 'uk',
+        professional_body_focus: pack.professionalBody,
+        related_bodies: pack.relatedBodies,
+        eligibility_model_version: 1,
+        sources: pack.sources,
+      },
+    })
+
+    if (error) {
+      if (error.code === '23505') {
+        skipped.push(seed.name)
+        continue
+      }
+      throw new Error(`${pack.label}: ${seed.name} [${stage.stage_key}]: ${error.message}`)
+    }
+
+    created.push(seed.name)
+    existingSlugs.add(slug)
+    reservedNames.add(nameKey)
+  }
+
+  return { created, skipped, crossSkipped }
+}
+
+async function populatePack(
+  supabase: SupabaseClient,
+  pack: SpecialismPack,
+  stageByKey: Map<string, { id: string; stage_key: string; label: string }>,
+  reservedNames: Set<string>
+) {
+  const { data: specialism, error: specErr } = await supabase
+    .from('career_library_specialisms')
+    .select('id, name, slug, professional_body, regulated_profession')
+    .eq('slug', pack.slug)
+    .maybeSingle()
+
+  if (specErr || !specialism) {
+    throw new Error(`${pack.label} specialism not found: ${specErr?.message ?? 'missing row'}`)
+  }
+
+  if (!specialism.professional_body) {
+    await supabase
+      .from('career_library_specialisms')
+      .update({
+        professional_body: pack.professionalBody,
+        regulated_profession: true,
+      })
+      .eq('id', specialism.id)
+  }
+
+  const { data: siblings } = await supabase
+    .from('career_library_specialisms')
+    .select('id, slug')
+    .in('slug', pack.siblingSlugs)
+
+  for (const sib of siblings ?? []) {
+    const { data: roles } = await supabase
+      .from('career_library_roles')
+      .select('name')
+      .eq('specialism_id', sib.id)
+    for (const r of roles ?? []) reservedNames.add(r.name.trim().toLowerCase())
+  }
+
+  const { data: existingRoles, error: rolesErr } = await supabase
+    .from('career_library_roles')
+    .select('slug, name')
+    .eq('specialism_id', specialism.id)
+
+  if (rolesErr) throw new Error(rolesErr.message)
+  const existingSlugs = new Set((existingRoles ?? []).map((r) => r.slug))
+  for (const r of existingRoles ?? []) reservedNames.add(r.name.trim().toLowerCase())
+
+  const degree = await insertRolesForStage(
+    supabase,
+    pack,
+    specialism.id,
+    stageByKey.get('degree')!,
+    pack.degree,
+    existingSlugs,
+    reservedNames
+  )
+  const masters = await insertRolesForStage(
+    supabase,
+    pack,
+    specialism.id,
+    stageByKey.get('masters')!,
+    pack.masters,
+    existingSlugs,
+    reservedNames
+  )
+  const phd = await insertRolesForStage(
+    supabase,
+    pack,
+    specialism.id,
+    stageByKey.get('phd')!,
+    pack.phd,
+    existingSlugs,
+    reservedNames
+  )
+
+  const { count } = await supabase
+    .from('career_library_roles')
+    .select('id', { count: 'exact', head: true })
+    .eq('specialism_id', specialism.id)
+    .eq('status', 'draft')
+
+  return {
+    specialism,
+    degree,
+    masters,
+    phd,
+    draftCount: count ?? 0,
+  }
+}
+
+async function main() {
+  loadEnvLocal()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  }
+
+  const supabase = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  // Preflight: ensure no duplicate titles inside this run's seed data
+  const allSeedNames = PACKS.flatMap((p) => [...p.degree, ...p.masters, ...p.phd].map((r) => r.name))
+  const seen = new Set<string>()
+  const internalDupes: string[] = []
+  for (const n of allSeedNames) {
+    const k = n.trim().toLowerCase()
+    if (seen.has(k)) internalDupes.push(n)
+    seen.add(k)
+  }
+  if (internalDupes.length) {
+    throw new Error(`Duplicate titles within seed packs: ${internalDupes.join('; ')}`)
+  }
+
+  const { data: model, error: modelErr } = await supabase
+    .from('career_library_stage_models')
+    .select('id')
+    .eq('model_key', 'academic_level')
+    .maybeSingle()
+
+  if (modelErr || !model) {
+    throw new Error(`academic_level stage model not found: ${modelErr?.message ?? 'missing'}`)
+  }
+
+  const { data: stages, error: stagesErr } = await supabase
+    .from('career_library_stages')
+    .select('id, stage_key, label, sort_order')
+    .eq('stage_model_id', model.id)
+    .in('stage_key', ['degree', 'masters', 'phd'])
+    .order('sort_order', { ascending: true })
+
+  if (stagesErr || !stages?.length) {
+    throw new Error(`Academic stages not found: ${stagesErr?.message ?? 'empty'}`)
+  }
+
+  const stageByKey = new Map(stages.map((s) => [s.stage_key, s]))
+  for (const key of ['degree', 'masters', 'phd'] as const) {
+    if (!stageByKey.has(key)) throw new Error(`Missing academic stage: ${key}`)
+  }
+
+  const reservedNames = new Set<string>()
+  let totalCreated = 0
+  let totalSameSkipped = 0
+  let totalCrossSkipped = 0
+
+  console.log('\n=== Structural + Geotechnical + Water roles populate ===')
+  console.log('Stage model: academic_level | Status: draft\n')
+
+  for (const pack of PACKS) {
+    const result = await populatePack(supabase, pack, stageByKey, reservedNames)
+    const created =
+      result.degree.created.length + result.masters.created.length + result.phd.created.length
+    const sameSkipped =
+      result.degree.skipped.length + result.masters.skipped.length + result.phd.skipped.length
+    const crossSkipped =
+      result.degree.crossSkipped.length +
+      result.masters.crossSkipped.length +
+      result.phd.crossSkipped.length
+
+    totalCreated += created
+    totalSameSkipped += sameSkipped
+    totalCrossSkipped += crossSkipped
+
+    console.log(`--- ${result.specialism.name} (${result.specialism.slug}) ---`)
+    console.log(`Created this run: ${created} | Draft total: ${result.draftCount}`)
+    console.log(`Skipped same-specialism: ${sameSkipped} | Skipped title conflicts: ${crossSkipped}`)
+    if (crossSkipped) {
+      for (const n of [
+        ...result.degree.crossSkipped,
+        ...result.masters.crossSkipped,
+        ...result.phd.crossSkipped,
+      ]) {
+        console.log(`  - skipped: ${n}`)
+      }
+    }
+    console.log('Degree:')
+    for (const n of result.degree.created) console.log(`  + ${n}`)
+    console.log("Master's:")
+    for (const n of result.masters.created) console.log(`  + ${n}`)
+    console.log('PhD:')
+    for (const n of result.phd.created) console.log(`  + ${n}`)
+    console.log('')
+  }
+
+  console.log('=== Combined totals ===')
+  console.log(`Total roles created: ${totalCreated}`)
+  console.log(`Duplicates skipped (same specialism): ${totalSameSkipped}`)
+  console.log(`Duplicates skipped (cross-specialism / sibling title conflict): ${totalCrossSkipped}`)
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

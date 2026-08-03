@@ -1,0 +1,910 @@
+/**
+ * ARCHIVED � NON-EXECUTABLE historical copy.
+ * DO NOT RUN. Degree / Master's / PhD must not be used as Engineering stages.
+ * Canonical path: scripts/populate-career-library-engineering.ts +
+ *   scripts/remap-engineering-professional-stages.ts
+ * See scripts/career-library-engineering/legacy-archives/README.md
+ */
+import { refuseLegacyEngineeringAcademicPopulate } from '../refuseLegacyAcademicPopulate'
+refuseLegacyEngineeringAcademicPopulate('legacy-archives/' + (typeof __filename !== 'undefined' ? __filename : 'archived-script'))
+
+/* ===== ORIGINAL LEGACY BODY BELOW (unreachable) ===== */
+/**
+ * Populate Career Knowledge Library roles for Quantity Surveying only.
+ *
+ * Focus: assistant/graduate QS, cost planning/estimating, cost consultancy,
+ * commercial surveying, procurement, contracts (incl. NEC), claims, project
+ * controls, sector QS (rail/utilities/infrastructure), senior/principal QS,
+ * commercial leadership, academic/research pathways.
+ *
+ * Leave under other specialisms: Civil/Structural design, Architecture,
+ * Construction Management (site delivery), Building Surveying, Commercial
+ * Management (non-QS titles), Urban Planning, property valuation surveying.
+ *
+ * Sources: National Careers Service, Prospects, RICS (APC/MRICS), CIOB,
+ * CICES/ACostE context, major UK consultancies/contractors.
+ *
+ *   npx tsx scripts/populate-career-library-quantity-surveying-roles.ts
+ */
+
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { normalizeSlug } from '../lib/admin/career-library/guards'
+import type {
+  CareerLibraryAcademicRequirement,
+  CareerLibraryFitClassification,
+  CareerLibraryRegistrationRequirement,
+  CareerLibraryRoleCategory,
+  CareerLibrarySeniorityLevel,
+} from '../lib/admin/career-library/types'
+
+function loadEnvLocal() {
+  const envPath = resolve(process.cwd(), '.env.local')
+  if (!existsSync(envPath)) return
+  const text = readFileSync(envPath, 'utf8')
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim()
+    let val = trimmed.slice(eq + 1).trim()
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
+
+type StageKey = 'degree' | 'masters' | 'phd'
+
+type RoleSeed = {
+  name: string
+  description: string
+  roleCategory: CareerLibraryRoleCategory
+  seniorityLevel: CareerLibrarySeniorityLevel
+  minimumExperienceYears: number
+  experienceRequirementLabel: string
+  professionalRegistrationRequirement: CareerLibraryRegistrationRequirement
+  professionalMembershipRequirement: CareerLibraryRegistrationRequirement
+  academicRequirement: CareerLibraryAcademicRequirement
+  isResearchRole: boolean
+  isAcademicRole: boolean
+  isRegulatedOrRestricted: boolean
+  eligibilityNote: string
+  fitClassification: CareerLibraryFitClassification
+  priority: number
+}
+
+const DEGREE_ROLES: RoleSeed[] = [
+  {
+    name: 'Graduate Quantity Surveyor',
+    description:
+      'Entry UK role on a consultancy or contractor graduate scheme supporting cost plans, measurement, tenders and commercial administration toward RICS APC.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior industry experience required',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'accredited_degree_preferred',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate graduate-entry QS role. RICS membership (MRICS via APC) is a later professional goal, not a start gate. Degree alone is not seniority.',
+    fitClassification: 'immediate',
+    priority: 10,
+  },
+  {
+    name: 'Assistant Quantity Surveyor',
+    description:
+      'Supports senior QSs with measurement, valuations, subcontract accounts, change control and basic cost reporting on UK construction projects.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry via degree, apprenticeship or technician progression',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate assistant pathway commonly used on degree apprenticeships and graduate schemes.',
+    fitClassification: 'immediate',
+    priority: 20,
+  },
+  {
+    name: 'Estimator (Graduate / Junior)',
+    description:
+      'Supports tender estimating, pricing enquiries, subcontractor quotes and bid submissions for contractors or specialist packages.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry via graduate schemes; placement helpful',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate estimating pathway within QS/commercial cost management — not Construction Management site supervision.',
+    fitClassification: 'immediate',
+    priority: 30,
+  },
+  {
+    name: 'Cost Planner (Junior)',
+    description:
+      'Assists with elemental cost plans, benchmarking and early-stage budget advice under senior cost consultants or QSs.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years cost planning or QS support experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Realistic next step after graduate QS/estimating exposure. Independent client cost advice needs further experience.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    name: 'Cost Control Engineer (Junior)',
+    description:
+      'Supports earned-value tracking, cost coding, forecasts and variance reporting on construction or engineering projects.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years cost control or QS experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Cost-control focus within QS commercial pathway — not Civil/Structural design engineering.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    name: 'Junior Procurement Consultant (Construction Cost)',
+    description:
+      'Supports procurement strategy packs, tender documentation and supplier evaluation for construction packages under senior commercial staff.',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years QS, estimating or procurement support experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Construction cost/procurement support — not general supply-chain OpEx outside built-environment commercial practice.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    name: 'Cost Intelligence Analyst (Junior)',
+    description:
+      'Supports cost databases, benchmarking, market intelligence and data analysis used by QS and cost-management teams.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 1,
+    experienceRequirementLabel: 'Typically 1–3 years cost data, QS or estimating experience',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Analytical cost-intelligence pathway within Quantity Surveying — not pure software/AI engineering.',
+    fitClassification: 'realistic_next',
+    priority: 70,
+  },
+  {
+    name: 'Junior Commercial Surveyor (QS pathway)',
+    description:
+      'Supports commercial administration of construction contracts, valuations and change notices under a senior commercial QS or manager.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'early_career',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry via QS graduate schemes or apprenticeships',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'QS commercial pathway title — scoped to construction cost/commercial surveying, not a separate Commercial Management specialism duplicate.',
+    fitClassification: 'immediate',
+    priority: 80,
+  },
+  {
+    name: 'Utilities Quantity Surveyor (Graduate)',
+    description:
+      'Supports cost and commercial management on utilities networks, plant or infrastructure packages for contractors or client organisations.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'Entry via graduate schemes in utilities/infrastructure employers',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate sector QS pathway. Distinct from Civil Engineering design roles on utilities assets.',
+    fitClassification: 'immediate',
+    priority: 90,
+  },
+  {
+    name: 'Quantity Surveying Technician / AssocRICS pathway',
+    description:
+      'Provides measurement, billing and commercial support; may progress via AssocRICS or technician routes toward chartered QS status.',
+    roleCategory: 'graduate_entry',
+    seniorityLevel: 'entry',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'No prior experience required; technician/AssocRICS pathway available',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'degree_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Immediate technical pathway. Professional registration is a later goal, not an entry gate.',
+    fitClassification: 'immediate',
+    priority: 100,
+  },
+]
+
+const MASTERS_ROLES: RoleSeed[] = [
+  {
+    name: 'Quantity Surveyor',
+    description:
+      'Manages project costs, tenders, valuations and commercial reporting for clients or contractors, commonly working toward or holding MRICS.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 2,
+    experienceRequirementLabel: 'Typically 2–5 years QS experience; APC/MRICS commonly in progress or achieved',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Core QS practice role. Master’s/conversion alone does not confer seniority or MRICS; APC and experience matter.',
+    fitClassification: 'realistic_next',
+    priority: 10,
+  },
+  {
+    name: 'Project Quantity Surveyor',
+    description:
+      'Owns commercial delivery for a construction project, including subcontract accounts, change control, cashflow and final account preparation.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years project QS experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Project ownership needs demonstrated commercial competence beyond postgraduate study.',
+    fitClassification: 'realistic_next',
+    priority: 20,
+  },
+  {
+    name: 'Cost Consultant',
+    description:
+      'Advises clients on budgets, cost plans, value engineering and cost reporting through design and construction stages (PQS consultancy).',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years cost consultancy or PQS experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Client-side cost consultancy pathway. Not Architecture design or Structural Engineering design ownership.',
+    fitClassification: 'realistic_next',
+    priority: 30,
+  },
+  {
+    name: 'Cost Engineer',
+    description:
+      'Applies cost engineering methods to estimates, forecasts and control on major engineering, industrial or infrastructure projects.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years cost engineering or QS experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Cost engineering within QS commercial practice — not Civil/Structural design engineering. ACostE membership sometimes relevant.',
+    fitClassification: 'realistic_next',
+    priority: 40,
+  },
+  {
+    name: 'Procurement Consultant',
+    description:
+      'Advises on construction procurement routes, tender strategies, bid evaluation and commercial risk allocation for clients or frameworks.',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–7 years QS/procurement consultancy experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Construction procurement consultancy. Master’s alone is not automatic consultancy seniority.',
+    fitClassification: 'realistic_next',
+    priority: 50,
+  },
+  {
+    name: 'Contract Administrator',
+    description:
+      'Administers construction contracts including instructions, assessments, notices and payment processes under forms such as JCT or NEC.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years contracts/QS commercial experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Commercial contract administration — not Construction Management site management ownership.',
+    fitClassification: 'realistic_next',
+    priority: 60,
+  },
+  {
+    name: 'NEC Contract Specialist',
+    description:
+      'Specialises in NEC contract drafting, administration, compensation events and commercial advice on UK infrastructure and construction projects.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 4,
+    experienceRequirementLabel: 'Typically 4–8 years NEC commercial/contract experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Specialist contracts pathway needing substantial NEC project experience beyond academic stage.',
+    fitClassification: 'future_progression',
+    priority: 70,
+  },
+  {
+    name: 'Project Controls Engineer (Cost)',
+    description:
+      'Integrates cost control with schedule and risk reporting to support project controls on major construction or infrastructure programmes.',
+    roleCategory: 'technical_specialist',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years project controls/cost experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Cost-focused project controls within QS commercial practice — not pure Construction Management planning alone.',
+    fitClassification: 'realistic_next',
+    priority: 80,
+  },
+  {
+    name: 'Rail Quantity Surveyor',
+    description:
+      'Delivers cost and commercial management on rail infrastructure, stations or systems projects for contractors, clients or frameworks.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 3,
+    experienceRequirementLabel: 'Typically 3–6 years rail or infrastructure QS experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Sector QS specialism. Not Civil Engineering track/structural design roles.',
+    fitClassification: 'realistic_next',
+    priority: 90,
+  },
+  {
+    name: 'Infrastructure Cost Consultant',
+    description:
+      'Provides cost planning, benchmarking and commercial advice on major UK infrastructure programmes for clients and multidisciplinary teams.',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'mid_level',
+    minimumExperienceYears: 4,
+    experienceRequirementLabel: 'Typically 4–8 years infrastructure cost consultancy experience',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Infrastructure cost consultancy progression needs sector delivery experience beyond postgraduate study.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+]
+
+const PHD_ROLES: RoleSeed[] = [
+  {
+    name: 'Construction Economics Researcher',
+    description:
+      'Conducts research on construction economics, cost modelling, procurement or productivity in UK universities or research centres.',
+    roleCategory: 'research',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD (or near completion) in construction economics, QS or related field',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Academic/research fit. A PhD is not automatic industry Senior/Principal QS seniority or MRICS.',
+    fitClassification: 'academic_or_research',
+    priority: 10,
+  },
+  {
+    name: 'Quantity Surveying Lecturer',
+    description:
+      'Delivers teaching and research in quantity surveying, commercial management or construction cost modules within UK higher education.',
+    roleCategory: 'academic',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD and/or significant practice experience; teaching ability expected',
+    professionalRegistrationRequirement: 'desirable',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: true,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Academic pathway. Teaching, publications or practice track record often required beyond the doctorate alone.',
+    fitClassification: 'academic_or_research',
+    priority: 20,
+  },
+  {
+    name: 'Built Environment Research Fellow',
+    description:
+      'Holds a research fellowship developing independent work on cost, commercial practice, procurement or built-environment economics.',
+    roleCategory: 'research',
+    seniorityLevel: 'academic_research',
+    minimumExperienceYears: 0,
+    experienceRequirementLabel: 'PhD with strong research proposal/output; postdoctoral experience often preferred',
+    professionalRegistrationRequirement: 'none',
+    professionalMembershipRequirement: 'desirable',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: true,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Competitive research fellowship. Does not imply Commercial Director or Principal QS practice seniority.',
+    fitClassification: 'academic_or_research',
+    priority: 30,
+  },
+  {
+    name: 'Senior Quantity Surveyor',
+    description:
+      'Leads complex project commercial delivery, mentors junior QSs and provides senior cost/contract advice to clients or contractor leadership.',
+    roleCategory: 'professional_practice',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 6,
+    experienceRequirementLabel: 'Typically 6+ years QS experience; MRICS commonly expected',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Seniority requires significant industry experience. Academic stage alone is not Senior QS eligibility.',
+    fitClassification: 'future_progression',
+    priority: 40,
+  },
+  {
+    name: 'Principal Quantity Surveyor',
+    description:
+      'Acts as a principal technical/commercial authority on major commissions, setting standards and leading high-value cost advice.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'principal',
+    minimumExperienceYears: 10,
+    experienceRequirementLabel: 'Typically 10+ years QS delivery; deep sector expertise; MRICS/FRICS often expected',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Principal status is experience-led. A PhD does not create Principal QS seniority.',
+    fitClassification: 'future_progression',
+    priority: 50,
+  },
+  {
+    name: 'Commercial Manager (Construction Cost / QS)',
+    description:
+      'Leads commercial teams on contractor or client projects, owning margin, risk, subcontract strategy and commercial reporting.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 8,
+    experienceRequirementLabel: 'Typically 8+ years QS/commercial construction experience with people leadership',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'QS-scoped commercial management. Distinct from Construction Management site delivery and from a generic Commercial Management specialism title set.',
+    fitClassification: 'future_progression',
+    priority: 60,
+  },
+  {
+    name: 'Contract Manager (Commercial / QS)',
+    description:
+      'Leads commercial contract management across packages or programmes, including notices, assessments, negotiations and dispute avoidance.',
+    roleCategory: 'project_management',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 7,
+    experienceRequirementLabel: 'Typically 7+ years contracts/commercial QS experience',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Commercial/contract leadership — not Construction Management site contract supervision alone.',
+    fitClassification: 'future_progression',
+    priority: 70,
+  },
+  {
+    name: 'Claims Consultant',
+    description:
+      'Specialises in construction claims, delay/disruption analysis support, quantum assessment and dispute-related commercial advice.',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'senior',
+    minimumExperienceYears: 8,
+    experienceRequirementLabel: 'Typically 8+ years QS/contracts experience with claims/dispute exposure',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Specialist consultancy requires substantial claims experience. Doctorate alone is insufficient.',
+    fitClassification: 'future_progression',
+    priority: 80,
+  },
+  {
+    name: 'Construction Commercial / Cost Management Consultant',
+    description:
+      'Provides senior advisory on cost management, commercial strategy and construction economics for clients, funds or major programmes.',
+    roleCategory: 'consultancy',
+    seniorityLevel: 'principal',
+    minimumExperienceYears: 8,
+    experienceRequirementLabel: 'Typically 8+ years cost/commercial consultancy experience',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'phd_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Combines Construction Commercial Consultant and Cost Management Consultant pathways. Experience-led; PhD is not automatic principal status.',
+    fitClassification: 'future_progression',
+    priority: 90,
+  },
+  {
+    name: 'Commercial Director',
+    description:
+      'Leads commercial strategy, governance and performance for a contractor business unit, consultancy region or major portfolio.',
+    roleCategory: 'leadership',
+    seniorityLevel: 'leadership',
+    minimumExperienceYears: 12,
+    experienceRequirementLabel: 'Typically 12+ years QS/commercial leadership with board/director-level accountability',
+    professionalRegistrationRequirement: 'commonly_expected',
+    professionalMembershipRequirement: 'commonly_expected',
+    academicRequirement: 'masters_relevant',
+    isResearchRole: false,
+    isAcademicRole: false,
+    isRegulatedOrRestricted: false,
+    eligibilityNote:
+      'Requires extensive leadership experience. Academic qualifications alone never create Commercial Director eligibility.',
+    fitClassification: 'future_progression',
+    priority: 100,
+  },
+]
+
+const SIBLING_SPECIALISM_SLUGS = [
+  'civil-engineering',
+  'architecture',
+  'construction-management',
+  'building-surveying',
+  'commercial-management',
+  'structural-engineering',
+  'urban-planning',
+] as const
+
+async function insertRolesForStage(
+  supabase: SupabaseClient,
+  specialismId: string,
+  stage: { id: string; stage_key: string; label: string },
+  roles: RoleSeed[],
+  existingSlugs: Set<string>
+): Promise<{ created: string[]; skipped: string[] }> {
+  const created: string[] = []
+  const skipped: string[] = []
+
+  for (const role of roles) {
+    const baseSlug = normalizeSlug(undefined, role.name)
+    if (!baseSlug) {
+      skipped.push(role.name)
+      continue
+    }
+    const slug = `${stage.stage_key}-${baseSlug}`
+
+    if (existingSlugs.has(slug)) {
+      skipped.push(role.name)
+      continue
+    }
+
+    const { error } = await supabase.from('career_library_roles').insert({
+      specialism_id: specialismId,
+      stage_id: stage.id,
+      name: role.name,
+      slug,
+      description: role.description,
+      status: 'draft',
+      active: true,
+      sort_order: role.priority,
+      priority: role.priority,
+      role_category: role.roleCategory,
+      seniority_level: role.seniorityLevel,
+      minimum_experience_years: role.minimumExperienceYears,
+      experience_requirement_label: role.experienceRequirementLabel,
+      professional_registration_requirement: role.professionalRegistrationRequirement,
+      professional_membership_requirement: role.professionalMembershipRequirement,
+      academic_requirement: role.academicRequirement,
+      is_research_role: role.isResearchRole,
+      is_academic_role: role.isAcademicRole,
+      is_regulated_or_restricted: role.isRegulatedOrRestricted,
+      eligibility_note: role.eligibilityNote,
+      fit_classification: role.fitClassification,
+      metadata: {
+        stage_id: stage.id,
+        stage_key: stage.stage_key as StageKey,
+        stage_label: stage.label,
+        academic_level: stage.stage_key,
+        specialism_slug: 'quantity-surveying',
+        country_focus: 'uk',
+        professional_body_focus: 'Royal Institution of Chartered Surveyors (RICS)',
+        related_bodies: [
+          'Chartered Institute of Building (CIOB)',
+          'Chartered Institution of Civil Engineering Surveyors (CICES)',
+          'Association of Cost Engineers (ACostE)',
+        ],
+        eligibility_model_version: 1,
+        sources: [
+          'national_careers_service_quantity_surveyor',
+          'prospects_quantity_surveyor',
+          'rics_chartered_surveyor_apc',
+          'rics_recruit_qs_progression',
+          'ciob_professional_membership',
+        ],
+      },
+    })
+
+    if (error) {
+      if (error.code === '23505') {
+        skipped.push(role.name)
+        continue
+      }
+      throw new Error(`${role.name} [${stage.stage_key}]: ${error.message}`)
+    }
+
+    created.push(role.name)
+    existingSlugs.add(slug)
+  }
+
+  return { created, skipped }
+}
+
+async function main() {
+  loadEnvLocal()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  }
+
+  const supabase = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const { data: specialism, error: specErr } = await supabase
+    .from('career_library_specialisms')
+    .select('id, name, slug, professional_body, regulated_profession')
+    .eq('slug', 'quantity-surveying')
+    .maybeSingle()
+
+  if (specErr || !specialism) {
+    throw new Error(
+      `Quantity Surveying specialism not found: ${specErr?.message ?? 'missing row'}`
+    )
+  }
+
+  if (!specialism.professional_body) {
+    await supabase
+      .from('career_library_specialisms')
+      .update({
+        professional_body: 'Royal Institution of Chartered Surveyors (RICS)',
+        regulated_profession: true,
+      })
+      .eq('id', specialism.id)
+  }
+
+  const { data: siblings } = await supabase
+    .from('career_library_specialisms')
+    .select('id, slug')
+    .in('slug', [...SIBLING_SPECIALISM_SLUGS])
+
+  const siblingNames = new Set<string>()
+  for (const sib of siblings ?? []) {
+    const { data: roles } = await supabase
+      .from('career_library_roles')
+      .select('name')
+      .eq('specialism_id', sib.id)
+    for (const r of roles ?? []) siblingNames.add(r.name.trim().toLowerCase())
+  }
+
+  const allSeeds = [...DEGREE_ROLES, ...MASTERS_ROLES, ...PHD_ROLES]
+  const filteredByStage = {
+    degree: DEGREE_ROLES.filter((r) => !siblingNames.has(r.name.trim().toLowerCase())),
+    masters: MASTERS_ROLES.filter((r) => !siblingNames.has(r.name.trim().toLowerCase())),
+    phd: PHD_ROLES.filter((r) => !siblingNames.has(r.name.trim().toLowerCase())),
+  }
+  const crossSkipped = allSeeds
+    .filter((r) => siblingNames.has(r.name.trim().toLowerCase()))
+    .map((r) => r.name)
+
+  const { data: model, error: modelErr } = await supabase
+    .from('career_library_stage_models')
+    .select('id')
+    .eq('model_key', 'academic_level')
+    .maybeSingle()
+
+  if (modelErr || !model) {
+    throw new Error(`academic_level stage model not found: ${modelErr?.message ?? 'missing'}`)
+  }
+
+  const { data: stages, error: stagesErr } = await supabase
+    .from('career_library_stages')
+    .select('id, stage_key, label, sort_order')
+    .eq('stage_model_id', model.id)
+    .in('stage_key', ['degree', 'masters', 'phd'])
+    .order('sort_order', { ascending: true })
+
+  if (stagesErr || !stages?.length) {
+    throw new Error(`Academic stages not found: ${stagesErr?.message ?? 'empty'}`)
+  }
+
+  const stageByKey = new Map(stages.map((s) => [s.stage_key, s]))
+  for (const key of ['degree', 'masters', 'phd'] as const) {
+    if (!stageByKey.has(key)) throw new Error(`Missing academic stage: ${key}`)
+  }
+
+  const { data: existingRoles, error: rolesErr } = await supabase
+    .from('career_library_roles')
+    .select('slug')
+    .eq('specialism_id', specialism.id)
+
+  if (rolesErr) throw new Error(rolesErr.message)
+  const existingSlugs = new Set((existingRoles ?? []).map((r) => r.slug))
+
+  const degree = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('degree')!,
+    filteredByStage.degree,
+    existingSlugs
+  )
+  const masters = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('masters')!,
+    filteredByStage.masters,
+    existingSlugs
+  )
+  const phd = await insertRolesForStage(
+    supabase,
+    specialism.id,
+    stageByKey.get('phd')!,
+    filteredByStage.phd,
+    existingSlugs
+  )
+
+  const { count } = await supabase
+    .from('career_library_roles')
+    .select('id', { count: 'exact', head: true })
+    .eq('specialism_id', specialism.id)
+    .eq('status', 'draft')
+
+  const totalCreated = degree.created.length + masters.created.length + phd.created.length
+  const sameSpecSkipped =
+    degree.skipped.length + masters.skipped.length + phd.skipped.length
+
+  console.log('\n=== Quantity Surveying roles populate summary ===')
+  console.log(`Specialism: ${specialism.name} (${specialism.slug})`)
+  console.log(`Stage model: academic_level`)
+  console.log(`Status: draft`)
+  console.log(`Roles created this run: ${totalCreated}`)
+  console.log(`Duplicates skipped (same specialism): ${sameSpecSkipped}`)
+  console.log(
+    `Duplicates skipped (exact title overlap with Civil/Architecture/CM/Building Surveying/Commercial Mgmt): ${crossSkipped.length}`
+  )
+  if (crossSkipped.length) {
+    for (const n of crossSkipped) console.log(`  - ${n}`)
+  }
+  console.log(`Draft roles now in specialism: ${count ?? 'n/a'}`)
+
+  console.log('\nDegree / Bachelor roles:')
+  for (const n of degree.created) console.log(`  + ${n}`)
+  if (!degree.created.length) console.log('  (none new)')
+
+  console.log("\nMaster's roles:")
+  for (const n of masters.created) console.log(`  + ${n}`)
+  if (!masters.created.length) console.log('  (none new)')
+
+  console.log('\nPhD roles:')
+  for (const n of phd.created) console.log(`  + ${n}`)
+  if (!phd.created.length) console.log('  (none new)')
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

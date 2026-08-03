@@ -13,6 +13,53 @@ export function normalizeStageKey(raw: string | undefined, fallbackLabel: string
   return key || null
 }
 
+const STAGE_KEY_RE = /^[a-z][a-z0-9_]*$/
+
+/** Deduplicate and validate stage keys for specialism.disabled_stage_keys. */
+export function normalizeDisabledStageKeys(raw: unknown): string[] | null {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw)) return null
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (typeof item !== 'string') return null
+    const key = item.trim().toLowerCase()
+    if (!key) continue
+    if (!STAGE_KEY_RE.test(key)) return null
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(key)
+  }
+  return out
+}
+
+export async function validateDisabledStageKeysForModel(
+  supabase: SupabaseClient,
+  stageModelId: string,
+  disabledStageKeys: string[]
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (disabledStageKeys.length === 0) return { ok: true }
+
+  const { data: stages, error } = await supabase
+    .from('career_library_stages')
+    .select('stage_key')
+    .eq('stage_model_id', stageModelId)
+
+  if (error) {
+    return { ok: false, error: 'Could not validate disabled stages against the stage model.' }
+  }
+
+  const allowed = new Set((stages ?? []).map((s) => s.stage_key))
+  const unknown = disabledStageKeys.filter((k) => !allowed.has(k))
+  if (unknown.length) {
+    return {
+      ok: false,
+      error: `Unknown stage key(s) for this model: ${unknown.join(', ')}.`,
+    }
+  }
+  return { ok: true }
+}
+
 export async function countSpecialismsForField(
   supabase: SupabaseClient,
   fieldId: string

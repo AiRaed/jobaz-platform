@@ -180,6 +180,14 @@ export default function AdminCareerLibraryPage() {
               Empty data-management foundation for the next Career Assistant. No public careers are
               connected yet — populate fields, specialisms, and stage models from here.
             </p>
+            <p className="mt-2">
+              <Link
+                href="/admin/career-library/test-work-in-education"
+                className="text-sm text-cyan-400/90 hover:text-cyan-300"
+              >
+                Work in My Education — match test harness →
+              </Link>
+            </p>
           </div>
         </div>
       </header>

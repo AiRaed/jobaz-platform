@@ -1,0 +1,1026 @@
+{
+  "generated_at": "2026-08-03T20:58:41.739Z",
+  "count": 102,
+  "conflicts": [
+    {
+      "role_id": "d5758a71-b303-437a-9aa9-d1881cd93fe3",
+      "field": "engineering",
+      "specialism": "electrical-engineering",
+      "title": "Electrical Machines / Drives Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "32aa5487-54d3-4c64-9e22-f076f09bafe7",
+      "field": "engineering",
+      "specialism": "electrical-engineering",
+      "title": "Building Services Electrical Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "ca0a0b31-bb72-48ff-82bb-f0aa68a04b2a",
+      "field": "engineering",
+      "specialism": "electrical-engineering",
+      "title": "Protection and Control Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "e8862061-84b5-42ef-98a8-e329691f29de",
+      "field": "engineering",
+      "specialism": "electrical-engineering",
+      "title": "Assistant Project Engineer (Electrical)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "dd6fb7d7-8292-4280-a135-f38e5df9f54e",
+      "field": "engineering",
+      "specialism": "electrical-engineering",
+      "title": "Electrical Design Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "1ac6e8d9-196e-4ccb-b212-e0d90bb31ff0",
+      "field": "engineering",
+      "specialism": "electrical-engineering",
+      "title": "Electrical Site / Maintenance Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "d75a1878-7c8f-47aa-a5db-83994bad2d9e",
+      "field": "engineering",
+      "specialism": "electronic-engineering",
+      "title": "Digital Electronics Design Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "d286b73a-8e05-48e4-97f6-748c0a4f1231",
+      "field": "engineering",
+      "specialism": "electronic-engineering",
+      "title": "Electronics Test and Validation Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "a569febc-9530-409a-895c-892cc181d71d",
+      "field": "engineering",
+      "specialism": "electronic-engineering",
+      "title": "IoT Hardware Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "53cb7aa3-191d-4470-a047-a6dd193e9a9b",
+      "field": "engineering",
+      "specialism": "electronic-engineering",
+      "title": "Hardware Design Engineer (Electronics)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "5fa55776-96aa-4f49-97b2-68b57744f77d",
+      "field": "engineering",
+      "specialism": "electronic-engineering",
+      "title": "Analogue Electronics Design Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "2100e0a9-0dec-42de-9a82-cde33c501c59",
+      "field": "engineering",
+      "specialism": "electronic-engineering",
+      "title": "Assistant Project Engineer (Electronics)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "ea16d3dd-b616-4381-9044-67d272f233a7",
+      "field": "engineering",
+      "specialism": "electronic-engineering",
+      "title": "PCB Design Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "e4d04eed-47f5-40a6-9baf-3d28be4d01f7",
+      "field": "engineering",
+      "specialism": "chemical-engineering",
+      "title": "Process Engineer (Manufacturing)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "d9d878bb-ade1-4a0d-af39-cd5173003876",
+      "field": "engineering",
+      "specialism": "chemical-engineering",
+      "title": "Food and Beverage Process Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "c91909cc-0b6f-49f1-ba17-dbe49108550f",
+      "field": "engineering",
+      "specialism": "chemical-engineering",
+      "title": "Petrochemical Process Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "24ddebff-72e7-44ea-a511-91d793778cfd",
+      "field": "engineering",
+      "specialism": "chemical-engineering",
+      "title": "Process Design Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "93f002b2-1bf1-4c76-801c-710680181323",
+      "field": "engineering",
+      "specialism": "chemical-engineering",
+      "title": "Process Safety Engineer (Graduate / Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "a5c86fd7-29bd-4a24-b58f-37030b1b9c11",
+      "field": "engineering",
+      "specialism": "chemical-engineering",
+      "title": "Assistant Project Engineer (Process)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "77279bb2-f023-441a-84e4-aa9f928ce2af",
+      "field": "engineering",
+      "specialism": "aerospace-engineering",
+      "title": "Avionics Integration Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "57596540-c008-4a5d-9168-a88c600f15c2",
+      "field": "engineering",
+      "specialism": "aerospace-engineering",
+      "title": "Aerodynamics Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "8965cd92-f31f-4b4b-be2a-f47bf559d207",
+      "field": "engineering",
+      "specialism": "aerospace-engineering",
+      "title": "Flight Test Support Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "fc63ea89-e219-4643-960f-7a7db0664737",
+      "field": "engineering",
+      "specialism": "aerospace-engineering",
+      "title": "Assistant Aerospace Project Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "2a7f4302-0d69-4c66-a52d-d4518503970e",
+      "field": "engineering",
+      "specialism": "automotive-engineering",
+      "title": "Vehicle Dynamics Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "333acc14-5d0c-4522-a2e1-b71786b0cd7b",
+      "field": "engineering",
+      "specialism": "automotive-engineering",
+      "title": "Assistant Automotive Project Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "2baaf8be-1199-4962-a79c-a4b0d521bf86",
+      "field": "engineering",
+      "specialism": "automotive-engineering",
+      "title": "Automotive Test and Validation Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "b869433b-fed6-41f7-bd56-fc48d9cc9b9a",
+      "field": "engineering",
+      "specialism": "automotive-engineering",
+      "title": "Vehicle Design Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "ec563660-ef67-4b13-8199-c7ec8b220696",
+      "field": "engineering",
+      "specialism": "petroleum-engineering",
+      "title": "Junior Reservoir Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "0372944c-146a-485d-9ec5-dc262146733c",
+      "field": "engineering",
+      "specialism": "petroleum-engineering",
+      "title": "Assistant Subsea Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "eef8f56b-0cad-435f-8337-4598f41d5184",
+      "field": "engineering",
+      "specialism": "petroleum-engineering",
+      "title": "Flow Assurance Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "dba070ed-9507-4e42-81ba-eb6fd6dd1a6f",
+      "field": "engineering",
+      "specialism": "petroleum-engineering",
+      "title": "Drilling Engineer (Graduate / Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "a4e06d28-39fc-4c9f-86cd-3dd6affc949a",
+      "field": "engineering",
+      "specialism": "petroleum-engineering",
+      "title": "Well Site / Offshore Operations Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "91d7e7c2-9274-4223-9503-8c665dede9bc",
+      "field": "engineering",
+      "specialism": "mechatronics",
+      "title": "PLC Engineer (Graduate / Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "dc7d11fd-7dee-48f7-a609-8ab276e26b96",
+      "field": "engineering",
+      "specialism": "mechatronics",
+      "title": "Motion Control Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "8da53f60-2379-4c85-83a4-b7ae2af53fd0",
+      "field": "engineering",
+      "specialism": "mechatronics",
+      "title": "Robotics Integration Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "d1d0e337-d3cb-49d7-978f-db0a9bc52377",
+      "field": "engineering",
+      "specialism": "mechatronics",
+      "title": "Assistant Automation Project Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "eb549d7c-dda9-49a0-94cb-8f3ec722186a",
+      "field": "engineering",
+      "specialism": "mechatronics",
+      "title": "SCADA Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "1ce33baf-0de8-4570-8076-ddf98bfbe312",
+      "field": "engineering",
+      "specialism": "architecture",
+      "title": "Architectural Designer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "8c2aaf32-4852-4767-bc69-d314e294824d",
+      "field": "engineering",
+      "specialism": "architecture",
+      "title": "Sustainable Design Support (Architecture Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "2a27956b-b7b1-4eb3-ad0e-a2152db3a9ee",
+      "field": "engineering",
+      "specialism": "architecture",
+      "title": "Assistant Urban Designer (Architectural Practice)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "10c7673e-b5bf-49cf-9ddf-d28ebfcd585c",
+      "field": "engineering",
+      "specialism": "architecture",
+      "title": "BIM Coordinator (Architecture)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "e8bcd0af-efa4-4a0a-8fc3-4b6d1a162fc4",
+      "field": "engineering",
+      "specialism": "architecture",
+      "title": "Part 2 Architectural Assistant",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "7346bfa2-cb96-4824-9381-7f6ceee5d2a3",
+      "field": "engineering",
+      "specialism": "architecture",
+      "title": "Junior Architectural Technologist (CIAT pathway)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "bab0a86b-4034-4af1-adcb-88a4f5fe0ff9",
+      "field": "engineering",
+      "specialism": "quantity-surveying",
+      "title": "Cost Control Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "564d1fde-a3e5-4736-8f43-44bc401a27b1",
+      "field": "engineering",
+      "specialism": "quantity-surveying",
+      "title": "Cost Intelligence Analyst (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "9cb0d995-2743-4bd8-bac8-369ebdaa886a",
+      "field": "engineering",
+      "specialism": "quantity-surveying",
+      "title": "Estimator (Graduate / Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "155dd0b6-3a4e-493a-883d-f0c4754bf5a1",
+      "field": "engineering",
+      "specialism": "quantity-surveying",
+      "title": "Cost Planner (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "bfe67361-2d91-4c13-a5eb-7346d618b0eb",
+      "field": "engineering",
+      "specialism": "quantity-surveying",
+      "title": "Junior Procurement Consultant (Construction Cost)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "caff15fc-8a35-4475-81bc-b7d53ecdc2ca",
+      "field": "engineering",
+      "specialism": "quantity-surveying",
+      "title": "Junior Commercial Surveyor (QS pathway)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "c794dc7e-669e-4b12-abc1-5c4396cee6f8",
+      "field": "engineering",
+      "specialism": "structural-engineering",
+      "title": "Temporary Works Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "80a219a6-990c-42db-9b24-64ee88fb622c",
+      "field": "engineering",
+      "specialism": "structural-engineering",
+      "title": "Concrete Structures Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "c8190f92-d46d-4bfa-94d2-eb8ea147669b",
+      "field": "engineering",
+      "specialism": "structural-engineering",
+      "title": "Structural Assessment Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "deec42c6-0960-4f12-a833-b539d907ffbf",
+      "field": "engineering",
+      "specialism": "structural-engineering",
+      "title": "Assistant Bridge Structures Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "75f55d4c-ccff-4094-83ec-c1b88049bc9b",
+      "field": "engineering",
+      "specialism": "structural-engineering",
+      "title": "Steel Structures Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "27d7f53c-b442-4351-9a62-03c3243d4683",
+      "field": "engineering",
+      "specialism": "geotechnical-engineering",
+      "title": "Junior Foundations Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "963c549d-3e42-439d-89a3-679b4f068740",
+      "field": "engineering",
+      "specialism": "geotechnical-engineering",
+      "title": "Assistant Tunnel Geotechnical Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "c4794a21-759f-474f-bc1b-a909c61a6365",
+      "field": "engineering",
+      "specialism": "geotechnical-engineering",
+      "title": "Geotechnical Risk Support Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "3d926a2c-e304-442c-9b4d-d500d0b0a492",
+      "field": "engineering",
+      "specialism": "geotechnical-engineering",
+      "title": "Geotechnical Design Support Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "19c0c540-3926-411d-b0f9-215f2ee40c62",
+      "field": "engineering",
+      "specialism": "geotechnical-engineering",
+      "title": "Soil Mechanics Testing / Laboratory Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "69d48798-f461-4139-ba71-d68bd089820d",
+      "field": "engineering",
+      "specialism": "water-engineering",
+      "title": "Hydraulic Modelling Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "ec68acd7-6f43-4885-812c-1b49ce7f3ac5",
+      "field": "engineering",
+      "specialism": "water-engineering",
+      "title": "Assistant Water Infrastructure Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "769620bb-e910-4933-9929-1b4be782f243",
+      "field": "engineering",
+      "specialism": "water-engineering",
+      "title": "Flood Risk Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "9272238a-2792-43b9-ab55-6332245e18ae",
+      "field": "engineering",
+      "specialism": "marine-engineering",
+      "title": "Offshore Vessel Marine Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "ec7e6e0e-1e17-4eaf-8eb8-15900ee20ea4",
+      "field": "engineering",
+      "specialism": "marine-engineering",
+      "title": "Assistant Marine Survey / Inspection Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "75fc7813-891a-4f53-a2a3-5679ece4e62e",
+      "field": "engineering",
+      "specialism": "marine-engineering",
+      "title": "Vessel Maintenance Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "09075328-a448-4c66-96c0-2c289816d1a1",
+      "field": "engineering",
+      "specialism": "marine-engineering",
+      "title": "Marine Reliability Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "8092179b-ddb9-49da-8398-d73ebb6671bb",
+      "field": "engineering",
+      "specialism": "renewable-energy-engineering",
+      "title": "Energy Yield Analyst (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "7d9e3278-f322-4974-a8fd-ad93a3f73f41",
+      "field": "engineering",
+      "specialism": "renewable-energy-engineering",
+      "title": "Renewable Project Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "aa0c61e1-e518-4e3d-9372-47ca5f889a8c",
+      "field": "engineering",
+      "specialism": "mining-engineering",
+      "title": "Mine Ventilation Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "b3651ab4-e6a8-45db-80a4-a555353df634",
+      "field": "engineering",
+      "specialism": "mining-engineering",
+      "title": "Drill and Blast Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "1ad4fa5c-c020-47f0-a4c0-147d7533b29e",
+      "field": "engineering",
+      "specialism": "materials-engineering",
+      "title": "Materials Testing Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "5a1183b6-356d-45e8-b6a2-230e6d139622",
+      "field": "engineering",
+      "specialism": "materials-engineering",
+      "title": "Corrosion Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "60ad2fc5-0cd3-4985-99a4-86f4e9b9d092",
+      "field": "engineering",
+      "specialism": "biomedical-engineering",
+      "title": "Biomechanics Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "5c690afc-df67-4b7f-9ca7-666d60ba641f",
+      "field": "engineering",
+      "specialism": "biomedical-engineering",
+      "title": "Medical Device Verification & Validation Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "6b22abc4-77f3-4229-ba93-de9ce28fc812",
+      "field": "engineering",
+      "specialism": "nuclear-engineering",
+      "title": "Nuclear Project Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "77c13912-501c-42cc-8f24-44f07a53a7df",
+      "field": "engineering",
+      "specialism": "fire-engineering",
+      "title": "Smoke Control Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "ccbe6abd-74db-4f05-aeaa-3e88966545c4",
+      "field": "engineering",
+      "specialism": "fire-engineering",
+      "title": "Fire Testing Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "afbec8fd-9ec5-4ed5-8af7-e0e878cdeab1",
+      "field": "engineering",
+      "specialism": "mechanical-engineering",
+      "title": "Manufacturing Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "60a1d011-1724-4c70-b153-a430f3c516f1",
+      "field": "engineering",
+      "specialism": "mechanical-engineering",
+      "title": "Test and Validation Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "722b79d4-3b22-44fd-82d5-af193b1ae68a",
+      "field": "engineering",
+      "specialism": "mechanical-engineering",
+      "title": "Mechanical Design Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "9e927e9d-3461-4add-a6f1-ddbb796d4044",
+      "field": "engineering",
+      "specialism": "mechanical-engineering",
+      "title": "Maintenance / Reliability Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "8b10a9d5-9d7b-4811-8a19-8d038ef738c2",
+      "field": "engineering",
+      "specialism": "mechanical-engineering",
+      "title": "Assistant Project Engineer (Mechanical)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "305b0a53-d821-4fca-8229-04ecf26b031d",
+      "field": "engineering",
+      "specialism": "mechanical-engineering",
+      "title": "HVAC / Building Services Mechanical Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "e71f72c2-a036-4b73-8216-cc01fbc0268d",
+      "field": "engineering",
+      "specialism": "environmental-engineering",
+      "title": "Waste Management Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "e2788150-f68a-4b94-9a1e-f5a294bfb082",
+      "field": "engineering",
+      "specialism": "environmental-engineering",
+      "title": "Air Quality Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "d99f2b39-4419-496a-98bc-690b9497a792",
+      "field": "engineering",
+      "specialism": "environmental-engineering",
+      "title": "Remediation Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "287d97c2-41b9-4622-98ae-0efc2ad86a5a",
+      "field": "engineering",
+      "specialism": "environmental-engineering",
+      "title": "Assistant Environmental Project Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "a75c4873-c218-4ee8-8e68-18c92ff29b6f",
+      "field": "engineering",
+      "specialism": "naval-architecture",
+      "title": "Ship Stability Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "09d8331e-fb54-47e8-abfc-0e0d55d344a2",
+      "field": "engineering",
+      "specialism": "naval-architecture",
+      "title": "Ship Performance Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "7434765a-0876-457d-8011-06b4196e4bc0",
+      "field": "engineering",
+      "specialism": "naval-architecture",
+      "title": "Floating Systems Design Support Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "immediate",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "7a4a9144-0833-4df8-993d-4428b0a2673a",
+      "field": "engineering",
+      "specialism": "civil-engineering",
+      "title": "Site Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "873bc140-5d36-4331-96f4-8bade49962d9",
+      "field": "engineering",
+      "specialism": "civil-engineering",
+      "title": "Highways Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "e2dd278e-6ee2-4c3c-aedd-c19ae193e315",
+      "field": "engineering",
+      "specialism": "civil-engineering",
+      "title": "Civil Design Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "fa088ddc-c3c0-4238-a94d-61f5715356b6",
+      "field": "engineering",
+      "specialism": "civil-engineering",
+      "title": "Drainage Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "1f35e54e-8e57-4eb7-893c-93ea025409fb",
+      "field": "engineering",
+      "specialism": "civil-engineering",
+      "title": "Infrastructure Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "13614de7-037d-4760-8232-efc7823ba3b3",
+      "field": "engineering",
+      "specialism": "industrial-engineering",
+      "title": "Production Engineer (Industrial Operations)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "941202ba-4886-4221-b9e5-dcebd7b9a235",
+      "field": "engineering",
+      "specialism": "industrial-engineering",
+      "title": "Quality Engineer (Manufacturing Systems)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "0ede338a-a42f-4d97-bde3-9fdbc2d95028",
+      "field": "engineering",
+      "specialism": "industrial-engineering",
+      "title": "Production Planning Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "a1e4bbd4-7086-4c27-8da8-f116167d493e",
+      "field": "engineering",
+      "specialism": "industrial-engineering",
+      "title": "Operations Engineer (Factory)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    },
+    {
+      "role_id": "ccaca3da-fc15-459b-b106-78015314bffb",
+      "field": "engineering",
+      "specialism": "industrial-engineering",
+      "title": "Industrial Automation Operations Engineer (Graduate)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "8b52ae51-902b-4192-b2f2-de126a4afd1c",
+      "field": "engineering",
+      "specialism": "industrial-engineering",
+      "title": "Assistant Industrial Project Engineer",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "entryish_title_on_chartered_stage",
+      "suggested_later_data_fix": "Remap to graduate_engineer or apprentice_technician stage"
+    },
+    {
+      "role_id": "302e5bd5-d57f-42b4-9ef1-7b4115e1eb1a",
+      "field": "engineering",
+      "specialism": "industrial-engineering",
+      "title": "Lean Manufacturing Engineer (Junior)",
+      "stored_stage": "chartered_professional_engineer",
+      "stored_fit": "realistic_next",
+      "detected_conflict": "general_title_on_chartered_stage_low_min_experience",
+      "suggested_later_data_fix": "Review stage vs title; raise min experience or move to experienced_engineer"
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+/**
+ * Fixture profiles for Work in My Education matching tests.
+ */
+
+import type { WorkInEducationProfile } from '../types'
+
+export const FIXTURES: Record<string, WorkInEducationProfile> = {
+  uk_civil_beng_zero_exp: {
+    education_level: 'bachelor',
+    qualification_title: 'BEng Civil Engineering',
+    subject: 'Civil Engineering',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 0,
+    professional_registration: [],
+    skills: ['AutoCAD', 'site surveying'],
+  },
+  uk_animation_msc_unrelated_exp: {
+    education_level: 'master',
+    qualification_title: 'MSc Computer Animation',
+    subject: 'Animation',
+    specialisation: '3D Animation',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 4,
+    current_job_title: 'Retail Supervisor',
+    skills: ['Maya', 'Blender'],
+  },
+  overseas_law_no_reg: {
+    education_level: 'bachelor',
+    qualification_title: 'LLB',
+    subject: 'Law',
+    qualification_country: 'Nigeria',
+    years_relevant_experience: 1,
+    professional_registration: [{ body: 'SRA', status: 'none' }],
+  },
+  overseas_medicine_no_reg: {
+    education_level: 'bachelor',
+    qualification_title: 'MBBS',
+    subject: 'Medicine',
+    qualification_country: 'India',
+    years_relevant_experience: 0,
+    professional_registration: [],
+  },
+  uk_nursing_nmc: {
+    education_level: 'bachelor',
+    qualification_title: 'BSc Adult Nursing',
+    subject: 'Nursing',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 1,
+    professional_registration: [{ body: 'NMC', status: 'registered' }],
+  },
+  phd_biology_research: {
+    education_level: 'doctorate',
+    qualification_title: 'PhD Biology',
+    subject: 'Biology',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 2,
+    career_preferences: { wants_academic_route: true },
+  },
+  uk_business_3y: {
+    education_level: 'bachelor',
+    qualification_title: 'BA Business Management',
+    subject: 'Business Management',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 3,
+    current_job_title: 'Operations Coordinator',
+  },
+  cs_graduate_portfolio: {
+    education_level: 'bachelor',
+    qualification_title: 'BSc Computer Science',
+    subject: 'Computer Science',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 0,
+    skills: ['JavaScript', 'React', 'portfolio', 'Git'],
+  },
+  tourism_management: {
+    education_level: 'bachelor',
+    qualification_title: 'BA Tourism Management',
+    subject: 'Tourism Management',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 1,
+  },
+  ambiguous_missing_subject: {
+    education_level: 'bachelor',
+    qualification_title: 'BA Studies',
+    subject: '',
+    years_relevant_experience: 0,
+  },
+  missing_subject_explicit: {
+    education_level: 'master',
+    qualification_title: 'MSc',
+    subject: '',
+    years_relevant_experience: 0,
+  },
+  degree_plus_related_exp: {
+    education_level: 'bachelor',
+    qualification_title: 'BSc Software Engineering',
+    subject: 'Computer Science',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 5,
+    current_job_title: 'Software Developer',
+    skills: ['TypeScript', 'Node.js'],
+  },
+  overqualified_inexperienced: {
+    education_level: 'doctorate',
+    qualification_title: 'PhD Mechanical Engineering',
+    subject: 'Mechanical Engineering',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 0,
+  },
+  regulated_registration_unknown: {
+    education_level: 'bachelor',
+    qualification_title: 'BSc Adult Nursing',
+    subject: 'Nursing',
+    qualification_country: 'United Kingdom',
+    years_relevant_experience: 0,
+    professional_registration: [],
+  },
+}

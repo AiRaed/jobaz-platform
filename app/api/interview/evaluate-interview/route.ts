@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,6 +38,9 @@ export async function POST(req: NextRequest) {
         overall: 7,
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'interview_coach', 'evaluate-interview')
+    if (!usageGate.allowed) return usageGate.response
 
     // Combine all answers for evaluation
     const allAnswersText = validAnswers.join('\n\n---\n\n')

@@ -3,6 +3,7 @@ import { Plus, Trash2, Sparkles, CheckCircle2, Zap, Loader2, X, AlertTriangle, A
 import { CvData } from '@/app/cv-builder-v2/page'
 import ExperienceAIModal from './ExperienceAIModal'
 import CvPlanSuggestionChips from '@/components/cv-builder-v2/CvPlanSuggestionChips'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 
 interface ExperienceTabProps {
   experience: CvData['experience']
@@ -113,6 +114,8 @@ export default function ExperienceTab({ experience, onUpdate, planBulletSuggesti
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (data.ok) {
         setBulletQuality({
           ...bulletQuality,
@@ -153,6 +156,8 @@ export default function ExperienceTab({ experience, onUpdate, planBulletSuggesti
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (data.ok && data.improved) {
         const originalWordCount = bullet.trim().split(/\s+/).length
         const improvedWordCount = data.improved.trim().split(/\s+/).length
@@ -198,6 +203,8 @@ export default function ExperienceTab({ experience, onUpdate, planBulletSuggesti
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (data.ok && data.improved) {
         const originalWordCount = bullet.trim().split(/\s+/).length
         const improvedWordCount = data.improved.trim().split(/\s+/).length

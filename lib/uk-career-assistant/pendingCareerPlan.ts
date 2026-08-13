@@ -40,13 +40,13 @@ function buildSummary(plan: JobAZPlan, goal?: string): PendingCareerPlanPayload[
     current_focus: plan.route_summary.current_target_role,
     next_upgrade: plan.route_summary.next_upgrade_role,
     readiness: plan.route_summary.readiness_score,
-    work_now_roles: plan.work_now.map((r) => r.title),
+    work_now_roles: (plan.work_now || []).map((r) => r.title),
     recommended_courses: [
       ...(plan.training_next?.title ? [plan.training_next.title] : []),
-      ...plan.optional_training.map((t) => t.title),
-      ...plan.structured_cards.map((c) => c.title).filter(Boolean),
+      ...(plan.optional_training || []).map((t) => t.title),
+      ...(plan.structured_cards || []).map((c) => c.title).filter(Boolean),
     ].filter(Boolean),
-    weekly_plan: plan.this_week_plan,
+    weekly_plan: plan.this_week_plan || [],
   }
 }
 

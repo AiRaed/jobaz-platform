@@ -18,6 +18,7 @@ import { useJazContext } from '@/contexts/JazContextContext'
 import type { CoverLetterContext } from '@/components/JazAssistant'
 import { getUserScopedKeySync, getCurrentUserIdSync, initUserStorageCache } from '@/lib/user-storage'
 import { useToolGuestMode } from '@/lib/guest-tools/useToolGuestMode'
+import { messageFromAiLimitPayload } from '@/lib/ai-usage/client'
 import { GUEST_LIMITS } from '@/lib/guest-tools/constants'
 import {
   incrementGuestUsage,
@@ -544,6 +545,11 @@ export default function CoverPage() {
       try { data = await res.json(); } catch {}
 
       if (!res.ok || !data?.ok) {
+        const limitMsg = messageFromAiLimitPayload(data, res.status)
+        if (limitMsg) {
+          showToast('error', limitMsg)
+          return
+        }
         showToast('error', 'AI temporarily unavailable. Using a safe draft.')
         // fallback to mock if server ever returns non-ok - use local preview state
         const cleanedText = cleanCoverLetterText(
@@ -607,7 +613,7 @@ export default function CoverPage() {
 
       if (!response.ok || !data.ok) {
         console.error('[AI] request failed')
-        showToast('error', '⚠️ AI request failed')
+        showToast('error', messageFromAiLimitPayload(data, response.status) || '⚠️ AI request failed')
         return
       }
 
@@ -668,7 +674,7 @@ export default function CoverPage() {
 
       if (!response.ok || !data.ok) {
         console.error('[AI] request failed')
-        showToast('error', '⚠️ AI request failed')
+        showToast('error', messageFromAiLimitPayload(data, response.status) || '⚠️ AI request failed')
         return
       }
 
@@ -736,7 +742,7 @@ export default function CoverPage() {
 
       if (!response.ok || !data.ok) {
         console.error('[AI] request failed')
-        showToast('error', '⚠️ AI request failed')
+        showToast('error', messageFromAiLimitPayload(data, response.status) || '⚠️ AI request failed')
         return
       }
 

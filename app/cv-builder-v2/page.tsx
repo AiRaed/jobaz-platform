@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Download, FileText, Loader2, CheckCircle2, X, Save, Sparkles, ChevronDown, ChevronUp, FileEdit } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { exportToPDF } from '@/lib/pdf'
+import { messageFromAiLimitPayload } from '@/lib/ai-usage/client'
 import { exportToDocx } from '@/lib/docx'
 import CvPreview from '@/components/cv-builder-v2/CvPreview'
 import PersonalInfoTab from '@/components/cv-builder-v2/PersonalInfoTab'
@@ -19,6 +20,8 @@ import CvHealthPanel from '@/components/cv-builder-v2/CvHealthPanel'
 import CvAiWorkflowStrip from '@/components/cv-builder-v2/CvAiWorkflowStrip'
 import CvBuilderJourneyHeader from '@/components/cv-builder-v2/CvBuilderJourneyHeader'
 import CvBuilderCompletionPanel from '@/components/cv-builder-v2/CvBuilderCompletionPanel'
+import CvBuilderWorkspaceLoading from '@/components/cv-builder-v2/CvBuilderWorkspaceLoading'
+import CvPlanContextConfirmPanel from '@/components/cv-builder-v2/CvPlanContextConfirmPanel'
 import CvQualificationCompletionPrompt from '@/components/cv-builder-v2/CvQualificationCompletionPrompt'
 import CvCourseActionPrompt from '@/components/cv-builder-v2/CvCourseActionPrompt'
 import CvCustomizationPanel, { type CvCustomizationOptions } from '@/components/cv-builder-v2/CvCustomizationPanel'
@@ -79,12 +82,31 @@ import {
   normalizeToCvData,
   type ActiveCvSource,
 } from '@/lib/cv/getActiveCv'
+import { notifyJobsForYouRefresh } from '@/lib/jobs/resolveJobsForYouSource'
 import { isMeaningfulCv } from '@/lib/cv/isMeaningfulCv'
 import {
   enrichAiHintsWithCareerPlan,
   getCareerWorkflowSubtitle,
 } from '@/lib/cv-builder/careerGuidanceCopy'
 import { logEvent } from '@/lib/analytics/logEvent'
+import {
+  buildPlanContextKey,
+  readPlanModeChoice,
+  writePlanModeChoice,
+  readPlanModeSuppressed,
+  writePlanModeSuppressed,
+  stripPlanContextQueryString,
+  type CvPlanModeChoice,
+} from '@/lib/cv-builder/planContextSession'
+import {
+  applyPlanContextToCvDraft,
+  PLAN_SKILLS_UPDATED_TOAST,
+  filterPlanSkillSuggestions,
+  normalizeSkillsInput,
+  markCvPlanTailoredLocally,
+  readCvPlanTailoredLocally,
+  skillsLookStaleForPlan,
+} from '@/lib/cv-builder/applyPlanContextToCvDraft'
 
 export type CvTemplateId = 'atsClassic' | 'twoColumnPro' | 'customizeStyle'
 
@@ -164,7 +186,7 @@ function prepareCvForEditor(raw: CvData): CvData {
   const loadedExperience =
     Array.isArray(normalized.experience) && normalized.experience.length > 0
       ? normalized.experience
-      : [{ id: Date.now().toString(), jobTitle: '', company: '', bullets: [''] }]
+      : [{ id: 'exp-placeholder-1', jobTitle: '', company: '', bullets: [''] }]
   const loadedEducation =
     Array.isArray(normalized.education) && normalized.education.length > 0
       ? normalized.education
@@ -378,15 +400,25 @@ type GrammarResult = {
   error?: string
 }
 
-export default function CvBuilderV2Page() {
+function CvBuilderV2PageInner() {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
-  const jobId = searchParams.get('jobId')
-  const mode = searchParams.get('mode') || 'tailorCv'
-  const improveTargetRole = searchParams.get('targetRole')
-  const improveRoute = searchParams.get('route')
-  const improveFocus = searchParams.get('focus')
-  const planTask = searchParams.get('planTask')
+  /** Stable SSR + first client paint; URL / storage context applied after mount. */
+  const [isMounted, setIsMounted] = useState(false)
+  useEffect(() => {
+    setIsMounted(true)
+    initUserStorageCache()
+  }, [])
+
+  const jobId = isMounted ? searchParams.get('jobId') : null
+  const mode = isMounted ? searchParams.get('mode') || 'tailorCv' : 'tailorCv'
+  const improveTargetRole = isMounted
+    ? searchParams.get('targetRole') || searchParams.get('role')
+    : null
+  const improveRoute = isMounted ? searchParams.get('route') : null
+  const improveFocus = isMounted ? searchParams.get('focus') : null
+  const planTask = isMounted ? searchParams.get('planTask') : null
   const previewRef = useRef<HTMLDivElement>(null)
   const prefillCheckedRef = useRef(false)
   const [activeTab, setActiveTab] = useState<Tab>('personal')
@@ -413,11 +445,6 @@ export default function CvBuilderV2Page() {
   const [reviewResult, setReviewResult] = useState<ReviewResult | null>(null)
   const [grammarResult, setGrammarResult] = useState<GrammarResult | null>(null)
 
-  // Initialize user storage cache
-  useEffect(() => {
-    initUserStorageCache()
-  }, [])
-
   const guest = useToolGuestMode('cv')
   const [draftPickerOpen, setDraftPickerOpen] = useState(false)
   const [cvSource, setCvSource] = useState<ActiveCvSource>('none')
@@ -426,6 +453,16 @@ export default function CvBuilderV2Page() {
   const [cvHydrated, setCvHydrated] = useState(false)
   const [cvLoadWarnings, setCvLoadWarnings] = useState<string[]>([])
   const draftPickerCheckedRef = useRef(false)
+
+  /** Plan-context confirmation — idle until My Plan entry resolves after load. */
+  const [planModeDecision, setPlanModeDecision] = useState<
+    'idle' | 'pending' | CvPlanModeChoice
+  >('idle')
+  const [suppressPlanMode, setSuppressPlanMode] = useState(false)
+  const planConfirmResolvedRef = useRef(false)
+  /** Prevent draft-sync event from restoring stale skills right after plan tailor. */
+  const ignoreDraftSyncUntilRef = useRef(0)
+  const lastTailoredDraftRef = useRef<CvData | null>(null)
 
   // Helper function to get user-scoped storage keys
   const getUserKey = (baseKey: string) => {
@@ -445,7 +482,7 @@ export default function CvBuilderV2Page() {
     summary: '',
     experience: [
       {
-        id: Date.now().toString(),
+        id: 'exp-placeholder-1',
         jobTitle: '',
         company: '',
         bullets: [''],
@@ -469,10 +506,17 @@ export default function CvBuilderV2Page() {
   const initialCvDataRef = useRef<string>('')
   const initialTemplateRef = useRef<CvTemplateId>('atsClassic')
 
-  const { isCareerMode, plan, roleHeadline, mission } = useCvBuilderCareerMode()
+  const {
+    isCareerMode,
+    plan,
+    roleHeadline,
+    mission,
+    isLoadingPlanContext,
+  } = useCvBuilderCareerMode()
   const {
     suggestions: planSuggestions,
     setStageOverride,
+    hydrated: planSuggestionsReady,
   } = useCvPlanSuggestions({
     plan,
     routeTitle: improveRoute || plan?.planTitle || plan?.pathLabel,
@@ -480,6 +524,229 @@ export default function CvBuilderV2Page() {
     nextUpgrade: plan?.nextUpgrade,
     cvData,
   })
+
+  /** My Plan / improve links need plan context before showing the workspace. */
+  const expectsPlanContext = Boolean(
+    improveTargetRole ||
+      improveRoute ||
+      improveFocus ||
+      planTask ||
+      mode === 'improve'
+  )
+
+  const isLoadingSavedCv = !guest.authReady || !cvHydrated
+  const isHydratingCvState =
+    !isMounted ||
+    isLoadingSavedCv ||
+    (expectsPlanContext && (isLoadingPlanContext || !planSuggestionsReady))
+
+  const planContextKey = useMemo(
+    () =>
+      buildPlanContextKey({
+        role: improveTargetRole || plan?.currentTarget || plan?.targetRole,
+        route: improveRoute || plan?.planTitle || plan?.pathLabel,
+        planId: plan?.planId,
+      }),
+    [
+      improveTargetRole,
+      improveRoute,
+      plan?.currentTarget,
+      plan?.targetRole,
+      plan?.planTitle,
+      plan?.pathLabel,
+      plan?.planId,
+    ]
+  )
+
+  const clearPlanContextFromUrl = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const nextQs = stripPlanContextQueryString(searchParams.toString())
+    const nextUrl = `${pathname || '/cv-builder-v2'}${nextQs}`
+    router.replace(nextUrl)
+  }, [pathname, router, searchParams])
+
+  const exitPlanMode = useCallback(
+    (opts?: { toast?: boolean }) => {
+      writePlanModeChoice(planContextKey, 'normal')
+      writePlanModeSuppressed(true)
+      setSuppressPlanMode(true)
+      setPlanModeDecision('normal')
+      planConfirmResolvedRef.current = true
+      clearPlanContextFromUrl()
+      if (opts?.toast !== false) {
+        setToast({ type: 'success', message: 'Plan mode cleared. Your saved CV is unchanged.' })
+        setTimeout(() => setToast(null), 3500)
+      }
+    },
+    [planContextKey, clearPlanContextFromUrl]
+  )
+
+  const acceptPlanMode = useCallback(
+    (choice: 'tailor' | 'keep') => {
+      const roleLabel =
+        improveTargetRole ||
+        plan?.currentTarget ||
+        plan?.targetRole ||
+        'your current plan'
+
+      if (choice === 'tailor') {
+        ignoreDraftSyncUntilRef.current = Date.now() + 8000
+
+        let tailored: CvData | null = null
+        setCvData((prev) => {
+          tailored = applyPlanContextToCvDraft(
+            {
+              ...prev,
+              skills: normalizeSkillsInput(prev.skills),
+            },
+            {
+              targetRole: roleLabel,
+              routeTitle: improveRoute || plan?.planTitle || plan?.pathLabel,
+              nextUpgrade: plan?.nextUpgrade || null,
+              pathLabel: plan?.pathLabel || plan?.planTitle,
+              futureRoute: null,
+              suggestedSkills: [],
+              cvFocusKeywords: [],
+            },
+            { replaceSkills: true, keepTransferableSkills: true, debug: true }
+          )
+          lastTailoredDraftRef.current = tailored
+          return tailored
+        })
+
+        const persistTailoredEverywhere = async () => {
+          const draft = lastTailoredDraftRef.current || tailored
+          if (!draft) return
+
+          markCvPlanTailoredLocally(draft.skills)
+          persistCvDraftFromData(draft)
+
+          // Persist to account CV so refresh / reopen cannot restore old skills
+          if (!guest.isGuest && guest.authReady) {
+            try {
+              const response = await fetch('/api/cv/upsert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: 'Main CV',
+                  data: {
+                    template: selectedTemplate,
+                    personalInfo: draft.personalInfo,
+                    summary: draft.summary,
+                    experience: draft.experience,
+                    education: draft.education,
+                    skills: draft.skills,
+                    projects: draft.projects || [],
+                    languages: draft.languages || [],
+                    certifications: draft.certifications || [],
+                    publications: draft.publications || [],
+                  },
+                  ...(activeCvId ? { cvId: activeCvId } : {}),
+                }),
+              })
+              const result = await response.json().catch(() => ({}))
+              if (response.ok && result?.ok && result?.cv?.id) {
+                setActiveCvId(result.cv.id)
+                setStoredActiveCvId(result.cv.id)
+                setCvSource('saved')
+                setIsDirty(false)
+                initialCvDataRef.current = JSON.stringify(draft)
+              }
+            } catch (err) {
+              console.error('[cvPlanTailor] upsert after tailor failed', err)
+            }
+          }
+        }
+
+        setTimeout(() => {
+          void persistTailoredEverywhere()
+        }, 0)
+
+        setIsDirty(true)
+        setActiveTab('skills')
+      }
+
+      writePlanModeChoice(planContextKey, choice)
+      writePlanModeSuppressed(false)
+      setSuppressPlanMode(false)
+      setPlanModeDecision(choice)
+      planConfirmResolvedRef.current = true
+      setToast({
+        type: 'success',
+        message:
+          choice === 'tailor'
+            ? PLAN_SKILLS_UPDATED_TOAST
+            : 'Keeping your current CV. Edit anytime — nothing was overwritten.',
+      })
+      setTimeout(() => setToast(null), 3500)
+    },
+    [
+      planContextKey,
+      improveTargetRole,
+      improveRoute,
+      plan?.currentTarget,
+      plan?.targetRole,
+      plan?.planTitle,
+      plan?.pathLabel,
+      plan?.nextUpgrade,
+      guest.isGuest,
+      guest.authReady,
+      selectedTemplate,
+      activeCvId,
+    ]
+  )
+
+  // Restore suppress flag after mount (session only — never during SSR).
+  useEffect(() => {
+    if (!isMounted) return
+    setSuppressPlanMode(readPlanModeSuppressed())
+  }, [isMounted])
+
+  // After CV + plan load: show persistent confirmation for My Plan entry.
+  useEffect(() => {
+    if (isHydratingCvState) return
+
+    if (!expectsPlanContext) {
+      // Sidebar / generic open — never auto-open confirmation.
+      setPlanModeDecision((d) => (d === 'pending' ? 'idle' : d))
+      return
+    }
+
+    if (planConfirmResolvedRef.current) return
+
+    const stored = readPlanModeChoice(planContextKey)
+    // Resume only after an explicit Tailor / Keep in this tab session.
+    // A prior "normal" must not skip confirmation when My Plan opens CV Builder again.
+    if (stored === 'tailor' || stored === 'keep') {
+      setSuppressPlanMode(false)
+      setPlanModeDecision(stored)
+      planConfirmResolvedRef.current = true
+      return
+    }
+
+    // Fresh My Plan entry — require confirmation (stays until the user chooses).
+    writePlanModeSuppressed(false)
+    setSuppressPlanMode(false)
+    setPlanModeDecision('pending')
+  }, [isHydratingCvState, expectsPlanContext, planContextKey])
+
+  /** Plan/career UI active for this session (not suppressed / normal). */
+  const planModeActive =
+    !suppressPlanMode &&
+    planModeDecision !== 'normal' &&
+    (planModeDecision === 'tailor' ||
+      planModeDecision === 'keep' ||
+      planModeDecision === 'pending' ||
+      (planModeDecision === 'idle' && isCareerMode))
+
+  const showPlanConfirm =
+    !isHydratingCvState && planModeDecision === 'pending' && expectsPlanContext
+
+  const showPlanTools =
+    planModeActive &&
+    (planModeDecision === 'tailor' ||
+      planModeDecision === 'keep' ||
+      (planModeDecision === 'idle' && isCareerMode))
 
   // First Action Plan: opening CV Builder marks the CV step in progress
   useEffect(() => {
@@ -491,6 +758,18 @@ export default function CvBuilderV2Page() {
   const readinessCareerPlan = useMemo(() => {
     // Do not read localStorage/sync plan here — that breaks SSR hydration.
     // Prefer URL params + plan from useCvBuilderCareerMode (post-mount).
+    // When user exits plan mode, ignore plan/URL role context for scoring.
+    if (!planModeActive) {
+      return {
+        targetRole: null,
+        currentTarget: null,
+        nextUpgrade: null,
+        routeTitle: null,
+        focusKeywords: undefined as string[] | undefined,
+        planSource: 'none' as const,
+        planId: null as string | null,
+      }
+    }
     const fromUrl = improveFocus
       ? improveFocus.split(',').map((s) => s.trim()).filter(Boolean)
       : []
@@ -514,7 +793,13 @@ export default function CvBuilderV2Page() {
       planSource: plan?.planSource || ('none' as const),
       planId: plan?.planId || null,
     }
-  }, [improveTargetRole, improveRoute, improveFocus, plan])
+  }, [
+    planModeActive,
+    improveTargetRole,
+    improveRoute,
+    improveFocus,
+    plan,
+  ])
 
   const { report: cvHealthReport, scoreDelta } = useCvHealth(
     cvData,
@@ -532,32 +817,47 @@ export default function CvBuilderV2Page() {
   const [completionDismissed, setCompletionDismissed] = useState(false)
   const [dismissedPromptSlug, setDismissedPromptSlug] = useState<string | null>(null)
   const [courseActionTick, setCourseActionTick] = useState(0)
-  const [recentBoost, setRecentBoost] = useState<CvReadinessBoost | null>(() => {
-    const stored = loadRecentQualificationBoost()
-    return stored ? { label: stored.name, delta: stored.delta } : null
-  })
+  const [recentBoost, setRecentBoost] = useState<CvReadinessBoost | null>(null)
   const jdPanelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isMounted) return
+    const stored = loadRecentQualificationBoost()
+    if (stored) setRecentBoost({ label: stored.name, delta: stored.delta })
+  }, [isMounted])
 
   const showTrainingJourney = qualifications.length > 0
   const qualificationReminder = useMemo(
-    () => (showTrainingJourney ? pickQualificationReminder(qualifications, cvData, cvHealthReport.overallScore) : null),
-    [showTrainingJourney, qualifications, cvData, cvHealthReport.overallScore]
+    () =>
+      isMounted && showTrainingJourney
+        ? pickQualificationReminder(qualifications, cvData, cvHealthReport.overallScore)
+        : null,
+    [isMounted, showTrainingJourney, qualifications, cvData, cvHealthReport.overallScore]
   )
   const pendingCourseAction = useMemo(() => {
+    if (!isMounted || isHydratingCvState) return null
     void courseActionTick
     const pending = pickPendingCourseActionPrompt()
     if (!pending) return null
     if (pending.slug === dismissedPromptSlug) return null
     return pending
-  }, [courseActionTick, qualificationsLoaded, dismissedPromptSlug])
+  }, [isMounted, isHydratingCvState, courseActionTick, qualificationsLoaded, dismissedPromptSlug])
   const pendingQualificationPrompt = useMemo(() => {
     // Prefer course-action prompt: a click must never look like auto-completion.
-    if (pendingCourseAction) return null
+    if (!isMounted || isHydratingCvState || pendingCourseAction) return null
     if (!showTrainingJourney) return null
     const pending = pickPendingCvCompletionPrompt(qualifications, cvData)
     if (!pending || pending.slug === dismissedPromptSlug) return null
     return pending
-  }, [showTrainingJourney, qualifications, cvData, dismissedPromptSlug, pendingCourseAction])
+  }, [
+    isMounted,
+    isHydratingCvState,
+    showTrainingJourney,
+    qualifications,
+    cvData,
+    dismissedPromptSlug,
+    pendingCourseAction,
+  ])
 
   useEffect(() => {
     const refresh = () => setCourseActionTick((n) => n + 1)
@@ -568,9 +868,9 @@ export default function CvBuilderV2Page() {
   const atsMatch = cvHealthReport.metrics.find((m) => m.id === 'ats')?.progress ?? 0
 
   const careerAiHints = useMemo(() => {
-    if (!plan) return cvHealthReport.aiHints
+    if (!showPlanTools || !plan) return cvHealthReport.aiHints
     return enrichAiHintsWithCareerPlan(cvHealthReport.aiHints, plan)
-  }, [cvHealthReport.aiHints, plan])
+  }, [cvHealthReport.aiHints, plan, showPlanTools])
 
   const displayPotentialScore = useMemo(() => {
     const fromHealth = cvHealthReport.potentialScore
@@ -580,8 +880,25 @@ export default function CvBuilderV2Page() {
   }, [cvHealthReport.potentialScore, cvHealthReport.overallScore, showTrainingJourney, qualifications])
 
   const needsRouteTailoring =
+    isMounted &&
+    cvHydrated &&
+    !isHydratingCvState &&
+    planModeActive &&
     cvSource === 'saved' &&
     (cvHealthReport.planCvMatch === 'mismatch' || cvHealthReport.planCvMatch === 'partial_match')
+
+  const confirmRoleLabel =
+    improveTargetRole ||
+    planSuggestions?.currentTarget ||
+    readinessCareerPlan.currentTarget ||
+    plan?.targetRole ||
+    'your current plan'
+
+  const confirmRouteLabel =
+    improveRoute || planSuggestions?.routeTitle || readinessCareerPlan.routeTitle || plan?.pathLabel
+
+  const confirmUpgradeLabel =
+    planSuggestions?.nextUpgrade || readinessCareerPlan.nextUpgrade || plan?.nextUpgrade || null
 
   const careerReadiness = useMemo(() => {
     if (!isCareerMode && !showTrainingJourney) return null
@@ -722,7 +1039,8 @@ export default function CvBuilderV2Page() {
     let cancelled = false
 
     const hydrate = async () => {
-      setCvHydrated(false)
+      // Do not clear cvHydrated here — keeps workspace gated until first resolve
+      // without flashing empty form boxes on auth/searchParams refresh.
 
       if (guest.isGuest) {
         const draft = readGuestDraft<{ cvData?: CvData; selectedTemplate?: CvTemplateId }>('cv')
@@ -758,9 +1076,44 @@ export default function CvBuilderV2Page() {
       }
 
       if (resolved.cv) {
-        setCvData(prepareCvForEditor(resolved.cv))
-        // Keep a local draft mirror so autosave/quals use the same key
-        persistCvDraftFromData(prepareCvForEditor(resolved.cv))
+        let nextCv = prepareCvForEditor(resolved.cv)
+        const tailoredMeta = readCvPlanTailoredLocally()
+        const roleHint =
+          searchParams.get('targetRole') ||
+          searchParams.get('role') ||
+          ''
+
+        // Prefer the locally tailored draft when the saved CV still has stale sector skills
+        // (e.g. upsert in flight, or tailor before refresh completed).
+        try {
+          const draftKey = getUserKey(STORAGE_KEY)
+          const raw = localStorage.getItem(draftKey)
+          if (raw && tailoredMeta && Date.now() - tailoredMeta.at < 1000 * 60 * 60 * 24) {
+            const localDraft = prepareCvForEditor(JSON.parse(raw) as CvData)
+            const savedStale =
+              Boolean(roleHint) &&
+              skillsLookStaleForPlan(nextCv.skills, roleHint)
+            const localHasTailorSkills =
+              Array.isArray(localDraft.skills) &&
+              localDraft.skills.length > 0 &&
+              !skillsLookStaleForPlan(localDraft.skills, roleHint || 'Midwifery')
+
+            if (savedStale && localHasTailorSkills) {
+              nextCv = localDraft
+              if (process.env.NODE_ENV === 'development') {
+                console.debug('[cvPlanTailor] hydrate preferred local tailored draft over stale saved CV', {
+                  savedSkills: resolved.cv.skills,
+                  localSkills: localDraft.skills,
+                })
+              }
+            }
+          }
+        } catch {
+          // keep resolved.cv
+        }
+
+        setCvData(nextCv)
+        persistCvDraftFromData(nextCv)
       }
 
       setCvSource(resolved.source)
@@ -874,24 +1227,42 @@ export default function CvBuilderV2Page() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const onDraftUpdated = () => {
+      if (Date.now() < ignoreDraftSyncUntilRef.current) return
       try {
         const draftKey = getUserKey(STORAGE_KEY)
         const saved = localStorage.getItem(draftKey)
         if (!saved) return
         const parsed = JSON.parse(saved) as CvData
-        setCvData((prev) => ({
-          ...prev,
-          certifications: parsed.certifications ?? prev.certifications,
-          education: parsed.education ?? prev.education,
-          skills: parsed.skills ?? prev.skills,
-        }))
+        const incomingSkills = normalizeSkillsInput(parsed.skills)
+        setCvData((prev) => {
+          let nextSkills = prev.skills
+          if (incomingSkills.length > 0) {
+            const tailoredMeta = readCvPlanTailoredLocally()
+            const roleHint = improveTargetRole || 'Midwifery'
+            const incomingStale = skillsLookStaleForPlan(incomingSkills, roleHint)
+            const recentlyTailored =
+              Boolean(tailoredMeta) && Date.now() - (tailoredMeta?.at || 0) < 1000 * 60 * 60
+            // Do not let a stale draft/event restore cleaner skills after plan tailor
+            if (recentlyTailored && incomingStale) {
+              nextSkills = prev.skills
+            } else {
+              nextSkills = incomingSkills
+            }
+          }
+          return {
+            ...prev,
+            certifications: parsed.certifications ?? prev.certifications,
+            education: parsed.education ?? prev.education,
+            skills: nextSkills,
+          }
+        })
       } catch {
         // ignore invalid draft
       }
     }
     window.addEventListener('jobaz-cv-draft-updated', onDraftUpdated)
     return () => window.removeEventListener('jobaz-cv-draft-updated', onDraftUpdated)
-  }, [])
+  }, [improveTargetRole])
 
   const updateCvData = (updates: Partial<CvData>) => {
     setCvData((prev) => ({ ...prev, ...updates }))
@@ -1121,7 +1492,12 @@ export default function CvBuilderV2Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cvData }),
       })
-      const data = await response.json() as GrammarResult
+      const data = await response.json() as GrammarResult & { message?: string; error?: string }
+      const limitMsg = messageFromAiLimitPayload(data, response.status)
+      if (limitMsg) {
+        setGrammarResult({ ok: false, error: limitMsg })
+        return
+      }
       setGrammarResult(data)
       // Auto-select all safe fixes (by issue id so multiple issues in same field are independent)
       if (data.ok && data.issues) {
@@ -1732,6 +2108,7 @@ export default function CvBuilderV2Page() {
       // Dispatch custom event to notify dashboard of CV save
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('jobaz-cv-saved'))
+        notifyJobsForYouRefresh('cv')
         markActionPlanTask(ACTION_PLAN_TASK.CV, 'done')
       }
 
@@ -1741,7 +2118,7 @@ export default function CvBuilderV2Page() {
       setIsDirty(false)
 
       // Show success toast
-      showToast('success', 'CV saved to your dashboard!')
+      showToast('success', 'CV saved — job matches updated')
     } catch (error) {
       console.error('Error saving CV to dashboard:', error)
       showToast('error', error instanceof Error ? error.message : 'Failed to save CV. Please try again.')
@@ -1750,16 +2127,22 @@ export default function CvBuilderV2Page() {
 
   return (
     <PublicToolLayout
-      title={isCareerMode ? 'Career Journey · Build Your CV' : 'CV Optimization Engine'}
+      title={
+        !isHydratingCvState && planModeActive && isCareerMode
+          ? 'Career Journey · Build Your CV'
+          : 'CV Optimization Engine'
+      }
       subtitle={
-        isCareerMode && plan
+        !isHydratingCvState && planModeActive && isCareerMode && plan
           ? roleHeadline
-          : 'Build your CV for your next UK role.'
+          : isHydratingCvState
+            ? 'Preparing your CV workspace…'
+            : 'Build your CV for your next UK role.'
       }
       guest={guest}
       compactHero
       secondaryBackLinks={
-        jobId
+        isMounted && jobId
           ? [
               {
                 label: 'Back to Job Details',
@@ -1829,8 +2212,30 @@ export default function CvBuilderV2Page() {
         </>
       }
     >
-        {/* Compact route / status header */}
-        {(mode === 'improve' || readinessCareerPlan.routeTitle || planSuggestions || isCareerMode || showTrainingJourney) && (
+        {isHydratingCvState ? (
+          <CvBuilderWorkspaceLoading loadingPlanContext={expectsPlanContext || isLoadingPlanContext} />
+        ) : (
+          <>
+        {showPlanConfirm && (
+          <CvPlanContextConfirmPanel
+            roleLabel={confirmRoleLabel}
+            routeLabel={confirmRouteLabel}
+            upgradeLabel={confirmUpgradeLabel}
+            mismatch={needsRouteTailoring}
+            onTailor={() => acceptPlanMode('tailor')}
+            onKeep={() => acceptPlanMode('keep')}
+            onUseNormally={() => exitPlanMode()}
+          />
+        )}
+
+        {/* Compact route / status header — only after load + while plan mode is active */}
+        {planModeActive &&
+          (mode === 'improve' ||
+            readinessCareerPlan.routeTitle ||
+            (showPlanTools && planSuggestions) ||
+            isCareerMode ||
+            showTrainingJourney ||
+            improveTargetRole) && (
           <div className="mb-2.5 rounded-xl border border-violet-500/20 bg-violet-950/15 px-3 py-2">
             <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
               <div className="min-w-0 flex-1 space-y-1">
@@ -1846,7 +2251,10 @@ export default function CvBuilderV2Page() {
                           readinessCareerPlan.routeTitle}
                       </>
                     )}
-                    {!improveRoute && !planSuggestions?.routeTitle && !readinessCareerPlan.routeTitle && isCareerMode && (
+                    {!improveRoute &&
+                      !planSuggestions?.routeTitle &&
+                      !readinessCareerPlan.routeTitle &&
+                      (isCareerMode || improveTargetRole) && (
                       <span>Building your CV</span>
                     )}
                   </p>
@@ -1866,9 +2274,6 @@ export default function CvBuilderV2Page() {
                         ? 'Guest Draft'
                         : 'New CV'}
                   </span>
-                  {!cvHydrated && (
-                    <span className="text-[10px] text-slate-500">Loading…</span>
-                  )}
                 </div>
                 <p className="text-[11px] text-slate-400 leading-snug">
                   <span className="text-slate-500">Target:</span>{' '}
@@ -1894,15 +2299,58 @@ export default function CvBuilderV2Page() {
                       .join(', ')}
                   </p>
                 )}
-                {needsRouteTailoring && (
-                  <p className="text-[10px] text-amber-200/90">
-                    This CV was started for another route — you can update it for your current plan.
+                {!showPlanConfirm &&
+                  needsRouteTailoring &&
+                  (planModeDecision === 'keep' || planModeDecision === 'tailor') && (
+                  <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-950/25 px-3 py-2.5 space-y-2">
+                    <p className="text-[11px] text-amber-100/90 leading-snug">
+                      This CV was started for another route. You can tailor it for your current plan when
+                      ready.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => acceptPlanMode('tailor')}
+                        className="inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-[11px] font-semibold bg-violet-600 text-white hover:bg-violet-500"
+                      >
+                        Tailor CV for this plan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => exitPlanMode()}
+                        className="inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-[11px] font-semibold border border-amber-500/40 text-amber-100 hover:bg-amber-950/50"
+                      >
+                        Use CV Builder normally
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {(improveTargetRole ||
+                  planSuggestions?.currentTarget ||
+                  readinessCareerPlan.currentTarget) && (
+                  <p className="text-[11px] text-violet-200/90 font-medium pt-0.5">
+                    Focused on{' '}
+                    {planSuggestions?.currentTarget ||
+                      improveTargetRole ||
+                      readinessCareerPlan.currentTarget}{' '}
+                    now…
                   </p>
                 )}
               </div>
 
               <div className="flex flex-col items-end gap-1.5 shrink-0">
-                {planSuggestions && (
+                <button
+                  type="button"
+                  onClick={() => exitPlanMode()}
+                  title="Return CV Builder to normal mode. Your saved CV content remains editable."
+                  className="inline-flex flex-col items-end justify-center rounded-lg px-3 py-1.5 text-left border border-amber-500/45 bg-amber-950/40 text-amber-50 hover:bg-amber-900/50 hover:border-amber-400/60 shadow-sm"
+                >
+                  <span className="text-[11px] font-semibold leading-tight">Reset plan mode</span>
+                  <span className="text-[9px] font-normal text-amber-100/70 leading-tight mt-0.5 max-w-[11rem] text-right">
+                    Return to normal mode. Saved CV stays editable.
+                  </span>
+                </button>
+                {showPlanTools && planSuggestions && (
                   <CvPlanStageSwitcher
                     activeStage={planSuggestions.activeStage}
                     recommendedStage={planSuggestions.recommendedStage}
@@ -1933,12 +2381,12 @@ export default function CvBuilderV2Page() {
               </div>
             </div>
 
-            {isCareerMode && (
+            {showPlanTools && isCareerMode && (
               <div className="mt-1.5 pt-1.5 border-t border-violet-500/10">
                 <CvBuilderJourneyHeader className="border-0 bg-transparent px-0 py-0" />
               </div>
             )}
-            {showCompletionPanel && journeyNextStep && (
+            {showPlanTools && showCompletionPanel && journeyNextStep && (
               <div className="mt-1.5">
                 <CvBuilderCompletionPanel
                   cvScore={cvHealthReport.overallScore}
@@ -1954,7 +2402,7 @@ export default function CvBuilderV2Page() {
         )}
 
         {/* Standalone source chip when no route header */}
-        {!(mode === 'improve' || readinessCareerPlan.routeTitle || planSuggestions || isCareerMode || showTrainingJourney) && (
+        {!planModeActive && (
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span
               className={cn(
@@ -1972,8 +2420,8 @@ export default function CvBuilderV2Page() {
                   ? 'Editing: Guest Draft'
                   : 'Editing: New CV'}
             </span>
-            {!cvHydrated && (
-              <span className="text-[11px] text-slate-500">Loading CV…</span>
+            {(isCareerMode || expectsPlanContext) && suppressPlanMode && (
+              <span className="text-[11px] text-slate-500">Generic CV Builder mode</span>
             )}
           </div>
         )}
@@ -2015,7 +2463,7 @@ export default function CvBuilderV2Page() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      'px-2.5 py-2 text-[11px] font-medium transition whitespace-nowrap relative',
+                      'px-2.5 py-2 text-[11px] font-medium transition whitespace-nowrap relative shrink-0',
                       activeTab === tab.id
                         ? 'text-violet-300 border-b-2 border-violet-500'
                         : 'text-slate-400 hover:text-slate-200'
@@ -2048,7 +2496,7 @@ export default function CvBuilderV2Page() {
                       experience={cvData.experience}
                       onUpdate={(summary) => updateCvData({ summary })}
                       onLoadingChange={(loading) => setLoading((prev) => ({ ...prev, ai: loading }))}
-                      planSuggestions={planSuggestions}
+                      planSuggestions={showPlanTools ? planSuggestions : null}
                     />
                   </div>
                 )}
@@ -2057,7 +2505,9 @@ export default function CvBuilderV2Page() {
                     <ExperienceTab
                       experience={cvData.experience}
                       onUpdate={(experience) => updateCvData({ experience })}
-                      planBulletSuggestions={planSuggestions?.experienceBullets}
+                      planBulletSuggestions={
+                        showPlanTools ? planSuggestions?.experienceBullets : undefined
+                      }
                     />
                   </div>
                 )}
@@ -2089,15 +2539,22 @@ export default function CvBuilderV2Page() {
                         skills={cvData.skills}
                         onUpdate={(skills) => updateCvData({ skills })}
                         targetRole={
-                          planSuggestions?.currentTarget ||
-                          cvData.experience?.[0]?.jobTitle ||
-                          ''
+                          showPlanTools
+                            ? planSuggestions?.currentTarget ||
+                              improveTargetRole ||
+                              cvData.experience?.[0]?.jobTitle ||
+                              ''
+                            : cvData.experience?.[0]?.jobTitle || ''
                         }
                         summaryText={summaryText}
                         experiencePreview={experiencePreview}
                         onToast={showToast}
                         jobDescription={jobDescription}
-                        planSkillSuggestions={planSuggestions?.skills}
+                        planSkillSuggestions={
+                          showPlanTools
+                            ? filterPlanSkillSuggestions(planSuggestions?.skills)
+                            : undefined
+                        }
                       />
                     </div>
                   )
@@ -2110,7 +2567,9 @@ export default function CvBuilderV2Page() {
                       certifications={cvData.certifications || []}
                       publications={cvData.publications || []}
                       onUpdate={(updates) => updateCvData({ ...updates })}
-                      planQualificationSuggestions={planSuggestions?.qualificationSuggestions}
+                      planQualificationSuggestions={
+                        showPlanTools ? planSuggestions?.qualificationSuggestions : undefined
+                      }
                     />
                   </div>
                 )}
@@ -2120,8 +2579,10 @@ export default function CvBuilderV2Page() {
             {/* AI Optimization Mission */}
             <CvAiWorkflowStrip
               steps={cvHealthReport.workflowSteps}
-              subtitle={plan ? getCareerWorkflowSubtitle(plan) : undefined}
-              title={isCareerMode ? 'Improve your CV' : undefined}
+              subtitle={
+                showPlanTools && plan ? getCareerWorkflowSubtitle(plan) : undefined
+              }
+              title={showPlanTools && isCareerMode ? 'Improve your CV' : undefined}
             />
 
             <div ref={jdPanelRef}>
@@ -2137,8 +2598,8 @@ export default function CvBuilderV2Page() {
             </div>
           </div>
 
-          {/* RIGHT: Readiness + toolbar + preview (sticky, no nested page scroll) */}
-          <div className="space-y-2 min-w-0 lg:sticky lg:top-[calc(var(--jobaz-header-h,4.5rem)+0.75rem)] lg:self-start lg:max-w-full">
+          {/* RIGHT: Readiness + toolbar + preview (sticky column; CV scrolls inside preview) */}
+          <div className="space-y-2 min-w-0 lg:sticky lg:top-[calc(var(--jobaz-header-h,4.5rem)+0.75rem)] lg:self-start lg:max-w-full min-h-0">
             <CvHealthPanel
               overallScore={cvHealthReport.overallScore}
               metrics={cvHealthReport.metrics}
@@ -2158,6 +2619,16 @@ export default function CvBuilderV2Page() {
                 >
                   Find jobs
                 </button>
+                {(planModeActive || expectsPlanContext) && (
+                  <button
+                    type="button"
+                    onClick={() => exitPlanMode()}
+                    title="Return CV Builder to normal mode. Your saved CV content remains editable."
+                    className="inline-flex items-center justify-center h-7 px-2.5 text-[11px] font-medium rounded-md border border-amber-500/30 text-amber-100/90 bg-amber-950/30 hover:border-amber-400/50 hover:bg-amber-950/50 transition shrink-0"
+                  >
+                    Reset plan mode
+                  </button>
+                )}
                 <button
                   onClick={handleSaveCvToDashboard}
                   className={cn(
@@ -2266,46 +2737,50 @@ export default function CvBuilderV2Page() {
               />
             )}
 
-            {/* A4 Preview — page scroll only; no nested layout scrollbar */}
-            <div className="rounded-xl border border-slate-700/60 bg-slate-950/70 shadow-[0_12px_28px_rgba(15,23,42,0.75)] backdrop-blur p-2 md:p-2.5 flex items-start justify-center">
-              <div className="mx-auto aspect-[1/1.414] w-full max-w-[400px] xl:max-w-[440px] bg-white text-slate-900 shadow-lg overflow-hidden rounded-md">
-                <div
-                  id="cv-preview"
-                  ref={previewRef}
-                  className={cn('p-6 h-full', selectedTemplate === 'customizeStyle' && 'cv-customize-style')}
-                  style={
-                    selectedTemplate === 'customizeStyle'
-                      ? {
-                          '--cv-font-family':
-                            customizationOptions.fontFamily === 'inter'
-                              ? 'Inter, system-ui, sans-serif'
-                              : customizationOptions.fontFamily === 'serif'
-                              ? 'Georgia, serif'
-                              : 'Monaco, monospace',
-                          '--cv-font-size':
-                            customizationOptions.fontSize === 'small'
-                              ? '10.5px'
-                              : customizationOptions.fontSize === 'medium'
-                              ? '11.5px'
-                              : '12.5px',
-                          '--cv-line-height':
-                            customizationOptions.lineSpacing === 'compact'
-                              ? '1.4'
-                              : customizationOptions.lineSpacing === 'normal'
-                              ? '1.5'
-                              : '1.7',
-                          '--cv-heading-font-weight': customizationOptions.headingFontWeight === 'bold' ? '700' : '400',
-                          '--cv-heading-underline': customizationOptions.headingUnderline ? 'underline' : 'none',
-                          '--cv-section-spacing':
-                            customizationOptions.sectionSpacing === 'tight'
-                              ? '0.75rem'
-                              : customizationOptions.sectionSpacing === 'normal'
-                              ? '1rem'
-                              : '1.5rem',
-                        } as React.CSSProperties
-                      : undefined
-                  }
-                >
+            {/* A4 Preview — scroll inside the panel when CV is longer than the viewport */}
+            <div className="rounded-xl border border-slate-700/60 bg-slate-950/70 shadow-[0_12px_28px_rgba(15,23,42,0.75)] backdrop-blur p-2 md:p-2.5 flex items-start justify-center min-h-0">
+              <div
+                className="w-full max-h-[calc(100vh-220px)] overflow-y-auto overflow-x-hidden overscroll-contain rounded-md [scrollbar-gutter:stable]"
+                data-cv-preview-scroll
+              >
+                <div className="mx-auto w-full max-w-[400px] xl:max-w-[440px] min-h-[min(100%,28rem)] bg-white text-slate-900 shadow-lg rounded-md">
+                  <div
+                    id="cv-preview"
+                    ref={previewRef}
+                    className={cn('p-6', selectedTemplate === 'customizeStyle' && 'cv-customize-style')}
+                    style={
+                      selectedTemplate === 'customizeStyle'
+                        ? {
+                            '--cv-font-family':
+                              customizationOptions.fontFamily === 'inter'
+                                ? 'Inter, system-ui, sans-serif'
+                                : customizationOptions.fontFamily === 'serif'
+                                ? 'Georgia, serif'
+                                : 'Monaco, monospace',
+                            '--cv-font-size':
+                              customizationOptions.fontSize === 'small'
+                                ? '10.5px'
+                                : customizationOptions.fontSize === 'medium'
+                                ? '11.5px'
+                                : '12.5px',
+                            '--cv-line-height':
+                              customizationOptions.lineSpacing === 'compact'
+                                ? '1.4'
+                                : customizationOptions.lineSpacing === 'normal'
+                                ? '1.5'
+                                : '1.7',
+                            '--cv-heading-font-weight': customizationOptions.headingFontWeight === 'bold' ? '700' : '400',
+                            '--cv-heading-underline': customizationOptions.headingUnderline ? 'underline' : 'none',
+                            '--cv-section-spacing':
+                              customizationOptions.sectionSpacing === 'tight'
+                                ? '0.75rem'
+                                : customizationOptions.sectionSpacing === 'normal'
+                                ? '1rem'
+                                : '1.5rem',
+                          } as React.CSSProperties
+                        : undefined
+                    }
+                  >
                   {selectedTemplate === 'customizeStyle' && (
                     <style>{`
                       #cv-preview.cv-customize-style {
@@ -2345,6 +2820,7 @@ export default function CvBuilderV2Page() {
                     `}</style>
                   )}
                   <CvPreview data={cvData} template={selectedTemplate === 'customizeStyle' ? 'atsClassic' : selectedTemplate} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -2580,8 +3056,32 @@ export default function CvBuilderV2Page() {
           </div>
         </div>
       )}
-
+          </>
+        )}
     </PublicToolLayout>
+  )
+}
+
+function CvBuilderV2SuspenseFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#050617] to-[#02010f] text-slate-50 relative overflow-hidden">
+      <div className="pointer-events-none absolute -top-40 -left-24 h-72 w-72 rounded-full bg-violet-600/30 blur-3xl" />
+      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-10">
+        <div className="rounded-2xl border border-slate-700/50 bg-slate-950/60 px-6 py-14 text-center">
+          <div className="mx-auto h-12 w-12 rounded-full border border-violet-500/20 bg-violet-500/10 animate-pulse" />
+          <p className="mt-5 text-base font-medium text-slate-100">Preparing your CV workspace…</p>
+          <p className="mt-2 text-sm text-slate-400">Loading your saved CV and plan context…</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function CvBuilderV2Page() {
+  return (
+    <Suspense fallback={<CvBuilderV2SuspenseFallback />}>
+      <CvBuilderV2PageInner />
+    </Suspense>
   )
 }
 

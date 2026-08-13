@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 type BulletQualityStatus = 'excellent' | 'good' | 'needs-improvement'
 type FeedbackItem = { type: 'success' | 'warning' | 'error'; text: string }
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
           : [{ type: 'warning', text: 'Consider adding more detail about the outcome' }],
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'check-bullet-quality')
+    if (!usageGate.allowed) return usageGate.response
 
     // Use AI to analyze the bullet quality
     const analysisPrompt = `You are a professional CV expert specialized in experience bullet points. Analyze this CV bullet point and provide structured, constructive feedback.

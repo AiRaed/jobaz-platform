@@ -47,7 +47,7 @@ export default function AboutPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-violet-400 mt-0.5">•</span>
-              <span><strong className="text-slate-200">Career Path Exploration (Build Your Path)</strong> — Explore realistic career routes and skill paths.</span>
+              <span><strong className="text-slate-200">Career Assistant</strong> — Get a guided UK career route, or use courses, jobs, and CV tools on their own.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-violet-400 mt-0.5">•</span>

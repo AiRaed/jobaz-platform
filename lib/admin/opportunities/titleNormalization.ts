@@ -19,7 +19,7 @@ const TITLE_CANONICAL_GROUPS: string[][] = [
   ['power bi', 'power bi data analysis'],
   ['revit', 'revit bim'],
   ['apm project management', 'apm'],
-  ['data protection gdpr', 'gdpr'],
+  ['data protection gdpr', 'gdpr', 'gdpr basics'],
   ['sage', 'sage accounting'],
   ['tefl certificate', 'tefl'],
   [
@@ -28,7 +28,13 @@ const TITLE_CANONICAL_GROUPS: string[][] = [
     'qualifi level 2 diploma in care',
   ],
   ['health and social care level 3', 'level 3 health and social care'],
-  ['moving and handling people', 'moving handling people'],
+  ['moving and handling people', 'moving handling people', 'moving and handling'],
+  ['aat', 'aat foundation'],
+  ['autocad', 'auto cad'],
+  ['iosh managing safely', 'iosh'],
+  ['care certificate', 'the care certificate'],
+  ['cscs green card pathway', 'cscs green card'],
+  ['english for work', 'workplace english'],
 ]
 
 const canonicalKeyByNormalized = new Map<string, string>()

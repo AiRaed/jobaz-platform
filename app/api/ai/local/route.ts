@@ -5,6 +5,7 @@ import {
   type LocalFeatureId,
 } from '@/lib/jobaz-ai/local/runLocalFeature'
 import { isOllamaAvailable } from '@/lib/jobaz-ai/providers/ollama'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -34,6 +35,10 @@ export async function POST(req: NextRequest) {
     }
 
     const ollamaUp = await isOllamaAvailable()
+    if (!ollamaUp) {
+      const usageGate = await enforceAiUsageLimit(req, 'local_ai', feature)
+      if (!usageGate.allowed) return usageGate.response
+    }
     const result = await runLocalFeature(feature as LocalFeatureId, context)
 
     return NextResponse.json({

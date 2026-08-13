@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 interface GenerateRequest {
   applicantName: string
@@ -52,6 +53,9 @@ I am motivated by ownership and high standards, and I adapt quickly to new domai
         return NextResponse.json({ ok: true, body: mock.trim(), letter: mock.trim() })
       }
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cover_letter', 'generate')
+    if (!usageGate.allowed) return usageGate.response
 
     const modeGuide: Record<string, string> = {
       Executive: 'professional and strategic tone, focus on leadership and business impact',

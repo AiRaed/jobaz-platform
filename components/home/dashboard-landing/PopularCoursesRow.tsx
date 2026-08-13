@@ -10,7 +10,7 @@ function SectionHeader() {
     <div className="flex items-center justify-between mb-4 md:mb-5">
       <h2 className="text-sm font-semibold text-[var(--text-primary)]">Popular Courses & Licences</h2>
       <Link
-        href="/career-hub"
+        href="/courses"
         className="text-xs text-[var(--text-secondary)] hover:text-[var(--bg-primary)] transition shrink-0"
       >
         View all →

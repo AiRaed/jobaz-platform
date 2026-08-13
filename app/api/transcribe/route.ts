@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -25,6 +26,9 @@ export async function POST(req: NextRequest) {
         transcript: 'This is a mock transcript. Enable OpenAI API key for actual transcription.',
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'interview_coach', 'transcribe')
+    if (!usageGate.allowed) return usageGate.response
 
     // Transcribe audio using OpenAI Whisper
     let transcriptionResponse

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 type SkillsQualityRating = 'excellent' | 'good' | 'needs-improvement'
 
@@ -32,6 +33,9 @@ export async function POST(req: Request) {
         },
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'check-skills-quality')
+    if (!usageGate.allowed) return usageGate.response
 
     // Build context for AI evaluation
     let contextInfo = ''

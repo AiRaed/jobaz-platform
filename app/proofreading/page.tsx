@@ -15,6 +15,7 @@ import { postProofreadingAnalyze } from '@/lib/proofreading/analyzeApi'
 import { applyTextFix, sortIssuesForApply, type FixableIssue } from '@/lib/proofreading/applyFix'
 import { buildWritingReviewReport } from '@/lib/proofreading/reviewReport'
 import type { WritingReviewReport } from '@/lib/proofreading/types'
+import { messageFromAiLimitPayload } from '@/lib/ai-usage/client'
 import WritingReviewSummary from '@/components/proofreading/WritingReviewSummary'
 import ReviewStrengthsPanel from '@/components/proofreading/ReviewStrengthsPanel'
 import DocumentInsightsPanel from '@/components/proofreading/DocumentInsightsPanel'
@@ -1881,7 +1882,8 @@ export default function ProofreadingPage() {
         return
       }
       if (!data.ok) {
-        const errMsg = data.error || 'AI proofread failed'
+        const errMsg =
+          messageFromAiLimitPayload(data, res.status) || data.error || 'AI proofread failed'
         setError(errMsg)
         if (data.raw_preview) {
           if (process.env.NODE_ENV === 'development') console.log('LLM RAW RESPONSE (error preview):', data.raw_preview)

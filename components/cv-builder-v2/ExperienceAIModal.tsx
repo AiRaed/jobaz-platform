@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, Sparkles, Loader2 } from 'lucide-react'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 
 export type ExperienceAIMode = 'responsibilities' | 'achievements' | 'both'
 
@@ -26,6 +27,26 @@ export default function ExperienceAIModal({
   const [userNotes, setUserNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const handleClose = () => {
+    if (loading) return
+    setUserNotes('')
+    setError(null)
+    onClose()
+  }
+
+  // Handle escape key — must run before any early return (rules of hooks)
+  useEffect(() => {
+    if (!isOpen) return
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) {
+        handleClose()
+      }
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- close resets local form state
+  }, [isOpen, loading])
 
   if (!isOpen) return null
 
@@ -52,6 +73,8 @@ export default function ExperienceAIModal({
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
 
       if (!response.ok || !data.ok) {
         throw new Error(data.error || 'AI request failed')
@@ -75,25 +98,6 @@ export default function ExperienceAIModal({
       setLoading(false)
     }
   }
-
-  const handleClose = () => {
-    if (loading) return
-    setUserNotes('')
-    setError(null)
-    onClose()
-  }
-
-  // Handle escape key
-  useEffect(() => {
-    if (!isOpen) return
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !loading) {
-        handleClose()
-      }
-    }
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [isOpen, loading])
 
   return (
     <div 

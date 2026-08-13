@@ -14,18 +14,27 @@ import {
   hasPendingCareerPlan,
   promotePendingCareerPlan,
 } from '@/lib/uk-career-assistant/pendingCareerPlan'
+import { hasPendingPlanItems } from '@/lib/career-assistant/add-to-my-plan/pendingPlanItems'
+import { promotePendingPlanItems } from '@/lib/career-assistant/add-to-my-plan/promotePendingPlanItems'
 import { invalidateAssessmentBundleCache } from '@/lib/dashboard/careerOs/assessmentLoader'
 import type { AuthMode } from '@/lib/auth/mode'
 
-function resolveAuthDestination(
+async function resolveAuthDestination(
   redirectTo: string | null,
   email: string | null | undefined,
   transferFoundLocal: boolean
-): string {
+): Promise<string> {
   const hadPendingPlan = hasPendingCareerPlan()
+  const hadPendingItems = hasPendingPlanItems()
   promotePendingCareerPlan()
+  await promotePendingPlanItems()
   invalidateAssessmentBundleCache()
-  if (transferFoundLocal || hadPendingPlan || hasPendingGuestAssessment()) {
+  if (
+    transferFoundLocal ||
+    hadPendingPlan ||
+    hadPendingItems ||
+    hasPendingGuestAssessment()
+  ) {
     return GUEST_CAREER_DASHBOARD_PATH
   }
   return resolvePostLoginPath(redirectTo, email)
@@ -146,7 +155,7 @@ export default function AuthPageClient({ initialMode, redirectTo }: AuthPageClie
             await mergeAnonymousAiProfileOnAuth(authUserId)
           }
           const transfer = await transferGuestAssessmentOnAuth()
-          const dest = resolveAuthDestination(
+          const dest = await resolveAuthDestination(
             redirectTo,
             data.user?.email,
             transfer.foundLocal
@@ -207,7 +216,7 @@ export default function AuthPageClient({ initialMode, redirectTo }: AuthPageClie
           await mergeAnonymousAiProfileOnAuth(authUserId)
         }
         const transfer = await transferGuestAssessmentOnAuth()
-        const dest = resolveAuthDestination(
+        const dest = await resolveAuthDestination(
           redirectTo,
           data.user.email,
           transfer.foundLocal

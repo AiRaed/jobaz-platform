@@ -1,8 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Sparkles } from 'lucide-react'
 import { Question } from '@/app/uk-career-assistant/page'
+import { useToast } from '@/components/ui/toast'
+
+/** Launch-gated Career Assistant goals — always Coming Soon even if API strips metadata. */
+const LAUNCH_COMING_SOON_GOALS = new Set(['grow_career', 'start_business'])
+
+const COMING_SOON_TOAST =
+  'This career route is coming soon. Please choose another route for now.'
 
 interface QuestionCardProps {
   question: Question
@@ -14,6 +22,13 @@ interface QuestionCardProps {
   contextChip?: string
 }
 
+function isComingSoonGoalOption(option: {
+  value: string
+  disabled?: boolean
+}): boolean {
+  return Boolean(option.disabled) || LAUNCH_COMING_SOON_GOALS.has(option.value)
+}
+
 export default function QuestionCard({
   question,
   selectedOptions,
@@ -23,9 +38,22 @@ export default function QuestionCard({
   isTyping = false,
   contextChip,
 }: QuestionCardProps) {
+  const { addToast } = useToast()
+  const [inlineNotice, setInlineNotice] = useState<string | null>(null)
   const maxSelectReached =
     question.type === 'multi' && question.max_select && selectedOptions.length >= question.max_select
   const canSubmitMulti = question.type === 'multi' && selectedOptions.length > 0
+
+  const showComingSoonFeedback = () => {
+    setInlineNotice(COMING_SOON_TOAST)
+    addToast({
+      title: 'Coming Soon',
+      description: COMING_SOON_TOAST,
+      variant: 'default',
+      duration: 4000,
+    })
+    window.setTimeout(() => setInlineNotice(null), 4000)
+  }
 
   return (
     <div className="uk-ca-question mb-6 rounded-2xl border border-violet-500/20 bg-gradient-to-br from-slate-950/80 via-violet-950/20 to-slate-900/60 backdrop-blur-xl shadow-[0_0_40px_rgba(139,92,246,0.12)] p-5 md:p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -57,31 +85,65 @@ export default function QuestionCard({
         {question.id === 'cb_user_goal' ? (
           <div className="w-full space-y-2">
             {(question.options ?? []).map((option) => {
-              const isSelected = selectedOptions.includes(option.value)
+              const isComingSoon = isComingSoonGoalOption(option)
+              // Never show selected/active styling on Coming Soon cards
+              const isSelected = !isComingSoon && selectedOptions.includes(option.value)
               return (
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => onOptionClick(option.value)}
-                  disabled={loading || isTyping}
+                  onClick={() => {
+                    if (loading || isTyping) return
+                    if (isComingSoon) {
+                      showComingSoonFeedback()
+                      return
+                    }
+                    onOptionClick(option.value)
+                  }}
+                  aria-disabled={isComingSoon || loading || isTyping || undefined}
                   className={cn(
                     'uk-ca-option w-full text-left px-4 py-3 rounded-xl border text-sm transition-all duration-200',
-                    'hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(139,92,246,0.2)]',
-                    isSelected
-                      ? 'uk-ca-option--selected bg-gradient-to-r from-violet-600/40 to-cyan-600/30 border-violet-400/50 text-white shadow-[0_0_16px_rgba(139,92,246,0.25)] ring-1 ring-violet-400/30'
-                      : 'bg-slate-900/60 border-slate-600/40 text-slate-200 hover:border-violet-500/40 hover:bg-violet-950/30',
-                    'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none'
+                    isComingSoon
+                      ? 'opacity-60 cursor-not-allowed bg-slate-900/40 border-slate-700/40 text-slate-400 hover:translate-y-0 hover:shadow-none'
+                      : cn(
+                          'hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(139,92,246,0.2)]',
+                          isSelected
+                            ? 'uk-ca-option--selected bg-gradient-to-r from-violet-600/40 to-cyan-600/30 border-violet-400/50 text-white shadow-[0_0_16px_rgba(139,92,246,0.25)] ring-1 ring-violet-400/30'
+                            : 'bg-slate-900/60 border-slate-600/40 text-slate-200 hover:border-violet-500/40 hover:bg-violet-950/30',
+                          (loading || isTyping) &&
+                            'opacity-50 cursor-not-allowed hover:translate-y-0 hover:shadow-none'
+                        )
                   )}
                 >
-                  <span className="font-semibold block">{option.label}</span>
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="font-semibold block min-w-0">{option.label}</span>
+                    {isComingSoon ? (
+                      <span className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-100">
+                        {option.badge || 'Coming Soon'}
+                      </span>
+                    ) : null}
+                  </span>
                   {option.description && (
                     <span className="uk-ca-option-desc block text-xs text-slate-400 mt-1 font-normal leading-snug">
                       {option.description}
                     </span>
                   )}
+                  {isComingSoon ? (
+                    <span className="block text-[11px] text-slate-500 mt-1.5 font-normal">
+                      {option.helperText || 'Available in a future update.'}
+                    </span>
+                  ) : null}
                 </button>
               )
             })}
+            {inlineNotice ? (
+              <p
+                role="status"
+                className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-xs text-amber-100/90"
+              >
+                {inlineNotice}
+              </p>
+            ) : null}
           </div>
         ) : (
           (question.options ?? []).map((option) => {

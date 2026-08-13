@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'JobAZ – CV, Jobs & Interview Training',
-  description: 'Terms & Conditions for JobAZ. Review our service terms and conditions.',
+  title: 'Terms & Conditions | JobAZ',
+  description:
+    'Terms & Conditions for JobAZ — AI career plans, CV Builder, Jobs For You, courses, and UK career tools.',
 }
 
 export default function TermsLayout({
@@ -12,4 +13,3 @@ export default function TermsLayout({
 }) {
   return <>{children}</>
 }
-

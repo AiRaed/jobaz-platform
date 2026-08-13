@@ -82,7 +82,7 @@ export default function InterviewerAvatar({
             Interviewer Avatar
           </p>
           <p className="text-xs text-gray-500">
-            Generate at /admin/generate-avatar
+            Avatar coming soon
           </p>
         </div>
       </div>

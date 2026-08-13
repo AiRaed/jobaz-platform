@@ -116,12 +116,63 @@ export async function matchWorkInEducation(
   const base = await loadActiveFieldsAndSpecialisms(supabase)
   queryCount += base.queryCount
 
-  const resolution = resolveFieldAndSpecialism({
+  let resolution = resolveFieldAndSpecialism({
     profile,
     fields: base.fields,
     specialisms: base.specialisms,
     confidenceThreshold,
   })
+
+  const forcedId = options.forceSpecialismId?.trim() || null
+  if (forcedId) {
+    const forced = base.specialisms.find((s) => s.id === forcedId)
+    if (!forced) {
+      return {
+        ok: false,
+        errors: ['forceSpecialismId is not a known active specialism'],
+        status: 400,
+      }
+    }
+    const field = base.fields.find((f) => f.id === forced.field_id) ?? null
+    const allowed =
+      resolution.clarification_options.some((o) => o.id === forcedId) ||
+      resolution.primary_specialism?.id === forcedId ||
+      resolution.alternative_specialisms.some((s) => s.id === forcedId)
+    if (!allowed) {
+      return {
+        ok: false,
+        errors: ['forceSpecialismId must be one of the returned clarification options'],
+        status: 400,
+      }
+    }
+    resolution = {
+      ...resolution,
+      primary_field: field
+        ? {
+            id: field.id,
+            name: field.name,
+            slug: field.slug,
+            score: 1,
+            reasons: ['Forced via clarification selection'],
+          }
+        : resolution.primary_field,
+      primary_specialism: {
+        id: forced.id,
+        name: forced.name,
+        slug: forced.slug,
+        score: 1,
+        reasons: ['User-selected clarification specialism'],
+      },
+      needs_clarification: false,
+      clarification_reason: null,
+      clarification_options: [],
+      confidence: Math.max(resolution.confidence, 0.9),
+      match_reasons: [
+        ...resolution.match_reasons,
+        `Forced specialism from clarification: ${forced.name}`,
+      ],
+    }
+  }
 
   type SpecLoad = { id: string; source: RetrievalSource; relation_reason: string }
   const toLoad: SpecLoad[] = []
@@ -190,6 +241,9 @@ export async function matchWorkInEducation(
       evaluated,
       role,
       specialismRank: specialismRank.get(role.specialism_id) ?? 9,
+      field,
+      specialism,
+      stage,
     })
   }
 

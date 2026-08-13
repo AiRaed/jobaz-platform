@@ -16,7 +16,7 @@ export type JazPlanActionCategory =
   | 'follow_up'
 
 export type JazPlanActionPriority = 'required' | 'recommended' | 'optional'
-export type JazPlanActionStatus = 'not_started' | 'in_progress' | 'done' | 'skipped'
+export type JazPlanActionStatus = 'not_started' | 'in_progress' | 'applied' | 'done' | 'skipped'
 
 export type JazPlanAction = {
   id: string

@@ -11,7 +11,8 @@ import {
   type DropoffStepStat,
   type ToolStatRow,
 } from '@/lib/jobaz-ai/analytics'
-import { BarChart3 } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, BarChart3 } from 'lucide-react'
 
 export const metadata = {
   title: 'AI Analytics | JobAZ Admin',
@@ -38,6 +39,13 @@ export default async function AiAnalyticsPage() {
       <div className="mx-auto max-w-7xl space-y-8">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
+            <Link
+              href="/admin"
+              className="mb-3 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 transition"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Admin
+            </Link>
             <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-950/40 px-3 py-1 text-xs font-medium text-purple-300">
               <BarChart3 className="h-3.5 w-3.5" />
               Internal · JobAZ AI

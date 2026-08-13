@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest) {
         ],
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'interview_coach', 'hard-mode')
+    if (!usageGate.allowed) return usageGate.response
 
     // Evaluate the spoken answer compared to the written target answer using GPT
     const evaluationCompletion = await aiProvider.generateText({

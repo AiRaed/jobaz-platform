@@ -93,7 +93,16 @@ export default function CareerIdentityWorkspace({
       if (!idRes.ok) throw new Error(idData.error || 'Could not load identity')
       const next = (idData.identity as UserCareerIdentity) || emptyCareerIdentity('local')
       if (locationHint && !next.preferred_location) next.preferred_location = locationHint
-      setIdentity(next)
+      setIdentity({
+        ...emptyCareerIdentity(next.user_id || 'local'),
+        ...next,
+        mobile_phone: next.mobile_phone ?? null,
+        mobile_country_code: next.mobile_country_code ?? null,
+        message_reminders_opt_in: next.message_reminders_opt_in === true,
+        message_reminders_opted_in_at: next.message_reminders_opted_in_at ?? null,
+        message_reminders_opted_out_at: next.message_reminders_opted_out_at ?? null,
+        message_consent_source: next.message_consent_source || 'profile',
+      })
       setSkillsDraft(next.skills.join(', '))
       setIndustriesDraft(next.industries_experience.join(', '))
       setLanguagesDraft(next.languages.join(', '))
@@ -124,6 +133,7 @@ export default function CareerIdentityWorkspace({
   const save = async () => {
     if (!identity) return
     setSaving(true)
+    const previousOptIn = identity.message_reminders_opt_in === true
     try {
       const payload: UserCareerIdentity = {
         ...identity,
@@ -131,6 +141,9 @@ export default function CareerIdentityWorkspace({
         industries_experience: parseTags(industriesDraft),
         languages: parseTags(languagesDraft),
         qualifications: parseTags(qualificationsDraft),
+        mobile_phone: identity.mobile_phone?.trim() || null,
+        message_reminders_opt_in: identity.message_reminders_opt_in === true,
+        message_consent_source: 'profile',
       }
       const res = await fetch('/api/career-identity', {
         method: 'POST',
@@ -151,13 +164,34 @@ export default function CareerIdentityWorkspace({
         })
       }
 
-      setIdentity(data.identity)
-      setSkillsDraft((data.identity as UserCareerIdentity).skills.join(', '))
-      setIndustriesDraft((data.identity as UserCareerIdentity).industries_experience.join(', '))
-      setLanguagesDraft((data.identity as UserCareerIdentity).languages.join(', '))
-      setQualificationsDraft((data.identity as UserCareerIdentity).qualifications.join(', '))
+      const saved = data.identity as UserCareerIdentity
+      setIdentity(saved)
+      setSkillsDraft(saved.skills.join(', '))
+      setIndustriesDraft(saved.industries_experience.join(', '))
+      setLanguagesDraft(saved.languages.join(', '))
+      setQualificationsDraft(saved.qualifications.join(', '))
       setEditing(false)
-      onToast({ variant: 'success', title: 'Career identity saved' })
+
+      const remindersChanged =
+        data.message_reminders_changed === 'enabled' ||
+        data.message_reminders_changed === 'disabled'
+          ? data.message_reminders_changed
+          : previousOptIn !== saved.message_reminders_opt_in
+            ? saved.message_reminders_opt_in
+              ? 'enabled'
+              : 'disabled'
+            : null
+
+      onToast({
+        variant: 'success',
+        title: 'Career identity updated',
+        description:
+          remindersChanged === 'enabled'
+            ? 'Reminders enabled for future updates'
+            : remindersChanged === 'disabled'
+              ? 'Message reminders turned off'
+              : undefined,
+      })
     } catch (err) {
       onToast({
         variant: 'error',
@@ -520,6 +554,64 @@ export default function CareerIdentityWorkspace({
                 </label>
               ))}
             </div>
+          </div>
+        )}
+      </IdentityCard>
+
+      {/* Contact & reminders — private; consent defaults off */}
+      <IdentityCard
+        title="Contact & reminders"
+        subtitle="Optional mobile for future reminders — never shown on your public profile"
+      >
+        {!editing ? (
+          <div className="space-y-2 text-sm">
+            <SnapshotTile
+              label="Mobile number"
+              value={identity.mobile_phone}
+              emptyHint="No mobile number saved"
+            />
+            <p className="text-xs text-[var(--jaz-muted)]">
+              Message reminders:{' '}
+              <span className="font-medium text-[var(--jaz-text)] dark:text-slate-200">
+                {identity.message_reminders_opt_in ? 'On' : 'Off'}
+              </span>
+            </p>
+            <p className="text-[11px] text-[var(--jaz-muted)] leading-relaxed">
+              Optional. We may use this later for reminders, course updates, or job opportunity
+              alerts. You can turn this off anytime.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <label>
+              <span className={labelClass}>Mobile number</span>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                className={fieldClass}
+                value={identity.mobile_phone || ''}
+                onChange={(e) => patch('mobile_phone', e.target.value || null)}
+                placeholder="e.g. +44 7700 900123"
+              />
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border border-[var(--jaz-border)] dark:border-slate-800 px-3 py-2.5 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={identity.message_reminders_opt_in === true}
+                onChange={(e) => patch('message_reminders_opt_in', e.target.checked)}
+              />
+              <span>
+                <span className="block text-[var(--jaz-text)] dark:text-slate-200 font-medium">
+                  Send me career reminders and opportunity updates by message
+                </span>
+                <span className="block text-[11px] text-[var(--jaz-muted)] mt-1 leading-relaxed">
+                  Optional. We may use this later for reminders, course updates, or job opportunity
+                  alerts. You can turn this off anytime.
+                </span>
+              </span>
+            </label>
           </div>
         )}
       </IdentityCard>

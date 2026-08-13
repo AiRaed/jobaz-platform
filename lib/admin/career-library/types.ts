@@ -92,6 +92,105 @@ export const CAREER_LIBRARY_FIT_CLASSIFICATIONS: CareerLibraryFitClassification[
   'academic_or_research',
 ]
 
+/**
+ * WIE-facing metadata keys (stored in JSON `metadata` — migration-safe defaults).
+ * Admins can set these without schema breakage; missing keys use safe defaults.
+ */
+export type CareerLibraryStageMeaning = 'target' | 'current' | 'both'
+
+export type CareerLibraryTrainingItemType =
+  | 'course'
+  | 'qualification'
+  | 'licence'
+  | 'certification'
+  | 'skill'
+  | 'career_preparation'
+  | 'workshop'
+  | 'knowledge_area'
+
+export type CareerLibraryWieMetadata = {
+  /** How the library stage should be interpreted in WIE matching */
+  stageMeaning?: CareerLibraryStageMeaning
+  currentStageApplicable?: boolean
+  targetStageApplicable?: boolean
+  trainingItemType?: CareerLibraryTrainingItemType
+  providerEligible?: boolean
+  completionTrackable?: boolean
+}
+
+/** Defaults when metadata keys are absent (do not break existing records). */
+export const CAREER_LIBRARY_WIE_METADATA_DEFAULTS: Required<
+  Pick<
+    CareerLibraryWieMetadata,
+    | 'stageMeaning'
+    | 'currentStageApplicable'
+    | 'targetStageApplicable'
+    | 'trainingItemType'
+    | 'providerEligible'
+    | 'completionTrackable'
+  >
+> = {
+  stageMeaning: 'target',
+  currentStageApplicable: true,
+  targetStageApplicable: true,
+  trainingItemType: 'knowledge_area',
+  providerEligible: false,
+  completionTrackable: false,
+}
+
+export function readCareerLibraryWieMetadata(
+  metadata: Record<string, unknown> | null | undefined
+): Required<typeof CAREER_LIBRARY_WIE_METADATA_DEFAULTS> & CareerLibraryWieMetadata {
+  const m = metadata && typeof metadata === 'object' ? metadata : {}
+  const stageMeaningRaw = String(m.stageMeaning ?? m.stage_meaning ?? '').toLowerCase()
+  const stageMeaning: CareerLibraryStageMeaning =
+    stageMeaningRaw === 'current' || stageMeaningRaw === 'both' || stageMeaningRaw === 'target'
+      ? stageMeaningRaw
+      : CAREER_LIBRARY_WIE_METADATA_DEFAULTS.stageMeaning
+
+  const trainingRaw = String(m.trainingItemType ?? m.training_item_type ?? '').toLowerCase()
+  const allowed: CareerLibraryTrainingItemType[] = [
+    'course',
+    'qualification',
+    'licence',
+    'certification',
+    'skill',
+    'career_preparation',
+    'workshop',
+    'knowledge_area',
+  ]
+  const trainingItemType = (
+    trainingRaw === 'license' ? 'licence' : trainingRaw
+  ) as CareerLibraryTrainingItemType
+  const resolvedType = allowed.includes(trainingItemType)
+    ? trainingItemType
+    : CAREER_LIBRARY_WIE_METADATA_DEFAULTS.trainingItemType
+
+  const bool = (v: unknown, fallback: boolean) =>
+    typeof v === 'boolean' ? v : fallback
+
+  return {
+    stageMeaning,
+    currentStageApplicable: bool(
+      m.currentStageApplicable ?? m.current_stage_applicable,
+      CAREER_LIBRARY_WIE_METADATA_DEFAULTS.currentStageApplicable
+    ),
+    targetStageApplicable: bool(
+      m.targetStageApplicable ?? m.target_stage_applicable,
+      CAREER_LIBRARY_WIE_METADATA_DEFAULTS.targetStageApplicable
+    ),
+    trainingItemType: resolvedType,
+    providerEligible: bool(
+      m.providerEligible ?? m.provider_eligible,
+      CAREER_LIBRARY_WIE_METADATA_DEFAULTS.providerEligible
+    ),
+    completionTrackable: bool(
+      m.completionTrackable ?? m.completion_trackable,
+      CAREER_LIBRARY_WIE_METADATA_DEFAULTS.completionTrackable
+    ),
+  }
+}
+
 export type CareerLibraryStage = {
   id: string
   stageModelId: string
@@ -102,6 +201,8 @@ export type CareerLibraryStage = {
   active: boolean
   createdAt: string
   updatedAt: string
+  /** Optional WIE semantics (JSON metadata on stage row when present) */
+  metadata?: Record<string, unknown>
 }
 
 export type CareerLibraryStageModel = {

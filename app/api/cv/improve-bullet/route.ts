@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export async function POST(req: Request) {
   try {
@@ -19,6 +20,9 @@ export async function POST(req: Request) {
         improved: `Improved version: ${bullet}`,
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'improve-bullet')
+    if (!usageGate.allowed) return usageGate.response
 
     // Determine tense based on whether role is current
     const tense = isCurrent ? 'present tense' : 'past tense'

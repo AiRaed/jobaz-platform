@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,6 +45,9 @@ export async function POST(req: NextRequest) {
         ],
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'interview_coach', 'voice-train')
+    if (!usageGate.allowed) return usageGate.response
 
     // Transcribe audio using OpenAI Whisper
     // The OpenAI SDK accepts File objects from FormData directly

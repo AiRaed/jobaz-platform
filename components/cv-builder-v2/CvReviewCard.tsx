@@ -114,20 +114,20 @@ export default function CvReviewCard({ cvData }: CvReviewCardProps) {
 
   if (isAuthenticated === false) {
     return (
-      <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-4 md:p-5">
-        <h3 className="text-sm font-semibold text-slate-300 mb-3">AI CV Review</h3>
-        <p className="text-xs text-slate-400">Please sign in to use CV review features.</p>
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm backdrop-blur p-4 md:p-5 dark:border-slate-700/60 dark:bg-slate-950/70 dark:shadow-[0_18px_40px_rgba(15,23,42,0.9)]">
+        <h3 className="text-sm font-semibold text-slate-800 mb-3 dark:text-slate-300">AI CV Review</h3>
+        <p className="text-xs text-slate-600 dark:text-slate-400">Please sign in to use CV review features.</p>
       </div>
     )
   }
 
   return (
-    <div className="rounded-2xl border border-slate-700/60 bg-slate-950/70 shadow-[0_18px_40px_rgba(15,23,42,0.9)] backdrop-blur p-4 md:p-5">
-      <h3 className="text-sm font-semibold text-slate-300 mb-3">AI CV Review</h3>
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm backdrop-blur p-4 md:p-5 dark:border-slate-700/60 dark:bg-slate-950/70 dark:shadow-[0_18px_40px_rgba(15,23,42,0.9)]">
+      <h3 className="text-sm font-semibold text-slate-800 mb-3 dark:text-slate-300">AI CV Review</h3>
       
       {/* Hint text */}
       {!reviewResult && !grammarResult && (
-        <p className="text-xs text-slate-400 mb-4">Run a CV check to get your score and top fixes.</p>
+        <p className="text-xs text-slate-600 mb-4 dark:text-slate-400">Run a CV check to get your score and top fixes.</p>
       )}
       
       {/* Buttons */}
@@ -137,7 +137,8 @@ export default function CvReviewCard({ cvData }: CvReviewCardProps) {
           disabled={reviewLoading || grammarLoading}
           className={cn(
             'flex-1 min-w-[140px] px-3 py-1.5 text-xs font-medium rounded border transition',
-            'border-violet-500/60 text-violet-300 bg-violet-500/10 hover:bg-violet-500/20',
+            'border-blue-300 text-blue-800 bg-blue-50 hover:bg-blue-100',
+            'dark:border-violet-500/60 dark:text-violet-300 dark:bg-violet-500/10 dark:hover:bg-violet-500/20',
             'disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5'
           )}
         >
@@ -151,7 +152,8 @@ export default function CvReviewCard({ cvData }: CvReviewCardProps) {
           disabled={reviewLoading || grammarLoading}
           className={cn(
             'flex-1 min-w-[140px] px-3 py-1.5 text-xs font-medium rounded border transition',
-            'border-slate-600/60 text-slate-300 bg-slate-800/40 hover:bg-slate-700/40',
+            'border-slate-200 text-slate-700 bg-white hover:bg-slate-50',
+            'dark:border-slate-600/60 dark:text-slate-300 dark:bg-slate-800/40 dark:hover:bg-slate-700/40',
             'disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5'
           )}
         >

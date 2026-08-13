@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 interface CvData {
   personalInfo: {
@@ -271,6 +272,9 @@ export async function POST(req: NextRequest) {
         summary: { issueCount: 0, safeCount: 0 }
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'grammar-check')
+    if (!usageGate.allowed) return usageGate.response
 
     // Build a structured text representation of the CV for AI analysis
     const cvText = []

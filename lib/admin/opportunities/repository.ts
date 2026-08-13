@@ -278,6 +278,127 @@ export async function seedWorkInEducationOpportunityBank(): Promise<
   }
 }
 
+export type SeedWieGeneratedCourseTypesResult = {
+  summary: import('./seedWieGeneratedCourseTypes').WieGeneratedSeedSummary
+  message: string
+  generated_sample?: string[]
+  inserted_count: number
+  skipped_duplicates: number
+  updated_count: number
+  total_before: number
+  total_after: number
+}
+
+export async function seedWieGeneratedCourseTypes(): Promise<
+  OpportunityRepoResult<SeedWieGeneratedCourseTypesResult>
+> {
+  if (!isSupabaseCoursesConfigured()) {
+    return {
+      ok: false,
+      error: 'Supabase is not configured — cannot generate WIE course types against the live library.',
+    }
+  }
+
+  try {
+    const res = await fetch('/api/admin/course-opportunities/seed-wie-generated-course-types', {
+      method: 'POST',
+    })
+    if (!res.ok) return { ok: false, error: await readApiError(res) }
+    const body = (await res.json()) as SeedWieGeneratedCourseTypesResult & {
+      ok?: boolean
+      summary?: SeedWieGeneratedCourseTypesResult['summary']
+    }
+    const inserted = body.inserted_count ?? body.summary?.inserted_count ?? body.summary?.added_count ?? 0
+    const skipped =
+      body.skipped_duplicates ?? body.summary?.skipped_duplicates ?? body.summary?.skipped_duplicate_count ?? 0
+    const updated = body.updated_count ?? body.summary?.updated_count ?? 0
+    const totalBefore = body.total_before ?? body.summary?.total_before ?? 0
+    const totalAfter = body.total_after ?? body.summary?.total_after ?? 0
+    return {
+      ok: true,
+      data: {
+        summary: {
+          ...body.summary,
+          inserted_count: inserted,
+          skipped_duplicates: skipped,
+          updated_count: updated,
+          added_count: inserted,
+          total_before: totalBefore,
+          total_after: totalAfter,
+        },
+        message: body.message,
+        generated_sample: (body as { inserted_sample?: string[] }).inserted_sample,
+        inserted_count: inserted,
+        skipped_duplicates: skipped,
+        updated_count: updated,
+        total_before: totalBefore,
+        total_after: totalAfter,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Generate failed' }
+  }
+}
+
+export type SeedWipGeneratedCourseTypesResult = {
+  summary: import('./seedWipGeneratedCourseTypes').WipGeneratedSeedSummary
+  message: string
+  generated_sample?: string[]
+  inserted_count: number
+  skipped_duplicates: number
+  total_before: number
+  total_after: number
+}
+
+export async function seedWipGeneratedCourseTypes(): Promise<
+  OpportunityRepoResult<SeedWipGeneratedCourseTypesResult>
+> {
+  if (!isSupabaseCoursesConfigured()) {
+    return {
+      ok: false,
+      error:
+        'Supabase is not configured — cannot generate Profession course types against the live library.',
+    }
+  }
+
+  try {
+    const res = await fetch('/api/admin/course-opportunities/seed-wip-generated-course-types', {
+      method: 'POST',
+    })
+    if (!res.ok) return { ok: false, error: await readApiError(res) }
+    const body = (await res.json()) as SeedWipGeneratedCourseTypesResult & {
+      summary?: SeedWipGeneratedCourseTypesResult['summary']
+      inserted_sample?: string[]
+    }
+    const inserted = body.inserted_count ?? body.summary?.inserted_count ?? body.summary?.added_count ?? 0
+    const skipped =
+      body.skipped_duplicates ?? body.summary?.skipped_duplicates ?? body.summary?.skipped_duplicate_count ?? 0
+    const totalBefore = body.total_before ?? body.summary?.total_before ?? 0
+    const totalAfter = body.total_after ?? body.summary?.total_after ?? 0
+    return {
+      ok: true,
+      data: {
+        summary: {
+          ...body.summary,
+          inserted_count: inserted,
+          skipped_duplicates: skipped,
+          added_count: inserted,
+          total_before: totalBefore,
+          total_after: totalAfter,
+        },
+        message: body.message,
+        generated_sample: body.inserted_sample,
+        inserted_count: inserted,
+        skipped_duplicates: skipped,
+        total_before: totalBefore,
+        total_after: totalAfter,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Generate failed' }
+  }
+}
+
 export type CleanupDuplicatesPreviewResult = {
   plan: CleanupDuplicatesPlan
   summary: CleanupDuplicatesResult

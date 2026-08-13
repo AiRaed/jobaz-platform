@@ -9,7 +9,39 @@ export const metadata = {
   description: 'JobAZ administration area',
 }
 
-const SECTIONS = [
+/** UK Career Assistant libraries + engine — grouped for clarity. */
+const UK_CAREER_ASSISTANT = [
+  {
+    href: '/admin/career-library',
+    title: 'Work in My Education Library',
+    description:
+      'Controls the Work in My Education path. Education-based career knowledge for users who want to use their degree, academic field, or studied subject in the UK.',
+    comingSoon: false,
+  },
+  {
+    href: '/admin/career-library/work-in-profession',
+    title: 'Profession & Start New Career Library',
+    description:
+      'Controls Work in My Profession and Start a New Career. One shared practical profession library — Profession prioritises roles/jobs; Start a New Career prioritises courses, licences, and first steps.',
+    comingSoon: false,
+  },
+  {
+    href: '/admin/career-library/extra-income',
+    title: 'Extra Income Library',
+    description:
+      'Controls the Looking for Extra Income path. Side-income and flexible work routes, short training, supported jobs, and provider matching (admin editor coming after launch).',
+    comingSoon: false,
+  },
+  {
+    href: '/admin/jaz-career-engine',
+    title: 'Career Assistant Engine',
+    description:
+      'Controls engine health across Career Assistant paths — JAZ status, assistant logs, behaviour analytics, course matching, missing affiliates, and test tools.',
+    comingSoon: false,
+  },
+] as const
+
+const OTHER_SECTIONS = [
   {
     href: '/admin/ai',
     title: 'Admin AI',
@@ -27,20 +59,6 @@ const SECTIONS = [
     href: '/admin/ai-analytics',
     title: 'AI Analytics',
     description: 'Career Assistant usage, funnel drop-off, tool clicks, and assessment insights.',
-    comingSoon: false,
-  },
-  {
-    href: '/admin/jaz-career-engine',
-    title: 'JAZ Career Engine',
-    description:
-      'Career Assistant control room — Ollama/fallback status, recent plans, course matching, missing affiliates.',
-    comingSoon: false,
-  },
-  {
-    href: '/admin/career-library',
-    title: 'Career Knowledge Library',
-    description:
-      'Foundation for the next Career Assistant — fields, specialisms, and stage models JobAZ owns.',
     comingSoon: false,
   },
   {
@@ -96,6 +114,24 @@ const SECTIONS = [
   },
 ] as const
 
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string
+  title: string
+  description: string
+}) {
+  return (
+    <div className="mb-4">
+      <p className="text-[10px] uppercase tracking-widest text-cyan-300/90 mb-1">{eyebrow}</p>
+      <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
+      <p className="text-sm text-slate-400 mt-1 max-w-3xl">{description}</p>
+    </div>
+  )
+}
+
 export default function AdminHomePage() {
   return (
     <AppShell>
@@ -121,11 +157,41 @@ export default function AdminHomePage() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {SECTIONS.map((section) => (
-          <AdminSectionCard key={section.href} {...section} />
-        ))}
-      </div>
+      <section
+        id="uk-career-assistant"
+        className="mb-10 scroll-mt-6"
+        aria-labelledby="uk-career-assistant-heading"
+      >
+        <SectionHeading
+          eyebrow="Career paths"
+          title="UK Career Assistant"
+          description="Each library below controls a Career Assistant path. Profession and Start a New Career share one library with different result priority — they are not separate databases."
+        />
+        <h2 id="uk-career-assistant-heading" className="sr-only">
+          UK Career Assistant
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {UK_CAREER_ASSISTANT.map((section) => (
+            <AdminSectionCard key={section.href} {...section} tone="cyan" />
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="platform-ops-heading">
+        <SectionHeading
+          eyebrow="Platform"
+          title="Operations & content"
+          description="AI tools, marketplace content, users, and day-to-day platform operations."
+        />
+        <h2 id="platform-ops-heading" className="sr-only">
+          Operations and content
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {OTHER_SECTIONS.map((section) => (
+            <AdminSectionCard key={section.href} {...section} />
+          ))}
+        </div>
+      </section>
     </AppShell>
   )
 }

@@ -11,6 +11,8 @@ import UkCareerAssistantFloatPanel from '@/components/uk-career-assistant/UkCare
 import HoverTranslateLayer from '@/components/HoverTranslateLayer'
 import ServiceWorkerGuard from '@/components/ServiceWorkerGuard'
 import NavigationProgress from '@/components/navigation/NavigationProgress'
+import CookieConsentBanner from '@/components/CookieConsentBanner'
+import GoogleAnalytics from '@/components/GoogleAnalytics'
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -27,6 +29,8 @@ export default function ClientProviders({ children }: { children: React.ReactNod
               <JazAssistant />
               <UkCareerAssistantFloatPanel />
               <HoverTranslateLayer />
+              <GoogleAnalytics />
+              <CookieConsentBanner />
             </UkCareerAssistantFloatProvider>
           </JazContextProvider>
         </TranslationSettingsProvider>

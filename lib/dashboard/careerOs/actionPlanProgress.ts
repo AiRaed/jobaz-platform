@@ -5,7 +5,7 @@
 
 import { getCurrentUserIdSync, getUserScopedKeySync } from '@/lib/user-storage'
 
-export type ActionPlanTaskStatus = 'not_started' | 'in_progress' | 'done'
+export type ActionPlanTaskStatus = 'not_started' | 'in_progress' | 'applied' | 'done'
 
 export type ActionPlanTaskNote = 'booked' | 'compared' | 'viewed'
 
@@ -65,7 +65,8 @@ export function listActionPlanTasks(): Record<string, ActionPlanTaskRecord> {
 const RANK: Record<ActionPlanTaskStatus, number> = {
   not_started: 0,
   in_progress: 1,
-  done: 2,
+  applied: 2,
+  done: 3,
 }
 
 /** Upgrade status only — never downgrade (except explicit setStatus). */

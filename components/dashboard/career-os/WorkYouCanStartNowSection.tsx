@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PathPlanLadder } from '@/lib/dashboard/careerOs/pathPlanLadder'
+import { isCourseLikeTitle } from '@/lib/career-assistant/add-to-my-plan/planIdentity'
 import PlanSectionHeader from '@/components/plan-ui/PlanSectionHeader'
 import { PLAN_SECTION_STYLES } from '@/lib/plan-ui/planVisualSystem'
 import { trackJazEvent } from '@/lib/analytics/jazTrackEvent'
@@ -23,6 +24,7 @@ function shortReason(description?: string): string {
 export default function WorkYouCanStartNowSection({ ladder, targetRole }: Props) {
   const work = PLAN_SECTION_STYLES.work
   const jobs = (ladder?.startNow ?? [])
+    .filter((j) => j.title?.trim() && !isCourseLikeTitle(j.title))
     .slice(0, 3)
     .map((j) => ({
       title: j.title,
@@ -32,11 +34,11 @@ export default function WorkYouCanStartNowSection({ ladder, targetRole }: Props)
     }))
 
   const fallback =
-    jobs.length === 0 && targetRole
+    jobs.length === 0 && targetRole && !isCourseLikeTitle(targetRole)
       ? [
           {
             title: targetRole,
-            reason: 'Matched to your Career Coach target.',
+            reason: 'Matched to your Career Assistant focus.',
             salary: null as string | null,
             href: `/job-finder?query=${encodeURIComponent(targetRole)}`,
           },

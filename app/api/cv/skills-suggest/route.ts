@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 type SkillsAIMode = 'hard' | 'soft' | 'both'
 type CareerDomain = 'tech' | 'hospitality' | 'production' | 'customer_service' | 'supervisor' | 'general'
@@ -107,6 +108,9 @@ export async function POST(req: Request) {
         skills: mockSkills,
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'skills-suggest')
+    if (!usageGate.allowed) return usageGate.response
 
     // Build context for the prompt
     const contextParts: string[] = []

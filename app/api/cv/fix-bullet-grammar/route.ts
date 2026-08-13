@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export async function POST(req: Request) {
   try {
@@ -18,6 +19,9 @@ export async function POST(req: Request) {
         improved: bullet,
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'fix-bullet-grammar')
+    if (!usageGate.allowed) return usageGate.response
 
     // Use AI to fix grammar and improve clarity
     const fixPrompt = `You are a professional CV editor. Fix ONLY grammar, spelling, and clarity issues in this experience bullet point.

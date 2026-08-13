@@ -83,6 +83,10 @@ function CareerIdentityPrivatePage({ target }: { target: ProfileViewTarget }) {
                 and{' '}
                 <code className="text-xs bg-slate-900 px-1.5 py-0.5 rounded text-slate-200">
                   20250729120000_user_career_identity.sql
+                </code>{' '}
+                and{' '}
+                <code className="text-xs bg-slate-900 px-1.5 py-0.5 rounded text-slate-200">
+                  20250812120000_career_identity_mobile_reminders.sql
                 </code>
                 .
               </p>

@@ -48,9 +48,34 @@ function normalizeQuestion(raw: unknown): Question | null {
             typeof opt.description === 'string' && opt.description.trim()
               ? opt.description.trim()
               : undefined
-          return { label: label || value, value, ...(description ? { description } : {}) }
+          const disabled = opt.disabled === true
+          const badge =
+            typeof opt.badge === 'string' && opt.badge.trim() ? opt.badge.trim() : undefined
+          const helperText =
+            typeof opt.helperText === 'string' && opt.helperText.trim()
+              ? opt.helperText.trim()
+              : undefined
+          return {
+            label: label || value,
+            value,
+            ...(description ? { description } : {}),
+            ...(disabled ? { disabled: true } : {}),
+            ...(badge ? { badge } : {}),
+            ...(helperText ? { helperText } : {}),
+          }
         })
-        .filter((x): x is { label: string; value: string; description?: string } => x !== null)
+        .filter(
+          (
+            x
+          ): x is {
+            label: string
+            value: string
+            description?: string
+            disabled?: boolean
+            badge?: string
+            helperText?: string
+          } => x !== null
+        )
     : []
 
   return {

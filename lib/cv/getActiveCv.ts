@@ -106,12 +106,16 @@ export type SavedCvFetchResult = {
   cvId: string
   lastUpdated: string | null
   title?: string | null
+  targetRole?: string | null
 } | null
 
 /** Fetch a saved CV from the account API (primary or by id). */
 export async function fetchSavedCv(cvId?: string | null): Promise<SavedCvFetchResult> {
   const qs = cvId ? `?cvId=${encodeURIComponent(cvId)}` : ''
-  const res = await fetch(`/api/cv/get-latest${qs}`, { cache: 'no-store' })
+  const res = await fetch(`/api/cv/get-latest${qs}`, {
+    cache: 'no-store',
+    credentials: 'include',
+  })
   if (!res.ok) return null
   const data = await res.json()
   if (!data?.ok || !data?.hasCv || !data?.cv) return null
@@ -121,6 +125,7 @@ export async function fetchSavedCv(cvId?: string | null): Promise<SavedCvFetchRe
     cvId: typeof data.cvId === 'string' ? data.cvId : '',
     lastUpdated: data.readiness?.lastUpdated || data.profile?.updatedAt || null,
     title: data.profile?.title || null,
+    targetRole: data.profile?.targetRole || null,
   }
 }
 

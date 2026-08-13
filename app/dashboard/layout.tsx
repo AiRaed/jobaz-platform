@@ -1,9 +1,11 @@
-import type { Metadata } from 'next'
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
+import { PRIVATE_PAGE_ROBOTS } from '@/lib/seo/site'
 
 export const metadata: Metadata = {
   title: 'JobAZ – AI Career Operating System',
   description: 'Your career plan, courses, job tracker, and readiness — all in one UK career dashboard.',
+  robots: PRIVATE_PAGE_ROBOTS,
 }
 
 function DashboardFallback() {

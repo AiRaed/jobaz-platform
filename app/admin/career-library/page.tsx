@@ -2,8 +2,9 @@ import dynamic from 'next/dynamic'
 import AppShell from '@/components/layout/AppShell'
 
 export const metadata = {
-  title: 'Career Knowledge Library | JobAZ Admin',
-  description: 'JobAZ-owned career knowledge foundation for the next Career Assistant',
+  title: 'Work in My Education Library | JobAZ Admin',
+  description:
+    'UK Career Assistant — education-based career knowledge library (fields, specialisms, stages, roles)',
 }
 
 const AdminCareerLibraryPage = dynamic(
@@ -12,7 +13,9 @@ const AdminCareerLibraryPage = dynamic(
     ssr: false,
     loading: () => (
       <AppShell>
-        <div className="py-16 text-center text-sm text-slate-400">Loading Career Library…</div>
+        <div className="py-16 text-center text-sm text-slate-400">
+          Loading Work in My Education Library…
+        </div>
       </AppShell>
     ),
   }

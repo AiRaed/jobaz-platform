@@ -215,12 +215,17 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--background);
   color: var(--foreground);
   transition: background-color 300ms ease, color 300ms ease;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .jobaz-page-bg {
@@ -246,6 +251,21 @@ body {
   color: var(--shell-text);
 }
 
+/* Header logo column — same chrome as sidebar so wordmark reads as sidebar brand */
+.jobaz-sidebar-brand {
+  background: var(--shell-sidebar-bg);
+  color: var(--shell-text);
+}
+
+.jobaz-sidebar-brand__link {
+  max-width: 100%;
+}
+
+.jobaz-sidebar-brand .jobaz-logo {
+  display: block;
+  margin-inline: auto;
+}
+
 [data-jobaz-theme='day'] .jobaz-platform-sidebar,
 [data-jobaz-theme='day'] .jobaz-platform-header {
   backdrop-filter: none;
@@ -267,7 +287,8 @@ body {
 }
 
 /* Deep navy sidebar — professional, not neon */
-[data-jobaz-theme='day'] .jobaz-platform-sidebar {
+[data-jobaz-theme='day'] .jobaz-platform-sidebar,
+[data-jobaz-theme='day'] .jobaz-sidebar-brand {
   color: rgba(248, 250, 252, 0.94);
   background: linear-gradient(
     180deg,
@@ -276,7 +297,16 @@ body {
     #152544 100%
   ) !important;
   border-color: rgba(148, 163, 184, 0.16) !important;
+}
+
+[data-jobaz-theme='day'] .jobaz-platform-sidebar {
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+[data-jobaz-theme='day'] .jobaz-sidebar-brand {
+  /* Cap of the sidebar column — match top of sidebar gradient */
+  background: linear-gradient(180deg, #0b1220 0%, #111c33 100%) !important;
+  box-shadow: none;
 }
 
 [data-jobaz-theme='day'] .jobaz-shell-nav--active {
@@ -504,38 +534,203 @@ body {
 }
 
 [data-jobaz-theme='day'] .text-slate-500,
+[data-jobaz-theme='day'] .text-gray-500 {
+  color: #475569 !important;
+}
+
 [data-jobaz-theme='day'] .text-slate-600,
-[data-jobaz-theme='day'] .text-gray-500,
 [data-jobaz-theme='day'] .text-gray-600 {
   color: #64748b !important;
 }
 
-/* Dark slate panels ? white / soft blue-white (not dull gray) */
+/* Disabled controls — remain readable (avoid washed-out white-on-grey) */
+[data-jobaz-theme='day'] button:disabled:not(.jobaz-btn-primary):not([class*='bg-violet']):not([class*='bg-blue']):not([class*='bg-gradient']),
+[data-jobaz-theme='day'] [aria-disabled='true']:not(.jobaz-btn-primary) {
+  opacity: 0.75;
+  color: #475569 !important;
+}
+
+[data-jobaz-theme='day'] .jobaz-btn-primary:disabled,
+[data-jobaz-theme='day'] .jobaz-btn-primary[aria-disabled='true'],
+[data-jobaz-theme='day'] button.bg-violet-600:disabled,
+[data-jobaz-theme='day'] button.bg-blue-600:disabled {
+  opacity: 0.7;
+  color: #ffffff !important;
+}
+
+/* Dark slate panels → white / soft blue-white (not dull gray) */
 [data-jobaz-theme='day'] .bg-slate-950,
+[data-jobaz-theme='day'] .bg-slate-950\/30,
+[data-jobaz-theme='day'] .bg-slate-950\/40,
 [data-jobaz-theme='day'] .bg-slate-950\/50,
 [data-jobaz-theme='day'] .bg-slate-950\/60,
 [data-jobaz-theme='day'] .bg-slate-950\/70,
 [data-jobaz-theme='day'] .bg-slate-950\/80,
 [data-jobaz-theme='day'] .bg-slate-950\/90,
+[data-jobaz-theme='day'] .bg-slate-950\/95,
 [data-jobaz-theme='day'] .bg-\[\#0D0D0D\],
-[data-jobaz-theme='day'] .bg-\[\#1a1a1a\] {
+[data-jobaz-theme='day'] .bg-\[\#1a1a1a\],
+[data-jobaz-theme='day'] .bg-\[\#0b1220\],
+[data-jobaz-theme='day'] .bg-zinc-900,
+[data-jobaz-theme='day'] .bg-zinc-950,
+[data-jobaz-theme='day'] .bg-neutral-900,
+[data-jobaz-theme='day'] .bg-neutral-950 {
   background-color: #ffffff !important;
 }
 
 [data-jobaz-theme='day'] .bg-slate-900,
+[data-jobaz-theme='day'] .bg-slate-900\/20,
+[data-jobaz-theme='day'] .bg-slate-900\/30,
 [data-jobaz-theme='day'] .bg-slate-900\/40,
 [data-jobaz-theme='day'] .bg-slate-900\/50,
 [data-jobaz-theme='day'] .bg-slate-900\/60,
 [data-jobaz-theme='day'] .bg-slate-900\/70,
-[data-jobaz-theme='day'] .bg-slate-900\/80 {
-  background-color: var(--jaz-surface-soft) !important;
+[data-jobaz-theme='day'] .bg-slate-900\/80,
+[data-jobaz-theme='day'] .bg-slate-900\/90 {
+  background-color: #f8fafc !important;
 }
 
 [data-jobaz-theme='day'] .bg-slate-800,
+[data-jobaz-theme='day'] .bg-slate-800\/40,
 [data-jobaz-theme='day'] .bg-slate-800\/50,
+[data-jobaz-theme='day'] .bg-slate-800\/60,
+[data-jobaz-theme='day'] .bg-slate-800\/70,
+[data-jobaz-theme='day'] .bg-slate-800\/80,
+[data-jobaz-theme='day'] .bg-slate-800\/90,
+[data-jobaz-theme='day'] .bg-slate-700,
+[data-jobaz-theme='day'] .bg-slate-700\/40,
+[data-jobaz-theme='day'] .bg-slate-700\/50,
+[data-jobaz-theme='day'] .bg-slate-700\/60,
+[data-jobaz-theme='day'] .bg-gray-700,
 [data-jobaz-theme='day'] .bg-gray-800,
-[data-jobaz-theme='day'] .bg-gray-900 {
-  background-color: var(--jaz-panel) !important;
+[data-jobaz-theme='day'] .bg-gray-900,
+[data-jobaz-theme='day'] .bg-zinc-800 {
+  background-color: #f1f5f9 !important;
+}
+
+/* Dark tinted accent panels → soft readable tints (not muddy navy) */
+[data-jobaz-theme='day'] .bg-cyan-950\/20,
+[data-jobaz-theme='day'] .bg-cyan-950\/30,
+[data-jobaz-theme='day'] .bg-cyan-950\/40,
+[data-jobaz-theme='day'] .bg-cyan-950\/50,
+[data-jobaz-theme='day'] .bg-cyan-950\/60,
+[data-jobaz-theme='day'] .bg-cyan-950\/80 {
+  background-color: #ecfeff !important;
+}
+[data-jobaz-theme='day'] .bg-violet-950\/20,
+[data-jobaz-theme='day'] .bg-violet-950\/30,
+[data-jobaz-theme='day'] .bg-violet-950\/40,
+[data-jobaz-theme='day'] .bg-violet-950\/50,
+[data-jobaz-theme='day'] .bg-violet-950\/60,
+[data-jobaz-theme='day'] .bg-violet-950\/80,
+[data-jobaz-theme='day'] .bg-indigo-950\/20,
+[data-jobaz-theme='day'] .bg-indigo-950\/30,
+[data-jobaz-theme='day'] .bg-indigo-950\/40,
+[data-jobaz-theme='day'] .bg-purple-950\/20,
+[data-jobaz-theme='day'] .bg-purple-950\/30,
+[data-jobaz-theme='day'] .bg-purple-950\/40 {
+  background-color: #eef2ff !important;
+}
+[data-jobaz-theme='day'] .bg-emerald-950\/15,
+[data-jobaz-theme='day'] .bg-emerald-950\/20,
+[data-jobaz-theme='day'] .bg-emerald-950\/30,
+[data-jobaz-theme='day'] .bg-emerald-950\/40 {
+  background-color: #ecfdf5 !important;
+}
+[data-jobaz-theme='day'] .bg-amber-950\/10,
+[data-jobaz-theme='day'] .bg-amber-950\/20,
+[data-jobaz-theme='day'] .bg-amber-950\/30 {
+  background-color: #fffbeb !important;
+}
+[data-jobaz-theme='day'] .bg-sky-950\/15,
+[data-jobaz-theme='day'] .bg-sky-950\/20,
+[data-jobaz-theme='day'] .bg-sky-950\/30 {
+  background-color: #f0f9ff !important;
+}
+[data-jobaz-theme='day'] .bg-rose-950\/20,
+[data-jobaz-theme='day'] .bg-rose-950\/30 {
+  background-color: #fef2f2 !important;
+}
+
+/* Soft status chips — readable on white cards */
+[data-jobaz-theme='day'] .bg-emerald-500\/10,
+[data-jobaz-theme='day'] .bg-emerald-500\/15,
+[data-jobaz-theme='day'] .bg-emerald-500\/20 {
+  background-color: #ecfdf5 !important;
+}
+[data-jobaz-theme='day'] .bg-amber-500\/10,
+[data-jobaz-theme='day'] .bg-amber-500\/15,
+[data-jobaz-theme='day'] .bg-amber-500\/20 {
+  background-color: #fffbeb !important;
+}
+[data-jobaz-theme='day'] .bg-violet-500\/20,
+[data-jobaz-theme='day'] .bg-violet-500\/25,
+[data-jobaz-theme='day'] .bg-violet-600\/20,
+[data-jobaz-theme='day'] .bg-purple-500\/20 {
+  background-color: #eef2ff !important;
+}
+[data-jobaz-theme='day'] .bg-cyan-500\/10,
+[data-jobaz-theme='day'] .bg-cyan-500\/15,
+[data-jobaz-theme='day'] .bg-cyan-500\/20 {
+  background-color: #ecfeff !important;
+}
+[data-jobaz-theme='day'] .bg-rose-500\/10,
+[data-jobaz-theme='day'] .bg-rose-500\/15,
+[data-jobaz-theme='day'] .bg-red-500\/10,
+[data-jobaz-theme='day'] .bg-red-500\/15 {
+  background-color: #fef2f2 !important;
+}
+
+[data-jobaz-theme='day'] .text-emerald-200,
+[data-jobaz-theme='day'] .text-emerald-300 {
+  color: #047857 !important;
+}
+[data-jobaz-theme='day'] .text-emerald-400,
+[data-jobaz-theme='day'] .text-green-400 {
+  color: #059669 !important;
+}
+[data-jobaz-theme='day'] .text-amber-200,
+[data-jobaz-theme='day'] .text-amber-300 {
+  color: #b45309 !important;
+}
+[data-jobaz-theme='day'] .text-amber-400,
+[data-jobaz-theme='day'] .text-yellow-400 {
+  color: #d97706 !important;
+}
+[data-jobaz-theme='day'] .text-cyan-200,
+[data-jobaz-theme='day'] .text-cyan-300 {
+  color: #0e7490 !important;
+}
+[data-jobaz-theme='day'] .text-violet-200,
+[data-jobaz-theme='day'] .text-violet-300,
+[data-jobaz-theme='day'] .text-purple-200,
+[data-jobaz-theme='day'] .text-purple-300 {
+  color: #4338ca !important;
+}
+[data-jobaz-theme='day'] .text-violet-100,
+[data-jobaz-theme='day'] .text-violet-400 {
+  color: #4f46e5 !important;
+}
+[data-jobaz-theme='day'] .text-rose-200,
+[data-jobaz-theme='day'] .text-rose-300,
+[data-jobaz-theme='day'] .text-red-300 {
+  color: #b91c1c !important;
+}
+[data-jobaz-theme='day'] .text-rose-400,
+[data-jobaz-theme='day'] .text-red-400 {
+  color: #dc2626 !important;
+}
+
+/* Keep white text on solid brand buttons (after global text remaps) */
+[data-jobaz-theme='day'] button.bg-violet-600,
+[data-jobaz-theme='day'] a.bg-violet-600,
+[data-jobaz-theme='day'] button.bg-violet-600 .text-white,
+[data-jobaz-theme='day'] a.bg-violet-600 .text-white,
+[data-jobaz-theme='day'] button.bg-gradient-to-r,
+[data-jobaz-theme='day'] a.bg-gradient-to-r,
+[data-jobaz-theme='day'] .jobaz-btn-primary,
+[data-jobaz-theme='day'] .jobaz-btn-primary * {
+  color: #ffffff !important;
 }
 
 [data-jobaz-theme='day'] .bg-slate-50,
@@ -545,13 +740,57 @@ body {
 [data-jobaz-theme='day'] .bg-zinc-50,
 [data-jobaz-theme='day'] .bg-neutral-50,
 [data-jobaz-theme='day'] .bg-stone-50 {
-  background-color: var(--jaz-panel) !important;
+  background-color: #f8fafc !important;
 }
 
 [data-jobaz-theme='day'] .hover\:bg-slate-50:hover,
 [data-jobaz-theme='day'] .hover\:bg-gray-50:hover,
-[data-jobaz-theme='day'] .hover\:bg-slate-100:hover {
-  background-color: var(--jaz-surface-soft) !important;
+[data-jobaz-theme='day'] .hover\:bg-slate-100:hover,
+[data-jobaz-theme='day'] .hover\:bg-slate-800\/90:hover,
+[data-jobaz-theme='day'] .hover\:bg-slate-800:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Secondary / ghost buttons that used dark fills */
+[data-jobaz-theme='day'] button.bg-slate-800\/80,
+[data-jobaz-theme='day'] button.border-slate-600\/70,
+[data-jobaz-theme='day'] .rounded-full.border.bg-slate-800\/80 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Sidebar stays light-on-navy — undo chip text remaps inside chrome */
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-emerald-200,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-emerald-300,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-amber-200,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-amber-300,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-cyan-200,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-cyan-300,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-violet-100,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-violet-200,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-violet-300,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-violet-400,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-purple-200,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .text-purple-300,
+[data-jobaz-theme='day'] .jobaz-hero .text-emerald-200,
+[data-jobaz-theme='day'] .jobaz-hero .text-emerald-300,
+[data-jobaz-theme='day'] .jobaz-hero .text-violet-100,
+[data-jobaz-theme='day'] .jobaz-hero .text-violet-200,
+[data-jobaz-theme='day'] .jobaz-hero .text-violet-300,
+[data-jobaz-theme='day'] .jobaz-hero .text-violet-400,
+[data-jobaz-theme='day'] .jobaz-keep-light .text-violet-100,
+[data-jobaz-theme='day'] .jobaz-keep-light .text-violet-200,
+[data-jobaz-theme='day'] .jobaz-keep-light .text-violet-300,
+[data-jobaz-theme='day'] .jobaz-keep-light .text-violet-400 {
+  color: inherit !important;
+}
+
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .bg-emerald-500\/20,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .bg-amber-500\/20,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .bg-violet-500\/20,
+[data-jobaz-theme='day'] .jobaz-platform-sidebar .bg-cyan-500\/20 {
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /*
@@ -636,18 +875,54 @@ body {
 [data-jobaz-theme='day'] .border-slate-700\/40,
 [data-jobaz-theme='day'] .border-slate-700\/50,
 [data-jobaz-theme='day'] .border-slate-700\/60,
+[data-jobaz-theme='day'] .border-slate-700\/70,
+[data-jobaz-theme='day'] .border-slate-700\/80,
 [data-jobaz-theme='day'] .border-slate-800,
+[data-jobaz-theme='day'] .border-slate-800\/50,
 [data-jobaz-theme='day'] .border-slate-800\/60,
 [data-jobaz-theme='day'] .border-slate-800\/70,
+[data-jobaz-theme='day'] .border-slate-800\/80,
+[data-jobaz-theme='day'] .border-slate-600,
+[data-jobaz-theme='day'] .border-slate-600\/40,
+[data-jobaz-theme='day'] .border-slate-600\/50,
+[data-jobaz-theme='day'] .border-slate-600\/60,
+[data-jobaz-theme='day'] .border-slate-600\/70,
+[data-jobaz-theme='day'] .border-slate-600\/80,
+[data-jobaz-theme='day'] .border-slate-500,
 [data-jobaz-theme='day'] .border-gray-700,
 [data-jobaz-theme='day'] .border-gray-800 {
   border-color: var(--border) !important;
 }
 
+/* Soften heavy dark-mode glow shadows in Day */
+[data-jobaz-theme='day'] .shadow-\[0_18px_40px_rgba\(15\,23\,42\,0\.9\)\],
+[data-jobaz-theme='day'] .shadow-\[0_18px_40px_rgba\(15\,23\,42\,0\.85\)\],
+[data-jobaz-theme='day'] .shadow-\[0_18px_40px_rgba\(15\,23\,42\,0\.8\)\],
+[data-jobaz-theme='day'] .shadow-\[0_8px_24px_rgba\(15\,23\,42\,0\.55\)\],
+[data-jobaz-theme='day'] .shadow-\[0_8px_24px_rgba\(15\,23\,42\,0\.6\)\],
+[data-jobaz-theme='day'] .shadow-\[0_8px_30px_rgba\(0\,0\,0\,0\.25\)\],
+[data-jobaz-theme='day'] .shadow-\[0_16px_40px_rgba\(0\,0\,0\,0\.45\)\] {
+  box-shadow: var(--day-shadow) !important;
+}
+
 [data-jobaz-theme='day'] .rounded-2xl.border,
-[data-jobaz-theme='day'] .rounded-xl.border {
-  box-shadow: var(--card-shadow);
-  border-color: var(--jaz-border);
+[data-jobaz-theme='day'] .rounded-xl.border,
+[data-jobaz-theme='day'] .rounded-lg.border {
+  box-shadow: var(--day-shadow-sm);
+  border-color: var(--jaz-border) !important;
+}
+
+[data-jobaz-theme='day'] .rounded-2xl.border:not([class*='bg-']):not(.jobaz-keep-light),
+[data-jobaz-theme='day'] .rounded-xl.border:not([class*='bg-']):not(.jobaz-keep-light) {
+  background-color: #ffffff;
+}
+
+/* Prefer white cards; nested soft panels can still use soft fills */
+[data-jobaz-theme='day'] .rounded-2xl.border.bg-slate-950\/50,
+[data-jobaz-theme='day'] .rounded-2xl.border.bg-slate-950\/60,
+[data-jobaz-theme='day'] .rounded-2xl.border.bg-slate-900\/50,
+[data-jobaz-theme='day'] .rounded-xl.border.bg-slate-950\/50 {
+  background-color: #ffffff !important;
 }
 
 /* Card shells that still use bg-white ? soft branded surface */

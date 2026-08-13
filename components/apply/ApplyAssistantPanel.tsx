@@ -10,6 +10,7 @@ import { useNextStepLoadingStore, generateRequestId } from '@/lib/next-step-load
 import { getBaseCvAnyScope } from '@/lib/cv-storage'
 import { useApplicationAnalysis } from '@/hooks/useApplicationAnalysis'
 import ApplicationIntelligenceSections from '@/components/apply/ApplicationIntelligenceSections'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 
 interface ApplyAssistantPanelProps {
   jobId: string
@@ -272,6 +273,9 @@ export default function ApplyAssistantPanel({
         return
       }
       
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
+
       // Consider success if we got content, even if response.ok is false
       if (!response.ok && (!data || !data.fitScore || data.fitScore.score === 0)) {
         throw new Error(data?.error || 'Failed to fetch analysis')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { getOpenAiModel } from '@/lib/openai-model'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -17,6 +18,9 @@ export async function POST(req: NextRequest) {
         {id:"A", content:"Variant A…"}, {id:"B", content:"Variant B…"}, {id:"C", content:"Variant C…"}
       ] }, { status: 200 });
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'jaz_assistant', 'translate')
+    if (!usageGate.allowed) return usageGate.response
 
     const completion = await openai.chat.completions.create({
       model: getOpenAiModel(),

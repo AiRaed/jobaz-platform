@@ -9,7 +9,8 @@ export default function CareerPlanEmptyState() {
       <Sparkles className="w-10 h-10 text-violet-400 mx-auto mb-4" />
       <h2 className="text-2xl font-bold text-slate-50 mb-3">Your career plan starts here</h2>
       <p className="text-sm text-slate-400 max-w-lg mx-auto mb-8 leading-relaxed">
-        Start the Career Assistant to build your personalised career plan.
+        Start the Career Assistant to build a personalised My Plan. You can still use CV Builder,
+        Job Finder, Writing Review, and Courses without creating a plan.
       </p>
       <UkCareerAssistantLink
         href="/uk-career-assistant"

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 type QualityStatus = 'strong' | 'good' | 'needs-improvement'
 type FeedbackItem = { type: 'success' | 'warning' | 'error'; text: string }
@@ -27,6 +28,9 @@ export async function POST(req: Request) {
         hasGrammarIssues: false,
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'check-summary-quality')
+    if (!usageGate.allowed) return usageGate.response
 
     // Use AI to analyze the summary quality
     const analysisPrompt = `You are a professional CV expert. Analyze the following CV summary and provide structured feedback.

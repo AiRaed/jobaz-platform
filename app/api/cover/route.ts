@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 interface CoverLetterRequest {
   fullName: string
@@ -52,6 +53,9 @@ ${fullName}
 ${[email, phone].filter(Boolean).join(' · ')}`
       return NextResponse.json({ ok: true, content: mockContent })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cover_letter', 'generate-letter')
+    if (!usageGate.allowed) return usageGate.response
 
     const lengthGuide = {
       Short: '2-3 concise paragraphs',

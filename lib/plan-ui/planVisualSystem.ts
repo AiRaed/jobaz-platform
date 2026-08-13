@@ -33,6 +33,7 @@ export type PlanSectionAccent =
 export type PlanRouteVisualKey =
   | 'side_job'
   | 'work_in_education'
+  | 'work_in_profession'
   | 'work_in_experience'
   | 'start_new_career'
   | 'grow_career'
@@ -148,6 +149,13 @@ const ROUTE_VISUALS: Record<PlanRouteVisualKey, Omit<PlanRouteVisual, 'key'>> = 
     badgeClass:
       'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200',
   },
+  work_in_profession: {
+    label: 'Profession route',
+    Icon: Briefcase,
+    accentClass: 'from-teal-500/20 to-cyan-500/5',
+    badgeClass:
+      'border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200',
+  },
   work_in_experience: {
     label: 'Experience route',
     Icon: Briefcase,
@@ -196,6 +204,7 @@ export function resolvePlanRouteVisual(
   let key: PlanRouteVisualKey = 'default'
   if (id === 'side_job' || /extra income|side.?job|security/.test(label)) key = 'side_job'
   else if (id === 'work_in_education' || /education/.test(label)) key = 'work_in_education'
+  else if (id === 'work_in_profession' || /profession/.test(label)) key = 'work_in_profession'
   else if (id === 'work_in_experience' || /experience/.test(label)) key = 'work_in_experience'
   else if (id === 'start_new_career' || /new career|→/.test(label)) key = 'start_new_career'
   else if (id === 'grow_career' || /grow/.test(label)) key = 'grow_career'

@@ -44,6 +44,7 @@ type DisplayMission = MissionItem & {
 
 function autoStatusForMission(m: MissionItem): ActionPlanTaskStatus {
   if (m.status === 'done' || m.completed) return 'done'
+  if (m.status === 'applied') return 'applied'
   if (m.status === 'in_progress') return 'in_progress'
   if ((m.current ?? 0) > 0) return 'in_progress'
   return 'not_started'
@@ -202,6 +203,13 @@ export default function ThisWeeksPlanSection({
     refresh()
   }
 
+  const markApplied = (mission: DisplayMission) => {
+    markActionPlanTask(mission.id, 'applied', { force: true })
+    void onStepStatusChange?.(mission.id, 'applied')
+    setSkipped((prev) => ({ ...prev, [mission.id]: false }))
+    refresh()
+  }
+
   const confirmCourseDone = (mode: 'booked' | 'compared') => {
     if (!confirmTaskId) return
     markActionPlanTask(confirmTaskId, 'done', {
@@ -296,8 +304,12 @@ export default function ThisWeeksPlanSection({
         {steps.map((mission, index) => {
           const isActive = active?.id === mission.id
           const isDone = mission.status === 'done'
+          const isApplied = mission.status === 'applied'
           const isInProgress = mission.status === 'in_progress'
           const isSkipped = Boolean(skipped[mission.id])
+          const isJobStep =
+            /apply|search jobs|view jobs|job/i.test(mission.label) ||
+            /job-finder|\/jobs/i.test(mission.href || '')
 
           return (
             <li
@@ -305,6 +317,7 @@ export default function ThisWeeksPlanSection({
               className={cn(
                 'flex items-start gap-3 rounded-xl px-3 py-3 transition',
                 isDone && 'bg-emerald-50 dark:bg-emerald-950/25',
+                isApplied && !isDone && 'bg-sky-50 dark:bg-sky-950/20',
                 isSkipped && !isDone && 'opacity-50',
                 isActive &&
                   !isDone &&
@@ -345,9 +358,14 @@ export default function ThisWeeksPlanSection({
                       Optional
                     </span>
                   )}
-                  {isInProgress && !isDone && (
+                  {isInProgress && !isDone && !isApplied && (
                     <span className="text-[10px] font-medium uppercase tracking-wider text-indigo-700 dark:text-indigo-300/90">
                       In progress
+                    </span>
+                  )}
+                  {isApplied && !isDone && (
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-sky-700 dark:text-sky-300/90">
+                      Applied
                     </span>
                   )}
                   {isDone && (
@@ -358,6 +376,11 @@ export default function ThisWeeksPlanSection({
                   {isSkipped && !isDone && (
                     <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
                       Skipped
+                    </span>
+                  )}
+                  {!isInProgress && !isDone && !isSkipped && !isApplied && (
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-500">
+                      Not started
                     </span>
                   )}
                   {mission.progressLabel && !isDone && (
@@ -386,6 +409,15 @@ export default function ThisWeeksPlanSection({
                       {mission.actionLabel}
                       <ArrowRight className="w-3 h-3" />
                     </Link>
+                  )}
+                  {isJobStep && !isDone && !isSkipped && !isApplied && (
+                    <button
+                      type="button"
+                      onClick={() => markApplied(mission)}
+                      className="text-[11px] font-medium text-sky-600 hover:text-sky-400 dark:text-sky-300"
+                    >
+                      Mark as applied
+                    </button>
                   )}
                   {!isDone && !isSkipped && (
                     <button

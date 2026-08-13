@@ -19,7 +19,11 @@ export {
   persistJazActionPlan,
   updateJazPlanStepStatus,
   loadLatestJazActionPlan,
+  loadActiveJazActionPlan,
 } from './persist'
+export type { ActiveJazPlanLoad, JazPlanPersistSource } from './persist'
+export { appendJazPlanSteps } from './appendSteps'
+export { replaceJazPlanSteps } from './replaceSteps'
 export { buildPlanEngineAdminSnapshot } from './planAnalytics'
 export {
   jazActionsToMissions,

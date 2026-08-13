@@ -4,7 +4,8 @@
  * Does not mutate stored role fit.
  */
 
-import { educationLevelRank } from './normalise'
+import { qualificationSatisfiesAcademicRequirement } from '@/lib/career-engine/qualification-taxonomy'
+import { profileAcademicRank } from './normalise'
 import { evaluateProfessionalStageGate } from './professional-stage-gate'
 import { evaluateQualificationScope } from './qualification-scope'
 import type {
@@ -46,53 +47,33 @@ function educationSatisfies(
   profile: NormalisedWorkInEducationProfile,
   academicReq: string | null
 ): { ok: boolean; gap?: EligibilityGap } {
-  const req = (academicReq ?? 'none').toLowerCase()
-  const rank = educationLevelRank(profile.education_level)
+  const result = qualificationSatisfiesAcademicRequirement(profile.qualification, academicReq)
+  if (result.ok) return { ok: true }
 
-  if (req === 'none') return { ok: true }
-  if (req === 'degree_relevant' || req === 'accredited_degree_preferred') {
-    if (rank >= 2) return { ok: true }
-    return {
-      ok: false,
-      gap: {
-        type: 'academic_requirement',
-        code: 'education.degree_required',
-        message_key: 'career.academic.degree_required',
-        message: 'Role typically expects a relevant bachelor-level (or higher) qualification',
-        severity: 'blocker',
-        details: {},
+  const req = (academicReq ?? 'none').toLowerCase()
+  const severity: EligibilityGap['severity'] =
+    result.needs_review || req.includes('master')
+      ? 'warning'
+      : req === 'none'
+        ? 'info'
+        : 'blocker'
+
+  return {
+    ok: false,
+    gap: {
+      type: 'academic_requirement',
+      code: result.reason_code,
+      message_key: `career.academic.${result.reason_code.replace(/^academic\./, '')}`,
+      message: result.message,
+      severity: result.needs_review ? 'warning' : severity,
+      details: {
+        user_uk_level: result.user_uk_level,
+        required_uk_level: result.required_uk_level,
+        qualification_type: profile.qualification.type,
+        equivalence_status: profile.qualification.equivalence_status,
       },
-    }
+    },
   }
-  if (req === 'masters_relevant') {
-    if (rank >= 3) return { ok: true }
-    return {
-      ok: false,
-      gap: {
-        type: 'academic_requirement',
-        code: 'education.masters_relevant',
-        message_key: 'career.academic.masters_relevant',
-        message: 'Role typically expects Master’s-level study or equivalent depth',
-        severity: 'warning',
-        details: {},
-      },
-    }
-  }
-  if (req === 'phd_relevant') {
-    if (rank >= 4) return { ok: true }
-    return {
-      ok: false,
-      gap: {
-        type: 'academic_requirement',
-        code: 'education.phd_relevant',
-        message_key: 'career.academic.phd_relevant',
-        message: 'Role typically expects doctoral research training',
-        severity: 'blocker',
-        details: {},
-      },
-    }
-  }
-  return { ok: true }
 }
 
 function experienceSatisfies(
@@ -200,9 +181,9 @@ export function evaluateRoleEligibility(args: {
         code: 'registration.missing_or_unknown',
         message_key: 'career.registration.missing_or_unknown',
         message: regulated
-          ? 'Regulated role — registration/licence pathway must be confirmed before treating as unrestricted employment'
-          : 'Professional registration required or commonly expected',
-        severity: 'blocker',
+          ? 'Professional registration may be required.'
+          : 'Some employers may ask for qualification evidence.',
+        severity: regulated ? 'blocker' : 'warning',
         details: {},
       })
     } else {
@@ -217,12 +198,12 @@ export function evaluateRoleEligibility(args: {
       })
     }
   } else if (regReq === 'commonly_expected' && !hasReg) {
-    warnings.push('Professional registration/membership commonly expected for this role')
+    warnings.push('Some employers may ask for qualification evidence.')
     gaps.push({
       type: 'registration',
       code: 'registration.commonly_expected',
       message_key: 'career.registration.commonly_expected',
-      message: 'Registration/membership commonly expected',
+      message: 'Some employers may ask for qualification evidence.',
       severity: 'info',
       details: {},
     })
@@ -242,18 +223,31 @@ export function evaluateRoleEligibility(args: {
     })
   }
 
+  const overseasEquivalenceReview =
+    profile.qualification.group === 'overseas' &&
+    (profile.qualification.equivalence_status === 'unsure' ||
+      profile.qualification.equivalence_status === 'not_confirmed')
+
   const country_recognition_review_needed =
-    !profile.is_uk_qualification &&
-    (regulated || isHealthcare || isLaw || /recognition|overseas|international/i.test(note))
+    overseasEquivalenceReview ||
+    (!profile.is_uk_qualification &&
+      (regulated || isHealthcare || isLaw || /recognition|overseas|international/i.test(note)))
 
   if (country_recognition_review_needed) {
     gaps.push({
       type: 'qualification_recognition',
-      code: 'recognition.overseas_qualification',
+      code: overseasEquivalenceReview
+        ? 'recognition.overseas_equivalence_unconfirmed'
+        : 'recognition.overseas_qualification',
       message_key: 'career.recognition.overseas_qualification',
-      message: 'Non-UK qualification may need recognition review before UK practice',
-      severity: regulated ? 'blocker' : 'warning',
-      details: { country: profile.qualification_country },
+      message: overseasEquivalenceReview
+        ? 'Overseas qualification equivalence is not confirmed — review required before treating as UK-equivalent'
+        : 'Non-UK qualification may need recognition review before UK practice',
+      severity: regulated || overseasEquivalenceReview ? 'blocker' : 'warning',
+      details: {
+        country: profile.qualification_country,
+        equivalence_status: profile.qualification.equivalence_status,
+      },
     })
     warnings.push('Qualification recognition review recommended')
   }
@@ -317,9 +311,10 @@ export function evaluateRoleEligibility(args: {
   if (academic && profile.career_preferences.wants_academic_route !== false) {
     if (
       edu.ok &&
-      (profile.education_level === 'doctorate' ||
+      (profile.qualification.uk_level === 'level_8' ||
+        profile.education_level === 'doctorate' ||
         !role.academic_requirement?.includes('phd') ||
-        educationLevelRank(profile.education_level) >= 4)
+        profileAcademicRank(profile) >= 4)
     ) {
       effective_fit = 'academic_or_research'
     } else if (!edu.ok) {

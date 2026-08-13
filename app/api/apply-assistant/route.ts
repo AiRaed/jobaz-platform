@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { getOpenAiQualityModel } from '@/lib/openai-model'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -68,6 +69,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    const usageGate = await enforceAiUsageLimit(request, 'apply_assistant', 'apply-assistant')
+    if (!usageGate.allowed) return usageGate.response
 
     // Prepare CV text for analysis
     const cvText = `

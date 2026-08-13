@@ -15,6 +15,9 @@ import { PLAN_SECTION_STYLES } from '@/lib/plan-ui/planVisualSystem'
 type Props = {
   ladder: PathPlanLadder | null | undefined
   fallbackTitles?: string[]
+  /** Real partner referral URL from the active CA plan — never invent Apply Now */
+  preferredApplyUrl?: string | null
+  preferredTrainingTitle?: string | null
 }
 
 function shortTrainingCopy(text?: string): string {
@@ -30,7 +33,12 @@ function displayTrainingTitle(raw: string, isSecurity: boolean): string {
 }
 
 /** Upgrade training card + compact add-ons. Display wording only. */
-export default function TrainingYouNeedNextSection({ ladder, fallbackTitles = [] }: Props) {
+export default function TrainingYouNeedNextSection({
+  ladder,
+  fallbackTitles = [],
+  preferredApplyUrl = null,
+  preferredTrainingTitle = null,
+}: Props) {
   const isSecurity =
     Boolean(ladder?.isSecurityRoute) || /security/i.test(ladder?.routeLabel ?? '')
   const upgradeRole =
@@ -38,8 +46,9 @@ export default function TrainingYouNeedNextSection({ ladder, fallbackTitles = []
     (isSecurity ? 'Door Supervisor' : ladder?.trainNext[0]?.title || 'your next role')
 
   const primaryTitle =
-    ladder?.trainNext[0]?.title ??
-    ladder?.trainingTitles[0] ??
+    preferredTrainingTitle ||
+    ladder?.trainNext[0]?.title ||
+    ladder?.trainingTitles[0] ||
     fallbackTitles[0]
 
   const addOnTitles = useMemo(() => {
@@ -94,9 +103,13 @@ export default function TrainingYouNeedNextSection({ ladder, fallbackTitles = []
 
   const rawTitle = primaryCard?.title || primaryTitle || 'Recommended training'
   const displayTitle = displayTrainingTitle(rawTitle, isSecurity)
-  const referralUrl = (primaryCard?.referralUrl || '').trim()
+  const referralUrl = (preferredApplyUrl || primaryCard?.referralUrl || '').trim()
   const officialUrl = (primaryCard?.officialUrl || '').trim()
-  const googleUrl = primaryCard?.googleSearchUrl
+  const googleUrl =
+    primaryCard?.googleSearchUrl ||
+    (primaryTitle
+      ? `https://www.google.com/search?q=${encodeURIComponent(`${primaryTitle} course UK`)}`
+      : null)
   const isPartner = Boolean(referralUrl)
   const isOfficial = Boolean(officialUrl) && !referralUrl
   const detailHref = primaryCard?.slug ? `/courses/${primaryCard.slug}` : null
@@ -210,16 +223,19 @@ export default function TrainingYouNeedNextSection({ ladder, fallbackTitles = []
               </a>
             )}
             {!isPartner && !isOfficial && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (googleUrl) window.open(googleUrl, '_blank', 'noopener,noreferrer')
-                }}
-                className="jobaz-btn-secondary w-full"
-              >
-                <Search className="w-3.5 h-3.5" />
-                Search courses later
-              </button>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (googleUrl) window.open(googleUrl, '_blank', 'noopener,noreferrer')
+                  }}
+                  className="jobaz-btn-secondary w-full"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  Search courses later
+                </button>
+                <p className="text-center text-[11px] text-slate-500">Coming soon on JobAZ</p>
+              </div>
             )}
 
             {detailHref ? (

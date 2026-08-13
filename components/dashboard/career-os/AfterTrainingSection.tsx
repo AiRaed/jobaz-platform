@@ -32,8 +32,8 @@ export default function AfterTrainingSection({ ladder, suggestedRoles = [] }: Pr
     <section id="after-training" className="space-y-2.5">
       <PlanSectionHeader
         accent="training"
-        title="After Training"
-        subtitle="Roles that open after your upgrade training."
+        title="Future routes"
+        subtitle="Progression roles to work toward later — after more experience or training."
       />
       <ul className="flex flex-wrap gap-2">
         {roles.map((role) => (

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
 import { normalizeSummaryParagraph, stripPlaceholders } from '@/lib/normalize'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,9 @@ export async function POST(req: Request) {
       console.log('[AI] result', { ok: true, summary: mockContent })
       return NextResponse.json({ ok: true, summary: mockContent })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'generate')
+    if (!usageGate.allowed) return usageGate.response
 
     // Extract information from input (excluding names)
     const experienceInfo = experience && experience.length > 0 

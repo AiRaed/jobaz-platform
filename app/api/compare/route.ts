@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { getOpenAiQualityModel } from '@/lib/openai-model'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
         ],
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'compare')
+    if (!usageGate.allowed) return usageGate.response
 
     const prompt = content 
       ? `Generate three distinct, high-quality variations (labeled A, B, and C) of this CV section suitable for UI/UX or front-end developer roles. Write as clean paragraph text only - no headings, no bullets, no labels, no prefixes. Write in English only:\n\n${content}`

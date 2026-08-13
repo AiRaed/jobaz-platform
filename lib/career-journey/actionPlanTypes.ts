@@ -48,7 +48,7 @@ export type ActionTier = {
   accent: 'emerald' | 'cyan' | 'violet'
 }
 
-export type MissionTaskStatus = 'not_started' | 'in_progress' | 'done'
+export type MissionTaskStatus = 'not_started' | 'in_progress' | 'applied' | 'done'
 
 export type MissionItem = {
   id: string

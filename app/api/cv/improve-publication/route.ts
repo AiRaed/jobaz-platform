@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 type QualityRating = 'Strong' | 'Good' | 'Needs Improvement'
 
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
         },
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'improve-publication')
+    if (!usageGate.allowed) return usageGate.response
 
     const isAcademic = mode === 'academic'
 

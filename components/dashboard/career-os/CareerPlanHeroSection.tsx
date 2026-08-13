@@ -10,30 +10,54 @@ import { PLAN_SECTION_STYLES, resolvePlanRouteVisual } from '@/lib/plan-ui/planV
 
 type Props = {
   roadmap: CareerRoadmap
+  /** Optional one-liner from Career Assistant ca_selection */
+  planSubtitle?: string | null
+  futureRoute?: string | null
+  /** Override hero focus from latest CA plan identity */
+  currentFocusOverride?: string | null
+  nextTrainingOverride?: string | null
 }
 
 /** Polished plan hero — route badge + accent stats. Display only. */
-export default function CareerPlanHeroSection({ roadmap }: Props) {
+export default function CareerPlanHeroSection({
+  roadmap,
+  planSubtitle,
+  futureRoute,
+  currentFocusOverride,
+  nextTrainingOverride,
+}: Props) {
   const action = roadmap.continueJourney
-  const currentRole = roadmap.targetRole || roadmap.destination.targetRole
-  const upgradeRole =
+  const currentRole =
+    (currentFocusOverride || '').trim() ||
+    roadmap.targetRole ||
+    roadmap.destination.targetRole
+  const trainTitle =
+    (nextTrainingOverride || '').trim() ||
+    roadmap.pathLadder?.trainNext[0]?.title
+  const futureTitle =
+    futureRoute ||
     roadmap.pathLadder?.upgradeAfter[0]?.title ||
-    roadmap.destination.nextRole ||
-    roadmap.suggestedRoles[0]?.title
-  const trainTitle = roadmap.pathLadder?.trainNext[0]?.title
+    null
+  // Next upgrade = selected training/course first — never a future academic role
+  const nextUpgrade = trainTitle || null
   const isSecurityRoute =
     Boolean(roadmap.pathLadder?.isSecurityRoute) || /security/i.test(roadmap.routeLabel)
 
-  const explanation = isSecurityRoute
-    ? 'Start earning through event/security steward roles now, then use SIA Door Supervisor to unlock better-paid security roles.'
-    : currentRole && upgradeRole && upgradeRole !== currentRole
-      ? `Work now as ${currentRole}. Training is the upgrade path toward ${upgradeRole}${
-          trainTitle ? ` (${trainTitle})` : ''
-        }.`
-      : currentRole
-        ? `Start with ${currentRole} now. Complete upgrade training when you are ready.`
-        : 'Your Career Coach route — work now first, then train to upgrade.'
+  const explanation =
+    planSubtitle?.trim() ||
+    (isSecurityRoute
+      ? 'Start earning through event/security steward roles now, then use SIA Door Supervisor to unlock better-paid security roles.'
+      : currentRole && futureTitle && futureTitle !== currentRole
+        ? `Work now as ${currentRole}. Future route: ${futureTitle}${
+            trainTitle ? `. Next training: ${trainTitle}` : ''
+          }.`
+        : currentRole && trainTitle
+          ? `Work now as ${currentRole}. Next upgrade: ${trainTitle}.`
+          : currentRole
+            ? `Start with ${currentRole} now. Complete upgrade training when you are ready.`
+            : 'Your Career Coach route — work now first, then train to upgrade.')
 
+  const headerTitle = currentRole || roadmap.routeLabel
   const routeVisual = resolvePlanRouteVisual(roadmap.routePathId, roadmap.routeLabel)
   const RouteIcon = routeVisual.Icon
   const route = PLAN_SECTION_STYLES.route
@@ -97,26 +121,39 @@ export default function CareerPlanHeroSection({ roadmap }: Props) {
               </p>
             </div>
             <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight">
-              {roadmap.routeLabel}
+              {headerTitle}
             </h2>
             <p className="text-sm text-slate-400 mt-1.5 max-w-2xl leading-relaxed">
               {explanation}
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 max-w-lg">
+          <div
+            className={cn(
+              'grid gap-3 max-w-2xl grid-cols-1 sm:grid-cols-2',
+              futureTitle ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+            )}
+          >
             <div className={cn('rounded-xl border px-3 py-2.5', route.chip)}>
               <p className="text-[10px] uppercase tracking-wider opacity-70">Current focus</p>
-              <p className="text-sm font-medium mt-0.5 truncate" title={currentRole}>
+              <p className="text-sm font-medium mt-0.5 break-words" title={currentRole}>
                 {currentRole || '—'}
               </p>
             </div>
             <div className={cn('rounded-xl border px-3 py-2.5', route.chip)}>
               <p className="text-[10px] uppercase tracking-wider opacity-70">Next upgrade</p>
-              <p className="text-sm font-medium mt-0.5 truncate" title={upgradeRole}>
-                {upgradeRole || '—'}
+              <p className="text-sm font-medium mt-0.5 break-words" title={nextUpgrade || undefined}>
+                {nextUpgrade || '—'}
               </p>
             </div>
+            {futureTitle ? (
+              <div className={cn('rounded-xl border px-3 py-2.5', route.chip)}>
+                <p className="text-[10px] uppercase tracking-wider opacity-70">Future route</p>
+                <p className="text-sm font-medium mt-0.5 break-words" title={futureTitle}>
+                  {futureTitle}
+                </p>
+              </div>
+            ) : null}
 
             <div className="relative" ref={popoverRef}>
               <button

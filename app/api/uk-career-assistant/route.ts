@@ -96,38 +96,61 @@ interface AIResponse {
 }
 
 /**
- * Normalize option schema to {value, label} format
+ * Normalize option schema to {value, label, ...} format
  * Handles various input shapes: {id, text}, {value, label}, or mixed
+ * Preserves launch metadata (disabled / badge / helperText / description).
  */
-function normalizeOptions(options: any[]): Array<{ value: string; label: string }> {
+function normalizeOptions(options: any[]): Array<{
+  value: string
+  label: string
+  description?: string
+  disabled?: boolean
+  badge?: string
+  helperText?: string
+}> {
   if (!Array.isArray(options)) return []
-  
-  return options.map(opt => {
-    // If already in correct format, return as-is
-    if (opt.value && opt.label) {
-      return { value: opt.value, label: opt.label }
+
+  return options.map((opt) => {
+    let value: string
+    let label: string
+
+    if (opt?.value && opt?.label) {
+      value = String(opt.value)
+      label = String(opt.label)
+    } else if (opt?.id && opt?.text) {
+      value = String(opt.id)
+      label = String(opt.text)
+    } else if (opt?.value && opt?.text) {
+      value = String(opt.value)
+      label = String(opt.text)
+    } else if (opt?.id && opt?.label) {
+      value = String(opt.id)
+      label = String(opt.label)
+    } else {
+      value = String(opt?.id || opt?.value || opt?.label || opt?.text || opt)
+      label = String(opt?.text || opt?.label || opt?.value || opt?.id || opt)
     }
-    
-    // Convert {id, text} to {value, label}
-    if (opt.id && opt.text) {
-      return { value: opt.id, label: opt.text }
+
+    const description =
+      typeof opt?.description === 'string' && opt.description.trim()
+        ? opt.description.trim()
+        : undefined
+    const disabled = opt?.disabled === true
+    const badge =
+      typeof opt?.badge === 'string' && opt.badge.trim() ? opt.badge.trim() : undefined
+    const helperText =
+      typeof opt?.helperText === 'string' && opt.helperText.trim()
+        ? opt.helperText.trim()
+        : undefined
+
+    return {
+      value,
+      label,
+      ...(description ? { description } : {}),
+      ...(disabled ? { disabled: true } : {}),
+      ...(badge ? { badge } : {}),
+      ...(helperText ? { helperText } : {}),
     }
-    
-    // Convert {value, text} to {value, label}
-    if (opt.value && opt.text) {
-      return { value: opt.value, label: opt.text }
-    }
-    
-    // Convert {id, label} to {value, label}
-    if (opt.id && opt.label) {
-      return { value: opt.id, label: opt.label }
-    }
-    
-    // Fallback: use best available
-    const value = opt.id || opt.value || opt.label || opt.text || String(opt)
-    const label = opt.text || opt.label || opt.value || opt.id || String(opt)
-    
-    return { value, label }
   })
 }
 

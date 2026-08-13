@@ -1,20 +1,24 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useCareerPlan } from '@/hooks/useCareerPlan'
 import { useGeneratedCareerPlan } from '@/hooks/useGeneratedCareerPlan'
 import { useJazPlanEngine } from '@/hooks/useJazPlanEngine'
-import ManagePlanDataControls from '@/components/dashboard/ManagePlanDataControls'
 import CareerPlanHeroSection from './CareerPlanHeroSection'
 import CareerPlanEmptyState from './CareerPlanEmptyState'
+import SelectedFromCareerAssistantSection from './SelectedFromCareerAssistantSection'
+import MyPlanPlanControls from './MyPlanPlanControls'
 import ThisWeeksPlanSection from './ThisWeeksPlanSection'
 import WorkYouCanStartNowSection from './WorkYouCanStartNowSection'
 import TrainingYouNeedNextSection from './TrainingYouNeedNextSection'
 import AfterTrainingSection from './AfterTrainingSection'
 import RouteInsightSummarySection from './RouteInsightSummarySection'
 import SavedRoadmapDrawer from './SavedRoadmapDrawer'
-import { isJobAZPlan } from '@/lib/dashboard/careerOs/mapCareerCoachResultToPlan'
+import WorkspaceErrorBoundary from '@/components/errors/WorkspaceErrorBoundary'
+import { normalizeJobAZPlan } from '@/lib/dashboard/careerOs/mapCareerCoachResultToPlan'
 import { trackJazEvent } from '@/lib/analytics/jazTrackEvent'
+import { supabase } from '@/lib/supabase'
+import { isAdminUser } from '@/lib/auth/adminEmails'
 
 type Props = {
   cvQualityScore: number
@@ -31,7 +35,15 @@ type Props = {
  * Hero (full) → [Week + Jobs | Training + After + Context] → Saved (full)
  * First Action Plan driven by JAZ Plan Engine when available.
  */
-export default function CareerOsDashboard({
+export default function CareerOsDashboard(props: Props) {
+  return (
+    <WorkspaceErrorBoundary name="CareerOsDashboard">
+      <CareerOsDashboardInner {...props} />
+    </WorkspaceErrorBoundary>
+  )
+}
+
+function CareerOsDashboardInner({
   cvQualityScore,
   hasBaseCv,
   savedJobsCount,
@@ -55,12 +67,23 @@ export default function CareerOsDashboard({
     [planItems, savedJobsCount, appliedJobsCount, interviewConfidence, cvQualityScore, hasBaseCv]
   )
 
-  const { roadmap, hasAssessment, loaded, syncStatus, bundle } = useGeneratedCareerPlan(signals)
+  const { roadmap, hasAssessment, loaded, syncStatus, bundle, activePlanMeta } =
+    useGeneratedCareerPlan(signals)
 
   const jobazPlan = useMemo(() => {
-    const raw = bundle?.aiState?.jobaz_plan
-    return isJobAZPlan(raw) ? raw : null
+    return normalizeJobAZPlan(bundle?.aiState?.jobaz_plan)
   }, [bundle])
+
+  const [isAdmin, setIsAdmin] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) setIsAdmin(isAdminUser(data.user?.email))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const jaz = useJazPlanEngine(jobazPlan, {
     hasBaseCv,
@@ -109,8 +132,8 @@ export default function CareerOsDashboard({
     return (
       <div className="pb-8 max-w-2xl space-y-6">
         <CareerPlanEmptyState />
-        <ManagePlanDataControls
-          variant="panel"
+        <MyPlanPlanControls
+          empty
           onCvCleared={onCvCleared}
           onPlanCleared={onPlanCleared}
         />
@@ -138,10 +161,58 @@ export default function CareerOsDashboard({
         </p>
       )}
 
-      <CareerPlanHeroSection roadmap={roadmap} />
+      <CareerPlanHeroSection
+        roadmap={roadmap}
+        planSubtitle={jobazPlan?.route_summary.one_sentence_summary || null}
+        futureRoute={
+          jobazPlan?.ca_selection?.future_route ||
+          jobazPlan?.ca_selection?.future_routes?.[0]?.title ||
+          null
+        }
+        currentFocusOverride={
+          jobazPlan?.ca_selection?.current_focus_role ||
+          jobazPlan?.route_summary.current_target_role ||
+          jobazPlan?.route_summary.route_title ||
+          null
+        }
+        nextTrainingOverride={
+          jobazPlan?.training_next?.title || jobazPlan?.route_summary.next_upgrade_role || null
+        }
+      />
+
+      {isAdmin && process.env.NODE_ENV === 'development' && (jobazPlan?.ca_selection || activePlanMeta) ? (
+        <div
+          className="text-[10px] text-slate-500 font-mono leading-relaxed rounded-lg border border-dashed border-amber-500/30 bg-slate-950/40 px-3 py-2 space-y-1"
+          data-admin-debug="my-plan"
+        >
+          <p className="text-amber-200/80 font-sans font-semibold tracking-wide uppercase">
+            Admin / dev debug only
+          </p>
+          <p>
+            Plan source: {activePlanMeta?.source || 'Career Assistant selected items'} · Current
+            focus source: {jobazPlan?.ca_selection?.focus_source || 'selected immediate role'} ·
+            Replaced previous active plan:{' '}
+            {jobazPlan?.ca_selection?.replaced_previous_plan === false ? 'no' : 'yes'}
+          </p>
+          {activePlanMeta ? (
+            <p>
+              active_plan_id: {activePlanMeta.action_plan_id || '—'} · updated_at:{' '}
+              {activePlanMeta.updated_at || '—'} · user: …{activePlanMeta.user_id_suffix || '—'} ·
+              plans: {activePlanMeta.user_plan_count} · active: {activePlanMeta.active_plan_count}
+            </p>
+          ) : null}
+          {activePlanMeta?.multiple_active_warning ? (
+            <p className="text-rose-400 font-semibold">
+              Data issue: multiple active plans found for this user
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <SelectedFromCareerAssistantSection plan={jobazPlan} />
 
       {jaz.progress && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           {[
             { label: 'CV ready', ok: jaz.progress.cv_ready },
             { label: 'Jobs started', ok: jaz.progress.jobs_started },
@@ -151,10 +222,16 @@ export default function CareerOsDashboard({
           ].map((item) => (
             <div
               key={item.label}
-              className="rounded-lg border border-slate-800 bg-slate-950/40 px-2.5 py-2 text-center"
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/40 dark:shadow-none"
             >
-              <p className="text-[10px] text-slate-500">{item.label}</p>
-              <p className={item.ok ? 'text-xs text-emerald-300 mt-0.5' : 'text-xs text-slate-400 mt-0.5'}>
+              <p className="text-[10px] text-slate-600 dark:text-slate-500">{item.label}</p>
+              <p
+                className={
+                  item.ok
+                    ? 'text-xs text-emerald-800 mt-0.5 dark:text-emerald-300'
+                    : 'text-xs text-slate-700 mt-0.5 dark:text-slate-400'
+                }
+              >
                 {item.ok ? 'Yes' : 'Not yet'}
               </p>
             </div>
@@ -179,6 +256,8 @@ export default function CareerOsDashboard({
           <TrainingYouNeedNextSection
             ladder={roadmap.pathLadder}
             fallbackTitles={trainingFallbackTitles}
+            preferredApplyUrl={jobazPlan?.training_next?.apply_url || null}
+            preferredTrainingTitle={jobazPlan?.training_next?.title || null}
           />
           <AfterTrainingSection
             ladder={roadmap.pathLadder}
@@ -190,11 +269,7 @@ export default function CareerOsDashboard({
 
       <SavedRoadmapDrawer ladder={roadmap.pathLadder} />
 
-      <ManagePlanDataControls
-        variant="panel"
-        onCvCleared={onCvCleared}
-        onPlanCleared={onPlanCleared}
-      />
+      <MyPlanPlanControls onCvCleared={onCvCleared} onPlanCleared={onPlanCleared} />
     </div>
   )
 }

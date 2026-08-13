@@ -18,6 +18,7 @@ import { getJazPageProfile, resolveJazPageId } from '@/lib/jaz/pageRegistry'
 import { getQuickActionsForPage, type JazQuickAction } from '@/lib/jaz/quickActions'
 import JazQuickActionsBar from '@/components/jaz/JazQuickActionsBar'
 import JazTranslateControls from '@/components/jaz/JazTranslateControls'
+import { messageFromAiLimitPayload } from '@/lib/ai-usage/client'
 import JazEyeIcon from '@/components/ui/JazEyeIcon'
 
 export type JazLanguage = 'EN' | 'AR' | 'FA' | 'KU' | 'ES' | 'PL'
@@ -1211,7 +1212,9 @@ export default function JazAssistant({}: JazAssistantProps) {
         }),
       })
 
-      const result: ApplyAssistantResult = await response.json()
+      const result: ApplyAssistantResult & { error?: string; message?: string } = await response.json()
+      const applyLimit = messageFromAiLimitPayload(result, response.status)
+      if (applyLimit) throw new Error(applyLimit)
 
       // Consider success if we got content, even if response.ok is false
       if (!response.ok && (!result || !result.fitScore || result.fitScore.score === 0)) {
@@ -1525,6 +1528,16 @@ export default function JazAssistant({}: JazAssistantProps) {
       })
 
       const data = await response.json()
+      const jazLimit = messageFromAiLimitPayload(data, response.status)
+      if (jazLimit) {
+        appendMessage({
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: jazLimit,
+          timestamp: new Date(),
+        })
+        return
+      }
 
       appendMessage({
         id: `assistant-${Date.now()}`,

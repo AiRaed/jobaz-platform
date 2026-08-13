@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 // Formatting instruction for AI Preview output
 const FORMATTING_INSTRUCTION = `CRITICAL FORMATTING REQUIREMENTS FOR OUTPUT:
@@ -42,6 +43,9 @@ export async function POST(req: Request) {
         letter: `[MOCK ${mode || tone || 'Professional'}] Rewritten cover letter:\n\n${letterText}`,
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cover_letter', 'rewrite')
+    if (!usageGate.allowed) return usageGate.response
 
     const modeGuide: Record<string, string> = {
       'Enhance': 'improve clarity, impact, and professionalism while maintaining the original meaning',

@@ -23,10 +23,6 @@ export function resolveApplyUrl(input: ApplyUrlInput): string | null {
   return null
 }
 
-export function canApplyToCourse(input: ApplyUrlInput): boolean {
-  return resolveApplyUrl(input) !== null
-}
-
 /**
  * Affiliate-first CTA mode from the route-stage framework.
  * Apply Now only when a referral/provider default URL exists.
@@ -39,6 +35,10 @@ export function courseCtaMode(input: ApplyUrlInput): 'apply_now' | 'course_type'
     officialUrl: input.officialUrl,
     published: input.published,
   })
+}
+
+export function canApplyToCourse(input: ApplyUrlInput): boolean {
+  return courseCtaMode(input) === 'apply_now'
 }
 
 /** Open apply destination in a new tab and track the click. Never marks qualification complete. */
@@ -57,7 +57,7 @@ export function openCourseApply(
   // Hard rule: never open Apply Now without a real destination URL
   const targetUrl = resolveApplyUrl(course)
   if (!targetUrl) return false
-  if (action === 'apply_now' && courseCtaMode(course) === 'coming_soon') return false
+  if (action === 'apply_now' && courseCtaMode(course) !== 'apply_now') return false
 
   void trackCourseEvent({
     courseId: course.id,

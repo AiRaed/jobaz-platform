@@ -684,7 +684,7 @@ export default function JobFinderPage() {
             Job Finder
           </h2>
           <p className="text-sm text-slate-300/95 mt-1.5 max-w-2xl leading-relaxed">
-            Search UK roles that match your skills — then save jobs and open them in your plan.
+            Search UK roles that match your skills. Save jobs if you want — no plan required.
           </p>
         </section>
 
@@ -731,10 +731,10 @@ export default function JobFinderPage() {
 
         {/* Prefill Hint from Career Assistant (only show if no back banner) */}
         {prefillLabel && !caSessionId && (
-          <div className="mb-6 p-4 rounded-xl border border-purple-500/30 bg-purple-950/20 backdrop-blur-sm flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm text-purple-200">
+          <div className="mb-6 p-4 rounded-xl border border-purple-500/30 bg-purple-950/20 backdrop-blur-sm flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-purple-200">
               <span>Prefilled from Career Assistant:</span>
-              <span className="font-medium text-purple-100">{prefillLabel}</span>
+              <span className="font-medium text-purple-100 break-words">{prefillLabel}</span>
             </div>
             <button
               onClick={handleClearPrefill}

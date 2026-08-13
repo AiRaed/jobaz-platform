@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,6 +49,9 @@ export async function POST(req: NextRequest) {
         shortTip: 'Focus on adding specific examples and quantifiable results to strengthen your answer.',
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'interview_coach', 'evaluate')
+    if (!usageGate.allowed) return usageGate.response
 
     // Build context-aware prompt
     const jobContext = jobTitle || company 

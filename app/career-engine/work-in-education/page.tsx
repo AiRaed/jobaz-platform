@@ -1,46 +1,43 @@
-'use client'
+import WorkInEducationKnowledgeEngineClient from '@/components/career-engine/work-in-education/WorkInEducationKnowledgeEngineClient'
+import WorkInEducationLegacyClient from '@/components/career-engine/work-in-education/WorkInEducationLegacyClient'
+import { resolveWieKnowledgeEngineForRequest } from '@/lib/career-engine/work-in-education/resolve-flag-server'
 
-import CareerEnginePathPage from '@/components/career-engine/conversation/CareerEnginePathPage'
-import EducationPathResultView from '@/components/career-engine/education-path/EducationPathResult'
-import type { EducationPathAnswers, EducationPathResult } from '@/lib/career-engine/education-path/types'
-import { buildEducationPathResult } from '@/lib/career-engine/education-path/decisionEngine'
-import { getSeedKnowledge } from '@/lib/career-engine/education-path/knowledge/seed'
+export const dynamic = 'force-dynamic'
 
-async function buildEducationResult(answers: Record<string, string>): Promise<EducationPathResult> {
-  const typed = answers as EducationPathAnswers
+type SearchParams = Record<string, string | string[] | undefined>
 
-  try {
-    const res = await fetch('/api/career-engine/education-path', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(typed),
+/**
+ * Work in My Education entry (Career Assistant pathway redirect target).
+ *
+ * Routing:
+ * - Knowledge engine (Batch 4/5 wizard): when flag is ON
+ *   (CAREER_KNOWLEDGE_ENGINE_WORK_IN_EDUCATION_V1=true, or development default,
+ *   or admin override cookie via /api/.../test-mode).
+ * - Legacy conversation: when flag is OFF / explicitly false, or ?legacy=1.
+ *
+ * Rollback: CAREER_KNOWLEDGE_ENGINE_WORK_IN_EDUCATION_V1=false
+ */
+export default async function WorkInEducationPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams
+}) {
+  const forceLegacy = String(searchParams?.legacy ?? '') === '1'
+  const { enabled, isAdmin } = await resolveWieKnowledgeEngineForRequest({ searchParams })
+
+  if (process.env.NODE_ENV === 'development') {
+    console.info('[work-in-education] route', {
+      knowledge_engine: enabled && !forceLegacy,
+      force_legacy: forceLegacy,
+      is_admin: isAdmin,
     })
-
-    if (res.ok) {
-      const body = (await res.json()) as {
-        result: EducationPathResult
-        structuredRecommendations?: EducationPathResult['structuredRecommendations']
-      }
-      return {
-        ...body.result,
-        structuredRecommendations: body.structuredRecommendations ?? body.result.structuredRecommendations,
-      }
-    }
-  } catch {
-    // fallback below
   }
 
-  return buildEducationPathResult(typed, getSeedKnowledge(typed.education_field))
-}
+  if (!forceLegacy && enabled) {
+    // Banner only for verified admins in development — never for normal users.
+    const showAdminBanner = Boolean(isAdmin && process.env.NODE_ENV === 'development')
+    return <WorkInEducationKnowledgeEngineClient showAdminBanner={showAdminBanner} />
+  }
 
-export default function WorkInEducationPage() {
-  return (
-    <CareerEnginePathPage
-      goalId="work_in_education"
-      buildStructuredResult={buildEducationResult}
-      renderStructuredResult={(result, isGuest) => (
-        <EducationPathResultView result={result as EducationPathResult} isGuest={isGuest} />
-      )}
-    />
-  )
+  return <WorkInEducationLegacyClient />
 }

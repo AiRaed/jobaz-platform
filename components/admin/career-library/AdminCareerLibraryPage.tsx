@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  ArrowLeft,
   BookOpen,
   ChevronDown,
   ChevronUp,
@@ -12,7 +11,6 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react'
-import AppShell from '@/components/layout/AppShell'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -29,6 +27,10 @@ import {
 import AssessmentBlueprintPanel from '@/components/admin/career-library/AssessmentBlueprintPanel'
 import CareerRolesPanel from '@/components/admin/career-library/CareerRolesPanel'
 import ReportRulesPanel from '@/components/admin/career-library/ReportRulesPanel'
+import {
+  UkCaAdminShell,
+  UkCaNote,
+} from '@/components/admin/career-library/UkCaAdminShell'
 
 type TabId =
   | 'fields'
@@ -130,7 +132,11 @@ export default function AdminCareerLibraryPage() {
     try {
       const res = await fetch('/api/admin/career-library', { cache: 'no-store' })
       if (!res.ok) {
-        addToast({ title: 'Could not load Career Library', description: await readError(res), variant: 'error' })
+        addToast({
+          title: 'Could not load Work in My Education Library',
+          description: await readError(res),
+          variant: 'error',
+        })
         return
       }
       const data = (await res.json()) as CareerLibraryOverview
@@ -139,7 +145,7 @@ export default function AdminCareerLibraryPage() {
       setStageModels(data.stageModels ?? [])
     } catch (err) {
       addToast({
-        title: 'Could not load Career Library',
+        title: 'Could not load Work in My Education Library',
         description: err instanceof Error ? err.message : 'Network error',
         variant: 'error',
       })
@@ -157,63 +163,67 @@ export default function AdminCareerLibraryPage() {
     [stageModels]
   )
 
+  const libraryStats = useMemo(
+    () => [
+      { label: 'Career fields', value: fields.length },
+      { label: 'Specialisms', value: specialisms.length },
+      {
+        label: 'Stage models',
+        value: stageModels.length,
+        hint: `${activeStageModels.length} active`,
+      },
+      {
+        label: 'Approved fields',
+        value: fields.filter((f) => f.status === 'approved').length,
+      },
+      {
+        label: 'Draft / other fields',
+        value: fields.filter((f) => f.status !== 'approved').length,
+      },
+    ],
+    [fields, specialisms, stageModels, activeStageModels]
+  )
+
   return (
-    <AppShell>
-      <header className="mb-6 pb-5 border-b border-slate-800/60">
-        <Link
-          href="/admin"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 transition mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Admin
-        </Link>
-        <div className="flex items-start gap-3">
-          <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-cyan-500/30 bg-cyan-950/30 shrink-0">
-            <BookOpen className="w-5 h-5 text-cyan-300" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-widest text-cyan-300/90 mb-1">
-              Foundation · Knowledge brain
-            </p>
-            <h1 className="text-2xl font-bold text-slate-50">Career Knowledge Library</h1>
-            <p className="text-sm text-slate-400 mt-1.5 max-w-2xl">
-              Empty data-management foundation for the next Career Assistant. No public careers are
-              connected yet — populate fields, specialisms, and stage models from here.
-            </p>
-            <p className="mt-2">
-              <Link
-                href="/admin/career-library/test-work-in-education"
-                className="text-sm text-cyan-400/90 hover:text-cyan-300"
-              >
-                Work in My Education — match test harness →
-              </Link>
-            </p>
-          </div>
-        </div>
-      </header>
-
-      <nav className="flex flex-wrap gap-2 mb-6" aria-label="Career Library sections">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setTab(item.id)}
-            className={cn(
-              'px-3 py-1.5 rounded-lg text-xs font-medium border transition',
-              tab === item.id
-                ? 'border-cyan-500/40 bg-cyan-950/40 text-cyan-100'
-                : 'border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-600',
-              !item.ready && tab !== item.id && 'opacity-70'
-            )}
-          >
-            {item.label}
-            {!item.ready && (
-              <span className="ml-1.5 text-[9px] uppercase tracking-wider text-slate-500">later</span>
-            )}
-          </button>
-        ))}
-      </nav>
-
+    <UkCaAdminShell
+      icon={<BookOpen className="h-5 w-5 text-cyan-300" aria-hidden />}
+      breadcrumb="Education library"
+      title="Work in My Education Library"
+      description="Education-based career knowledge for users who want to use their degree, academic field, or studied subject in the UK. Manages fields, specialisms, stages, education routes, roles, learning options, and recognition notes."
+      notes={
+        <UkCaNote>
+          Previously called Career Knowledge Library. This library powers the Work in My Education
+          path.
+        </UkCaNote>
+      }
+      actions={[
+        {
+          href: '/api/career-assistant/work-in-my-education/test-mode',
+          label: 'Open Work in My Education test mode',
+          primary: true,
+        },
+        {
+          href: '/career-engine/work-in-education',
+          label: 'Open public Work in My Education flow',
+        },
+        {
+          href: '/admin/career-library/test-work-in-education',
+          label: 'Match test harness',
+        },
+        {
+          href: '/admin/career-library/test-work-in-education-assessment',
+          label: 'Assessment preview',
+        },
+        {
+          href: '/admin/career-library/test-work-in-education-wizard',
+          label: 'Assessment wizard',
+        },
+      ]}
+      stats={libraryStats}
+      tabs={TABS}
+      activeTab={tab}
+      onTabChange={(id) => setTab(id as TabId)}
+    >
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-20 text-sm text-slate-400">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -288,7 +298,7 @@ export default function AdminCareerLibraryPage() {
           )}
         </>
       )}
-    </AppShell>
+    </UkCaAdminShell>
   )
 }
 

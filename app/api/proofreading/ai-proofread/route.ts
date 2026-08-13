@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -93,6 +94,9 @@ export async function POST(req: NextRequest) {
         { status: 503 }
       )
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'writing_review', 'ai-proofread')
+    if (!usageGate.allowed) return usageGate.response
 
     const completion = await aiProvider.generateText({
       messages: [

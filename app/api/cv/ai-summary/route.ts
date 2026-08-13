@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 type CareerDomain = 'tech' | 'design' | '3d_animation' | 'hospitality' | 'production' | 'customer_service' | 'supervisor' | 'general'
 
@@ -99,6 +100,9 @@ export async function POST(req: Request) {
         summary: isKeywordGeneration ? `[MOCK] ${instruction}` : `[MOCK] ${instruction}\n\n${summary}`,
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'ai-summary')
+    if (!usageGate.allowed) return usageGate.response
 
     // Extract keywords if this is keyword generation
     let keywords = ''

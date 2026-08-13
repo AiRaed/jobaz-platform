@@ -9,6 +9,7 @@ import PublicToolLayout from '@/components/guest-tools/PublicToolLayout'
 import { playQuestionWithTts, playQuestionWithReadyPrompt, stopQuestionAudio } from '@/lib/tts-helper'
 import { cn } from '@/lib/utils'
 import TranslatableText from '@/components/TranslatableText'
+import { messageFromAiLimitPayload } from '@/lib/ai-usage/client'
 import {
   InterviewJourneyProgress,
   InterviewSourceBanner,
@@ -812,8 +813,8 @@ export default function InterviewCoachPage() {
           errorMessage = 'Voice evaluation failed. Please check your connection and try again.'
         } else if (errorData.error === 'AI_PARSE_ERROR') {
           errorMessage = 'Failed to parse AI response. Please try again.'
-        } else if (errorData.message) {
-          errorMessage = errorData.message
+        } else if (errorData.error === 'AI_LIMIT_REACHED' || errorData.message) {
+          errorMessage = messageFromAiLimitPayload(errorData, response.status) || errorData.message
         }
       } catch (e) {
         // If we can't parse the error, use default message
@@ -905,6 +906,8 @@ export default function InterviewCoachPage() {
       })
 
       const data = await response.json()
+      const limitMsg = messageFromAiLimitPayload(data, response.status)
+      if (limitMsg) throw new Error(limitMsg)
       
       // Check if this result is stale (newer evaluation request exists)
       if (currentRequestId !== evaluationRequestIdRef.current) {
@@ -1036,6 +1039,11 @@ export default function InterviewCoachPage() {
       })
 
       const data = await response.json()
+      const limitMsg = messageFromAiLimitPayload(data, response.status)
+      if (limitMsg) {
+        alert(limitMsg)
+        return
+      }
       
       if (data.ok && data.improvedSample) {
         setImprovedAnswer(data.improvedSample)
@@ -2013,6 +2021,11 @@ export default function InterviewCoachPage() {
       })
 
       const data = await response.json()
+      const limitMsg = messageFromAiLimitPayload(data, response.status)
+      if (limitMsg) {
+        alert(limitMsg)
+        return
+      }
 
       if (data.ok) {
         setMemoryEvaluationResult({

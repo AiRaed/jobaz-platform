@@ -10,6 +10,10 @@ import {
   MAIN_GOALS,
   REMOTE_PREFERENCES,
 } from './constants'
+import {
+  normalizeMobileCountryCode,
+  normalizeMobilePhone,
+} from './mobilePhone'
 import { emptyCareerIdentity, type UserCareerIdentity } from './types'
 
 export async function tableExists(supabase: SupabaseClient, table: string): Promise<boolean> {
@@ -30,6 +34,7 @@ function pickEnum<T extends string>(v: unknown, allowed: readonly T[]): T | null
 }
 
 export function mapCareerIdentityRow(row: Record<string, unknown>): UserCareerIdentity {
+  const phoneResult = normalizeMobilePhone(row.mobile_phone)
   return {
     id: row.id ? String(row.id) : undefined,
     user_id: String(row.user_id),
@@ -68,6 +73,18 @@ export function mapCareerIdentityRow(row: Record<string, unknown>): UserCareerId
     barriers: asStringArray(row.barriers).filter((b) =>
       (BARRIERS as readonly string[]).includes(b)
     ) as UserCareerIdentity['barriers'],
+    mobile_phone: phoneResult.ok ? phoneResult.value : null,
+    mobile_country_code: normalizeMobileCountryCode(row.mobile_country_code),
+    message_reminders_opt_in: Boolean(row.message_reminders_opt_in),
+    message_reminders_opted_in_at: row.message_reminders_opted_in_at
+      ? String(row.message_reminders_opted_in_at)
+      : null,
+    message_reminders_opted_out_at: row.message_reminders_opted_out_at
+      ? String(row.message_reminders_opted_out_at)
+      : null,
+    message_consent_source: row.message_consent_source
+      ? String(row.message_consent_source).slice(0, 40)
+      : 'profile',
     created_at: row.created_at ? String(row.created_at) : undefined,
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
   }
@@ -77,8 +94,20 @@ export function sanitizeCareerIdentityPatch(
   body: Record<string, unknown>,
   userId: string
 ): UserCareerIdentity {
+  const phoneResult = normalizeMobilePhone(body.mobile_phone)
+  if (!phoneResult.ok) {
+    throw new Error(phoneResult.error)
+  }
+
   const base = emptyCareerIdentity(userId)
-  const merged = { ...base, ...mapCareerIdentityRow({ ...base, ...body, user_id: userId }) }
+  const merged = {
+    ...base,
+    ...mapCareerIdentityRow({ ...base, ...body, user_id: userId }),
+    mobile_phone: phoneResult.value,
+    mobile_country_code: normalizeMobileCountryCode(body.mobile_country_code),
+    // Never trust client timestamps / force default-off unless explicitly true
+    message_reminders_opt_in: body.message_reminders_opt_in === true,
+  }
   return {
     ...merged,
     preferred_route: merged.preferred_route?.slice(0, 160) || null,
@@ -96,6 +125,7 @@ export function sanitizeCareerIdentityPatch(
     interested_categories: merged.interested_categories.slice(0, 20),
     barriers: merged.barriers.slice(0, 20),
     job_type: merged.job_type.slice(0, 10),
+    message_consent_source: 'profile',
   }
 }
 
@@ -131,7 +161,52 @@ export function toDbPayload(identity: UserCareerIdentity) {
     short_bio: identity.short_bio,
     looking_for: identity.looking_for,
     barriers: identity.barriers,
+    mobile_phone: identity.mobile_phone,
+    mobile_country_code: identity.mobile_country_code,
+    message_reminders_opt_in: identity.message_reminders_opt_in === true,
+    message_reminders_opted_in_at: identity.message_reminders_opted_in_at,
+    message_reminders_opted_out_at: identity.message_reminders_opted_out_at,
+    message_consent_source: identity.message_consent_source || 'profile',
     updated_at: new Date().toISOString(),
+  }
+}
+
+/** Apply opt-in / opt-out timestamps when consent changes. */
+export function applyMessageConsentTimestamps(
+  next: UserCareerIdentity,
+  previous: UserCareerIdentity | null
+): UserCareerIdentity {
+  const wasOn = previous?.message_reminders_opt_in === true
+  const isOn = next.message_reminders_opt_in === true
+  const now = new Date().toISOString()
+
+  if (isOn && !wasOn) {
+    return {
+      ...next,
+      message_reminders_opt_in: true,
+      message_reminders_opted_in_at: now,
+      message_reminders_opted_out_at: null,
+      message_consent_source: 'profile',
+    }
+  }
+
+  if (!isOn && wasOn) {
+    return {
+      ...next,
+      message_reminders_opt_in: false,
+      message_reminders_opted_out_at: now,
+      message_consent_source: 'profile',
+    }
+  }
+
+  return {
+    ...next,
+    message_reminders_opt_in: isOn,
+    message_reminders_opted_in_at:
+      previous?.message_reminders_opted_in_at ?? next.message_reminders_opted_in_at,
+    message_reminders_opted_out_at:
+      previous?.message_reminders_opted_out_at ?? next.message_reminders_opted_out_at,
+    message_consent_source: next.message_consent_source || 'profile',
   }
 }
 
@@ -157,7 +232,9 @@ export async function upsertCareerIdentity(
   supabase: SupabaseClient,
   identity: UserCareerIdentity
 ): Promise<UserCareerIdentity> {
-  const payload = toDbPayload(identity)
+  const { identity: previous } = await loadCareerIdentity(supabase, identity.user_id)
+  const withConsent = applyMessageConsentTimestamps(identity, previous)
+  const payload = toDbPayload(withConsent)
   const { data, error } = await supabase
     .from('user_career_identity')
     .upsert(payload, { onConflict: 'user_id' })

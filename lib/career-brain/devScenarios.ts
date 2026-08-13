@@ -41,6 +41,7 @@ function runEntryFlowChecks() {
     throw new Error(`Expected 6 strategic pathway options, got ${goalOptions.length}`)
   }
   for (const removed of [
+    'work_in_experience',
     'first_job',
     'unemployed',
     'career_change',
@@ -53,6 +54,26 @@ function runEntryFlowChecks() {
     if (goalOptions.includes(removed)) {
       throw new Error(`Removed pathway option still on selector: ${removed}`)
     }
+  }
+  for (const active of [
+    'work_in_education',
+    'work_in_profession',
+    'start_new_career',
+    'side_job',
+  ]) {
+    if (!goalOptions.includes(active)) {
+      throw new Error(`Launch pathway missing from selector: ${active}`)
+    }
+  }
+  for (const comingSoon of ['grow_career', 'start_business']) {
+    const opt = GOAL_QUESTION.options?.find((o) => o.value === comingSoon)
+    if (!opt?.disabled) {
+      throw new Error(`Expected ${comingSoon} to be Coming Soon (disabled) on selector`)
+    }
+  }
+  // Coming Soon routes stay at the bottom
+  if (goalOptions[goalOptions.length - 2] !== 'grow_career' || goalOptions[goalOptions.length - 1] !== 'start_business') {
+    throw new Error('Coming Soon routes must be at the bottom of the goal selector')
   }
 
   const afterStartNewCareer = { answers: { cb_user_goal: 'start_new_career' }, path_story: '' }

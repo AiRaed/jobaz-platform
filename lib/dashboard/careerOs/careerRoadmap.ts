@@ -30,6 +30,7 @@ import { computeCareerReadiness } from './readiness'
 import { groupRequirementsBySection } from './trainingActions'
 import { buildPathPlanLadder } from './pathPlanLadder'
 import type { PathPlanLadder } from './pathPlanLadder'
+import { isJobAZPlan } from './mapCareerCoachResultToPlan'
 import { isSiaDoorTitle, titlesMatchLoose } from './myPlanDisplayFilter'
 import type {
   CareerMilestone,
@@ -503,8 +504,16 @@ export function generateCareerRoadmap(
   const { essentialActions, recommendedCourses } = splitTrainingDetails(requirements)
 
   const destination = buildCareerDestination(bundle, routeLabel, pathId, planType)
+  const storedPlan = bundle.aiState?.jobaz_plan
+  const caFocus =
+    storedPlan && isJobAZPlan(storedPlan)
+      ? storedPlan.ca_selection?.immediate_role ||
+        storedPlan.ca_selection?.current_focus_role ||
+        storedPlan.route_summary.current_target_role ||
+        storedPlan.cv_target_role
+      : null
   const targetRole =
-    pathLadder?.startNow[0]?.title ?? destinationTargetRole(destination)
+    pathLadder?.startNow[0]?.title ?? caFocus ?? destinationTargetRole(destination)
   const suggestedRoles =
     pathLadder?.upgradeAfter.map((s) => ({ title: s.title })) ??
     extractSuggestedRoles(bundle, targetRole)

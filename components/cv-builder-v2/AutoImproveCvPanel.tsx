@@ -5,6 +5,7 @@ import { Loader2, Sparkles, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CvData } from '@/app/cv-builder-v2/page'
 import { analyzeCvHealth } from '@/lib/cv-optimization'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 
 type Stage = {
   id: string
@@ -35,8 +36,10 @@ async function fetchTailor(body: Record<string, unknown>) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+  const data = await response.json().catch(() => ({}))
+  const limitErr = aiLimitErrorFromResponse(response, data)
+  if (limitErr) throw limitErr
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const data = await response.json()
   if (!data.ok) throw new Error(data.error || 'AI request failed')
   return data
 }

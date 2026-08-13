@@ -8,6 +8,11 @@ import type { ExtraIncomePlanResult } from '@/lib/career-engine/extra-income/typ
 import type { CareerEnginePlanResult } from '@/lib/career-engine/shared/planTypes'
 import type { StartNewCareerPlanResult } from '@/lib/career-engine/start-new-career/types'
 import {
+  isTitleSafeForWorkInEducation,
+  wieMatchTierBoost,
+} from '@/lib/career-engine/work-in-education/course-alignment'
+import { trackJazEventServer } from '@/lib/analytics/jazTrackEvent'
+import {
   buildOtherSuggestionsFromResult,
   matchEducationRecommendations,
 } from './matchEducationRecommendations'
@@ -97,6 +102,11 @@ export async function buildStructuredEducationRecommendations(
     loadServerPublishedCourses(),
   ])
 
+  const wieCtx = {
+    educationField: answers.education_field,
+    specialism: answers.education_specialisation || answers.education_specialisation_other,
+  }
+
   // Field/spec opportunity cards (may already be structured) + title resolve from Brain courses
   const supplemental = matchEducationRecommendations({
     answers,
@@ -117,11 +127,13 @@ export async function buildStructuredEducationRecommendations(
   // Common electrical / engineering short-names if Brain named certs differently
   if (answers.education_field === 'engineering') {
     const extras = ['18th Edition', 'ECS', 'APM', 'AutoCAD', 'CSCS', 'IOSH', 'NEBOSH']
-    for (const t of extras) titleCandidates.push({ title: t })
+    for (const t of extras) {
+      if (isTitleSafeForWorkInEducation(t, wieCtx)) titleCandidates.push({ title: t })
+    }
   }
 
   const resolved = resolveCourseRecommendationTitles({
-    titles: titleCandidates,
+    titles: titleCandidates.filter((t) => isTitleSafeForWorkInEducation(t.title, wieCtx)),
     publishedCourses,
     opportunities,
     goal: 'work_in_education',
@@ -131,10 +143,37 @@ export async function buildStructuredEducationRecommendations(
     limit: 4,
   })
 
-  const recommendedCourses = rankResolvedCourseCards([
-    ...resolved.cards,
-    ...supplemental,
-  ]).slice(0, 4)
+  // Drop any resolved cards that failed WIE title safety (defence in depth)
+  const safeResolved = resolved.cards.filter((c) => isTitleSafeForWorkInEducation(c.title, wieCtx))
+
+  const merged = rankResolvedCourseCards([...safeResolved, ...supplemental])
+    .sort((a, b) => wieMatchTierBoost(b) - wieMatchTierBoost(a))
+    .slice(0, 4)
+
+  // If Brain/resolution only produced unsafe commercial noise, fall back to supplemental (may be gap cards)
+  const recommendedCourses =
+    merged.length > 0
+      ? merged
+      : supplemental.slice(0, 4)
+
+  // Learning Loop: record missing provider / suggested course type opportunities
+  for (const card of recommendedCourses) {
+    if (card.commercialStatus === 'no_link' || card.id.startsWith('wie-gap-')) {
+      void trackJazEventServer({
+        event_type: 'course_missing_affiliate_detected',
+        event_source: 'work_in_education_course_coverage',
+        goal_path: 'work_in_education',
+        route_title: `${answers.education_field || ''} / ${answers.education_specialisation || ''}`.trim(),
+        tool_name: 'work_in_my_education',
+        metadata: {
+          course_title: card.title,
+          coverage: card.id.startsWith('wie-gap-') ? 'missing_course_coverage' : 'needs_provider',
+          education_field: answers.education_field,
+          specialism: answers.education_specialisation,
+        },
+      })
+    }
+  }
 
   const refinedActions = refineEssentialActions(result.essentialActions, answers)
   const essentialActions = refinedActions.map((action) => ({

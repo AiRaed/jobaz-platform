@@ -15,9 +15,10 @@ import { syncUkTransitionProfileAnswers } from './ukTransitionPath'
 import { syncUnemployedPathAnswers } from './unemployedPath'
 import type { CareerBrainQuestion, CareerBrainState } from './types'
 
-/** Strategic goals shown on the Career Assistant homepage (6 goal-based paths). */
+/** Strategic goals shown on the Career Assistant homepage. */
 export const STRATEGIC_GOAL_IDS = [
   'work_in_education',
+  'work_in_profession',
   'work_in_experience',
   'start_new_career',
   'grow_career',
@@ -76,12 +77,21 @@ const LEGACY_SITUATION_TO_GOAL: Partial<Record<LegacySituation, UserGoal>> = {
 function q(
   id: string,
   text: string,
-  options: Array<{ value: string; label: string; description?: string }>
+  options: Array<{
+    value: string
+    label: string
+    description?: string
+    disabled?: boolean
+    badge?: string
+    helperText?: string
+  }>
 ): CareerBrainQuestion {
   return { id, text, type: 'single', options, allow_free_text: false }
 }
 
-/** Six strategic career goals — outcome-focused, not employment status. */
+/** Strategic career goals — outcome-focused, not employment status.
+ * Launch: Experience removed (replaced by Profession). Grow + Business kept but Coming Soon.
+ */
 export const GOAL_QUESTION = q('cb_user_goal', 'Which career goal are you working towards?', [
   {
     value: 'work_in_education',
@@ -89,9 +99,9 @@ export const GOAL_QUESTION = q('cb_user_goal', 'Which career goal are you workin
     description: 'Use my qualification to build a career in the UK.',
   },
   {
-    value: 'work_in_experience',
-    label: '💼 Work in my Experience',
-    description: 'Continue my profession using my existing work experience.',
+    value: 'work_in_profession',
+    label: '🛠️ Work in My Profession',
+    description: 'Find the closest UK career route based on my practical work experience.',
   },
   {
     value: 'start_new_career',
@@ -99,19 +109,25 @@ export const GOAL_QUESTION = q('cb_user_goal', 'Which career goal are you workin
     description: 'Move into a completely different profession and learn a new career.',
   },
   {
-    value: 'grow_career',
-    label: '📈 Grow in my Current Career',
-    description: 'Get promoted, earn more, or progress further in my current profession.',
-  },
-  {
     value: 'side_job',
     label: '💰 Looking for Extra Income',
     description: 'Find part-time work, freelancing, gig economy, or side income opportunities.',
   },
   {
+    value: 'grow_career',
+    label: '📈 Grow in my Current Career',
+    description: 'Get promoted, earn more, or progress further in my current profession.',
+    disabled: true,
+    badge: 'Coming Soon',
+    helperText: 'Available in a future update.',
+  },
+  {
     value: 'start_business',
     label: '🚀 Start My Own Business',
     description: 'Build a business, become self-employed, or launch a startup.',
+    disabled: true,
+    badge: 'Coming Soon',
+    helperText: 'Available in a future update.',
   },
 ])
 
@@ -230,6 +246,8 @@ export function resolveLegacySituation(state: CareerBrainState): LegacySituation
   switch (goal) {
     case 'work_in_education':
       return 'graduate_little_exp'
+    case 'work_in_profession':
+      return 'experienced_professional'
     case 'work_in_experience':
       return 'experienced_professional'
     case 'start_new_career':

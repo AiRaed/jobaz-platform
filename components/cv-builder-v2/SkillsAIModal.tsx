@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Sparkles, Loader2 } from 'lucide-react'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 
 export type SkillsAIMode = 'hard' | 'soft' | 'both'
 
@@ -76,6 +77,8 @@ export default function SkillsAIModal({
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
 
       if (!response.ok || !data.ok) {
         throw new Error(data.error || 'AI request failed')

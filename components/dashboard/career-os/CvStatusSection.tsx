@@ -62,7 +62,11 @@ export default function CvStatusSection({ cv, loading }: Props) {
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    // UTC-stable — avoids server/client locale timezone hydration drift
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`
   } catch {
     return iso
   }

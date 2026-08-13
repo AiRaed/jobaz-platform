@@ -149,3 +149,64 @@ export function GoalChips({ labels, max = 2 }: { labels: string[]; max?: number 
     </div>
   )
 }
+
+const WIE_BADGE_STYLES: Record<string, string> = {
+  work_in_education_aligned: 'border-cyan-500/40 bg-cyan-950/35 text-cyan-200',
+  not_for_work_in_education: 'border-slate-600/50 bg-slate-900/50 text-slate-400',
+  needs_education_field_mapping: 'border-amber-500/40 bg-amber-950/30 text-amber-200',
+  needs_specialism_mapping: 'border-amber-500/40 bg-amber-950/30 text-amber-200',
+  needs_stage_mapping: 'border-amber-500/40 bg-amber-950/30 text-amber-200',
+  possible_contamination_risk: 'border-rose-500/40 bg-rose-950/35 text-rose-200',
+}
+
+export function WieAlignmentBadges({
+  badges,
+  max = 2,
+  generated,
+}: {
+  badges: string[]
+  max?: number
+  generated?: boolean
+}) {
+  const labels: Record<string, string> = {
+    work_in_education_aligned: 'WIE aligned',
+    not_for_work_in_education: 'Not for WIE',
+    needs_education_field_mapping: 'Needs field',
+    needs_specialism_mapping: 'Needs specialism',
+    needs_stage_mapping: 'Needs stage',
+    possible_contamination_risk: 'Contamination risk',
+  }
+  const extra = generated
+    ? ['Generated WIE course type']
+    : []
+  const all = [...extra, ...badges]
+  if (!all.length) return null
+  const shown = all.slice(0, max)
+  const rest = all.length - shown.length
+  return (
+    <div className="flex flex-wrap gap-0.5 mt-1">
+      {shown.map((b) => {
+        const isGenerated = b === 'Generated WIE course type'
+        return (
+          <span
+            key={b}
+            className={cn(
+              'inline-flex rounded-full border px-1.5 py-px text-[9px] leading-tight',
+              isGenerated
+                ? 'border-sky-500/40 bg-sky-950/35 text-sky-200'
+                : WIE_BADGE_STYLES[b] ?? 'border-slate-700/60 text-slate-400'
+            )}
+            title={isGenerated ? b : labels[b] ?? b}
+          >
+            {isGenerated ? b : labels[b] ?? b}
+          </span>
+        )
+      })}
+      {rest > 0 ? (
+        <span className="inline-flex rounded-full border border-slate-700/60 px-1.5 py-px text-[9px] text-slate-500">
+          +{rest}
+        </span>
+      ) : null}
+    </div>
+  )
+}

@@ -8,6 +8,7 @@ import type { JazAnalyseInput, JazCareerGoal } from './types'
 
 const GOAL_MAP: Record<StrategicGoalId, JazCareerGoal> = {
   work_in_education: 'work_in_education',
+  work_in_profession: 'work_in_experience',
   work_in_experience: 'work_in_experience',
   start_new_career: 'start_new_career',
   grow_career: 'grow_current_career',

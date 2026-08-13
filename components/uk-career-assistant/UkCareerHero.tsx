@@ -55,7 +55,7 @@ export default function UkCareerHero({
           </div>
         </div>
 
-        <div className="relative max-w-2xl pr-16">
+        <div className="relative max-w-2xl pr-12 sm:pr-16 min-w-0">
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[10px] uppercase tracking-widest text-emerald-300 mb-2.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             {loading && !started ? 'Starting session…' : 'JAZ AI brain · live'}
@@ -64,7 +64,7 @@ export default function UkCareerHero({
           <h1
             className={cn(
               'font-bold tracking-tight mb-1.5 bg-gradient-to-r from-white via-violet-100 to-cyan-200 bg-clip-text text-transparent',
-              embed ? 'text-xl md:text-2xl' : 'text-2xl md:text-3xl'
+              embed ? 'text-xl md:text-2xl' : 'text-xl sm:text-2xl md:text-3xl'
             )}
           >
             UK Career Assistant

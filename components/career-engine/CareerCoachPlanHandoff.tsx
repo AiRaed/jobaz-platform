@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Check, ExternalLink, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,8 @@ import { GUEST_CAREER_DASHBOARD_PATH } from '@/lib/auth/redirect'
 import PlanSectionHeader from '@/components/plan-ui/PlanSectionHeader'
 import RouteBadge from '@/components/plan-ui/RouteBadge'
 import { PLAN_SECTION_STYLES, resolvePlanRouteVisual } from '@/lib/plan-ui/planVisualSystem'
+import { AddToMyPlanButton } from '@/components/career-engine/add-to-my-plan/AddToMyPlanButton'
+import { buildCatalogFromJobAZPlan } from '@/lib/career-assistant/add-to-my-plan/buildPickCatalog'
 
 const DEFAULT_SUMMARY =
   'Your answers point to realistic UK entry routes with room to grow. Start with work you can apply for now, then build your CV and training step by step.'
@@ -89,6 +91,7 @@ export default function CareerCoachPlanHandoff({
   const [saved, setSaved] = useState(false)
   const [marketingOptIn, setMarketingOptIn] = useState(false)
   const training = resolveTraining(plan)
+  const planCatalog = useMemo(() => buildCatalogFromJobAZPlan(plan), [plan])
   const summary = plan.route_summary
   const routeVisual = resolvePlanRouteVisual(plan.source_path_id, summary.route_title)
   const RouteIcon = routeVisual.Icon
@@ -107,10 +110,10 @@ export default function CareerCoachPlanHandoff({
     DEFAULT_SUMMARY
 
   const weekSteps = (
-    plan.this_week_plan.length > 0 ? plan.this_week_plan : DEFAULT_WEEK_STEPS
+    (plan.this_week_plan || []).length > 0 ? plan.this_week_plan : DEFAULT_WEEK_STEPS
   ).slice(0, 5)
 
-  const workNow = plan.work_now.slice(0, 4)
+  const workNow = (plan.work_now || []).slice(0, 4)
   const goalPath = plan.source_path_id
   const routeTitle = summary.route_title
 
@@ -422,9 +425,9 @@ export default function CareerCoachPlanHandoff({
           </div>
         </div>
 
-        {plan.optional_training.length > 0 && (
+        {(plan.optional_training || []).length > 0 && (
           <ul className="mt-2 space-y-1.5">
-            {plan.optional_training.slice(0, 2).map((item) => (
+            {(plan.optional_training || []).slice(0, 2).map((item) => (
               <li
                 key={item.title}
                 className="rounded-lg border border-slate-700/40 bg-slate-900/30 px-3 py-2"
@@ -492,6 +495,9 @@ export default function CareerCoachPlanHandoff({
 
       {/* 7. Save actions */}
       <section className="space-y-2 pt-1">
+        <div className="flex flex-wrap gap-2">
+          <AddToMyPlanButton catalog={planCatalog} />
+        </div>
         <label className="flex items-start gap-2.5 rounded-xl border border-slate-700/60 bg-slate-950/40 px-3 py-2.5 cursor-pointer">
           <input
             type="checkbox"

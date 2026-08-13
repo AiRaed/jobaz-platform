@@ -14,6 +14,10 @@ export function waitForAssistantTransition(): Promise<number> {
   const reduced = prefersReducedMotion()
   const ms = getAssistantTransitionDuration(reduced)
   return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve(ms)
+      return
+    }
     window.setTimeout(() => resolve(ms), ms)
   })
 }

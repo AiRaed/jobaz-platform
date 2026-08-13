@@ -1,12 +1,21 @@
 /**
  * Transparent role ranking + diversity controls.
+ * Scoring delegated to Eligibility & Match Scoring v2.
  */
 
 import { aliasKey } from './aliases'
+import {
+  evaluateRoleMatch,
+  resultGroupToEffectiveFit,
+  eligibilityStatusToLegacy,
+} from '../evaluate-role-match'
 import type {
   EffectiveFit,
   FieldSpecialismResolution,
+  KnowledgeFieldRow,
   KnowledgeRoleRow,
+  KnowledgeSpecialismRow,
+  KnowledgeStageRow,
   NormalisedWorkInEducationProfile,
   RoleEligibilityResult,
 } from './types'
@@ -18,84 +27,61 @@ function titleStem(name: string): string {
     .trim()
 }
 
+/**
+ * @deprecated Prefer evaluateRoleMatch (v2). Kept for external imports; delegates to v2.
+ */
 export function scoreRoleMatch(args: {
   evaluated: RoleEligibilityResult
   role: KnowledgeRoleRow
   profile: NormalisedWorkInEducationProfile
   resolution: FieldSpecialismResolution
-  specialismRank: number // 0 = primary
+  specialismRank: number
+  field?: KnowledgeFieldRow
+  specialism?: KnowledgeSpecialismRow
+  stage?: KnowledgeStageRow | null
 }): number {
-  const { evaluated, role, profile, resolution, specialismRank } = args
-  let score = 0
-
-  // Specialism / field match
-  score += specialismRank === 0 ? 22 : Math.max(6, 18 - specialismRank * 4)
-  if (resolution.primary_field && evaluated.field.id === resolution.primary_field.id) score += 10
-
-  // Qualification / education
-  if (evaluated.eligibility.education_match) score += 12
-  else score -= 8
-
-  // Experience suitability
-  const min = role.minimum_experience_years ?? 0
-  const years = profile.years_relevant_experience
-  if (years >= min) score += 14
-  else if (years + 2 >= min) score += 6
-  else score -= 10
-
-  // Registration / licence
-  if (evaluated.eligibility.registration_match) score += 10
-  else if (evaluated.effective_fit === 'blocked_until_requirement' || evaluated.effective_fit === 'needs_review')
-    score -= 5
-
-  if (evaluated.eligibility.licence_match) score += 3
-
-  // Skills overlap (light)
-  const roleTokens = new Set(aliasKey(`${role.name} ${role.description}`).split(' ').filter(Boolean))
-  let skillHits = 0
-  for (const t of profile.skill_tokens) if (roleTokens.has(t)) skillHits += 1
-  score += Math.min(8, skillHits * 2)
-
-  // Preferences
-  if (profile.career_preferences.wants_academic_route && evaluated.effective_fit === 'academic_or_research') {
-    score += 8
+  const field = args.field ?? {
+    id: args.evaluated.field.id,
+    name: args.evaluated.field.name,
+    slug: args.evaluated.field.slug,
+    description: '',
+    active: true,
+    status: 'approved',
   }
-  if (profile.career_preferences.wants_related_field_only && specialismRank > 2) {
-    score -= 6
+  const specialism = args.specialism ?? {
+    id: args.evaluated.specialism.id,
+    name: args.evaluated.specialism.name,
+    slug: args.evaluated.specialism.slug,
+    field_id: field.id,
+    description: '',
+    regulated_profession: false,
+    professional_body: null,
+    active: true,
+    status: 'approved',
+    stage_model_id: null,
   }
-
-  // Progression realism
-  if (evaluated.effective_fit === 'immediate') score += 8
-  else if (evaluated.effective_fit === 'realistic_next') score += 5
-  else if (evaluated.effective_fit === 'future_progression') score += 2
-
-  // Priority hint from library
-  const priority = role.priority ?? 500
-  score += Math.max(0, 6 - Math.floor(priority / 100))
-
-  // UK recognition confidence
-  if (evaluated.eligibility.country_recognition_review_needed) score -= 4
-  if (profile.is_uk_qualification) score += 3
-
-  // Blockers: ranking must not rehabilitate blocked fits
-  if (
-    evaluated.effective_fit === 'blocked_until_requirement' ||
-    evaluated.effective_fit === 'needs_review'
-  ) {
-    score = Math.min(score, 35)
-  }
-  if (
-    evaluated.eligibility.qualification_scope_match === 'mismatched' ||
-    evaluated.eligibility.registration_scope_match === 'mismatched'
-  ) {
-    score -= 25
-  }
-
-  return Math.max(0, Math.min(100, Math.round(score)))
+  const evaluation = evaluateRoleMatch({
+    role: args.role,
+    specialism,
+    field,
+    stage: args.stage ?? null,
+    profile: args.profile,
+    resolution: args.resolution,
+    specialismRank: args.specialismRank,
+    prior: args.evaluated,
+  })
+  return evaluation.matchScore
 }
 
 export function rankAndBucketRoles(args: {
-  items: Array<{ evaluated: RoleEligibilityResult; role: KnowledgeRoleRow; specialismRank: number }>
+  items: Array<{
+    evaluated: RoleEligibilityResult
+    role: KnowledgeRoleRow
+    specialismRank: number
+    field?: KnowledgeFieldRow
+    specialism?: KnowledgeSpecialismRow
+    stage?: KnowledgeStageRow | null
+  }>
   profile: NormalisedWorkInEducationProfile
   resolution: FieldSpecialismResolution
   limits: {
@@ -113,22 +99,81 @@ export function rankAndBucketRoles(args: {
   blocked_or_needs_review: RoleEligibilityResult[]
 } {
   const scored = args.items.map((item) => {
-    const match_score = scoreRoleMatch({
-      evaluated: item.evaluated,
+    const field = item.field ?? {
+      id: item.evaluated.field.id,
+      name: item.evaluated.field.name,
+      slug: item.evaluated.field.slug,
+      description: '',
+      active: true,
+      status: 'approved',
+    }
+    const specialism = item.specialism ?? {
+      id: item.evaluated.specialism.id,
+      name: item.evaluated.specialism.name,
+      slug: item.evaluated.specialism.slug,
+      field_id: field.id,
+      description: '',
+      regulated_profession: false,
+      professional_body: null,
+      active: true,
+      status: 'approved',
+      stage_model_id: null,
+    }
+
+    const evaluation = evaluateRoleMatch({
       role: item.role,
+      specialism,
+      field,
+      stage: item.stage ?? null,
       profile: args.profile,
       resolution: args.resolution,
       specialismRank: item.specialismRank,
+      prior: item.evaluated,
     })
-    return {
+
+    const academic = Boolean(item.role.is_academic_role || item.role.is_research_role)
+    const effective_fit = resultGroupToEffectiveFit(evaluation.resultGroup, { academic })
+    const legacyStatus = eligibilityStatusToLegacy(evaluation.eligibilityStatus)
+
+    const experience_match = !evaluation.unmetRequirements.some((u) => /experience/i.test(u))
+    const education_match = !evaluation.unmetRequirements.some((u) => /qualification/i.test(u))
+    const registration_match = evaluation.matchedReasons.some((m) =>
+      /registration requirements appear met|hold registration that is desirable/i.test(m)
+    )
+
+    const next: RoleEligibilityResult = {
       ...item.evaluated,
-      match_score,
+      match_score: evaluation.matchScore,
+      effective_fit,
+      evaluation,
+      eligibility: {
+        ...item.evaluated.eligibility,
+        status: legacyStatus,
+        experience_match,
+        registration_match,
+        education_match,
+      },
+      match_reasons: evaluation.matchedReasons,
+      warnings: [
+        ...new Set([
+          ...item.evaluated.warnings.filter((w) => !/chartered stage|mis-stag/i.test(w)),
+          ...evaluation.warnings,
+        ]),
+      ],
+      demotion_reasons: item.evaluated.demotion_reasons.filter(
+        (d) =>
+          !(
+            /site engineer/i.test(item.role.name) &&
+            /charter|professional_stage/i.test(d) &&
+            !/\bchartered\b|\bceng\b/i.test(item.role.name)
+          )
+      ),
     }
+    return next
   })
 
   scored.sort(
-    (a, b) =>
-      b.match_score - a.match_score || a.role_title.localeCompare(b.role_title)
+    (a, b) => b.match_score - a.match_score || a.role_title.localeCompare(b.role_title)
   )
 
   const buckets: Record<
@@ -153,7 +198,6 @@ export function rankAndBucketRoles(args: {
     if (list.length >= limit) return
     if (usedIds.has(item.role_id)) return
     const stem = titleStem(item.role_title)
-    // Allow at most 1 near-identical title stem per bucket (diversity)
     const stemKey = `${item.effective_fit}:${stem}`
     if (stem && usedStems.has(stemKey)) return
     list.push(item)
@@ -163,17 +207,21 @@ export function rankAndBucketRoles(args: {
 
   for (const item of scored) {
     const fit = item.effective_fit as EffectiveFit
-    if (fit === 'blocked_until_requirement' || fit === 'needs_review') {
+    const group = item.evaluation?.resultGroup
+
+    if (group === 'blocked_or_review' || fit === 'blocked_until_requirement' || fit === 'needs_review') {
       pushDiverse(buckets.blocked_or_needs_review, item, args.limits.blocked_or_needs_review)
       continue
     }
-    if (fit === 'immediate') pushDiverse(buckets.immediate, item, args.limits.immediate)
-    else if (fit === 'realistic_next')
+    if (group === 'immediate' || fit === 'immediate') {
+      pushDiverse(buckets.immediate, item, args.limits.immediate)
+    } else if (group === 'developing' || fit === 'realistic_next') {
       pushDiverse(buckets.realistic_next, item, args.limits.realistic_next)
-    else if (fit === 'academic_or_research')
+    } else if (fit === 'academic_or_research') {
       pushDiverse(buckets.academic_or_research, item, args.limits.academic_or_research)
-    else if (fit === 'future_progression')
+    } else {
       pushDiverse(buckets.future_progression, item, args.limits.future_progression)
+    }
   }
 
   return buckets

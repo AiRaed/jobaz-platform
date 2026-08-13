@@ -19,7 +19,7 @@ export const DASHBOARD_TABS: {
   { id: 'profile', label: 'Career Identity', shortLabel: 'Identity' },
   { id: 'overview', label: 'My Plan', shortLabel: 'Plan' },
   { id: 'documents', label: 'Documents', shortLabel: 'Docs' },
-  { id: 'jobs', label: 'Saved Jobs', shortLabel: 'Jobs' },
+  { id: 'jobs', label: 'Jobs For You', shortLabel: 'Jobs' },
   { id: 'opportunities', label: 'Saved Opportunities', shortLabel: 'Opps' },
   { id: 'feed', label: 'Pulse Activity', shortLabel: 'Pulse' },
   { id: 'messages', label: 'Relay', shortLabel: 'Relay' },

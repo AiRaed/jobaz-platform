@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { getOpenAiModel } from '@/lib/openai-model'
 import { mapPathnameToApiContext, type JazApiPageContext } from '@/lib/jaz/pageRegistry'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -185,6 +186,9 @@ export async function POST(request: NextRequest) {
         pageContext,
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'jaz_assistant', `jaz-${body.mode}`)
+    if (!usageGate.allowed) return usageGate.response
 
     // Prepare user message - use default if empty (especially for guide mode)
     // For translate mode, userMessage is required (frontend should prevent empty, but validate here too)

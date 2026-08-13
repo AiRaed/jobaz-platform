@@ -292,7 +292,7 @@ export default function CareerHubCourseCard({
                   : 'px-4 py-2.5 border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700/50 dark:bg-slate-900/40 dark:text-slate-500'
               )}
             >
-              Link not available
+              Provider not listed yet
             </button>
           )}
 

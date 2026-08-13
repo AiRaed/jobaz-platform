@@ -106,6 +106,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const identity = sanitizeCareerIdentityPatch(body, user.id)
+    const previousOptIn = (await loadCareerIdentity(admin, user.id)).identity
+      .message_reminders_opt_in
     const saved = await upsertCareerIdentity(admin, identity)
 
     // Best-effort sync to existing profiles / personal_profiles (optional)
@@ -148,14 +150,22 @@ export async function POST(req: NextRequest) {
         }
       }
     } catch {
-      // profile sync optional
+      // profile sync optional — never sync mobile/consent to public profiles
     }
 
-    return NextResponse.json({ ok: true, identity: saved })
+    return NextResponse.json({
+      ok: true,
+      identity: saved,
+      message_reminders_changed:
+        previousOptIn !== saved.message_reminders_opt_in
+          ? saved.message_reminders_opt_in
+            ? 'enabled'
+            : 'disabled'
+          : null,
+    })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Save failed' },
-      { status: 500 }
-    )
+    const message = err instanceof Error ? err.message : 'Save failed'
+    const isValidation = /mobile number|digits/i.test(message)
+    return NextResponse.json({ error: message }, { status: isValidation ? 400 : 500 })
   }
 }

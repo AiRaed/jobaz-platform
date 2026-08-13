@@ -3,11 +3,11 @@
 import { motion } from 'framer-motion'
 import { Scale } from 'lucide-react'
 import Link from 'next/link'
+import CookieSettingsButton from '@/components/CookieSettingsButton'
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen relative overflow-x-hidden bg-gradient-to-br from-[#050617] via-[#0b0820] to-[#050814] text-white">
-      {/* Glowing orbs for ambient effect */}
+    <div className="min-h-screen relative overflow-x-hidden jobaz-page-bg text-[var(--text-primary)] bg-gradient-to-br from-[#050617] via-[#0b0820] to-[#050814] text-white">
       <div className="pointer-events-none absolute -top-32 -left-24 h-64 w-64 rounded-full bg-violet-600/30 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 rounded-full bg-fuchsia-500/20 blur-3xl" />
 
@@ -17,16 +17,18 @@ export default function TermsPage() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-12"
         >
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 bg-violet-600/20 rounded-xl flex items-center justify-center border border-violet-500/30">
-              <Scale className="w-6 h-6 text-violet-400" />
+          <div className="flex items-start sm:items-center gap-3 sm:gap-4 mb-6 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 bg-violet-600/20 rounded-xl flex items-center justify-center border border-violet-500/30">
+              <Scale className="w-5 h-5 sm:w-6 sm:h-6 text-violet-400" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-heading font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-heading font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent break-words min-w-0">
               Terms & Conditions
             </h1>
           </div>
-          <p className="text-sm text-slate-400">
-            Last updated: October 2025
+          <p className="text-sm text-slate-400">Last updated: August 2026</p>
+          <p className="text-sm text-slate-400 mt-2 leading-relaxed max-w-2xl">
+            JobAZ is an MVP platform. Features, providers, pricing, and these terms may change as
+            we improve the product.
           </p>
         </motion.div>
 
@@ -34,129 +36,222 @@ export default function TermsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-slate-900/40 backdrop-blur-sm rounded-2xl p-8 md:p-12 border border-slate-800/60 shadow-2xl space-y-8"
+          className="bg-slate-900/40 backdrop-blur-sm rounded-2xl p-4 sm:p-8 md:p-12 border border-slate-800/60 shadow-2xl space-y-8"
         >
           <div className="prose prose-lg dark:prose-invert max-w-none">
-            <section className="mt-8">
+            <section>
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
                 1. Service Overview
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                JobAZ is an AI-powered career platform designed to help users create and improve CVs, generate cover letters, search for jobs, and prepare for interviews.
+                JobAZ is an AI-powered UK career support platform. It helps users explore career
+                routes, build CVs, prepare applications, find jobs, discover courses and licences,
+                and manage a personal career plan (including Career Assistant / JAZ Career Coach,
+                My Plan, CV Builder, Jobs For You, and related tools).
               </p>
               <p className="text-slate-300 leading-relaxed mt-4">
-                All tools are provided for personal and professional assistance only. JobAZ does not act as an employer, recruiter, or hiring authority.
+                JobAZ provides tools and guidance only. JobAZ is not an employer, recruiter,
+                training provider, university, legal adviser, immigration adviser, financial
+                adviser, medical adviser, or hiring authority.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                2. AI-Generated Content & Career Guidance
+                2. AI Career Guidance
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                JobAZ uses artificial intelligence to generate CV content, summaries, career suggestions, and guidance tools such as Build Your Path.
+                JobAZ uses AI and rule-based career logic to generate suggestions, career paths, CV
+                content, skills, course ideas, job-search keywords, and action plans.
               </p>
               <p className="text-slate-300 leading-relaxed mt-4">
-                All AI-generated content is provided for informational and assistance purposes only and does not constitute professional, legal, or employment advice.
+                AI-generated content may be incomplete, inaccurate, outdated, or not suitable for
+                every user. You are responsible for reviewing and editing all content before you
+                use it.
               </p>
               <p className="text-slate-300 leading-relaxed mt-4">
-                Users are fully responsible for reviewing, editing, and validating any generated content before using it in real job applications.
+                Career suggestions are informational only. They are not professional career, legal,
+                immigration, financial, medical, or employment advice.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                3. Free Use & Donations
+                3. My Plan / Career Assistant / CV Builder
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                JobAZ is currently provided free of charge.
+                You may create career plans based on your answers, profile information, CV
+                information, and saved preferences. Plans are designed to support decision-making.
+                They do not guarantee outcomes.
               </p>
               <p className="text-slate-300 leading-relaxed mt-4">
-                Users may choose to support the platform through voluntary donations (such as Buy Me a Coffee).
+                CV Builder and CV tailoring tools help you draft content, but you must check that
+                everything is accurate before using it in applications.
               </p>
               <p className="text-slate-300 leading-relaxed mt-4">
-                Donations are optional and do not unlock mandatory features or guarantee any outcomes.
+                You must not include false qualifications, false work experience, false licences, or
+                other misleading claims in applications.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                4. Job Listings & Third-Party Platforms
+                4. Jobs and Third-Party Job Listings
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                JobAZ aggregates job listings from third-party sources, including but not limited to Adzuna and other external job boards or employer websites.
+                JobAZ may show job listings from third-party APIs, job boards, employers, or
+                external websites (including Jobs For You recommendations and Job Finder results).
               </p>
               <p className="text-slate-300 leading-relaxed mt-4">
-                When viewing or applying for a job, users may be redirected to an external website.
+                JobAZ does not own, control, or guarantee those listings. Job details, salaries,
+                locations, availability, and application processes may change.
               </p>
               <p className="text-slate-300 leading-relaxed mt-4">
-                JobAZ does not control, own, or operate these third-party websites and is not responsible for their content, availability, or application processes.
+                Always check details on the employer or job board website before applying. JobAZ
+                does not guarantee interviews, job offers, employment outcomes, or a response from
+                employers.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                5. No Guarantee of Employment
+                5. Courses, Licences, Training Providers and Affiliate Links
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                JobAZ provides tools and guidance to support job searching and career preparation.
+                JobAZ may recommend courses, licences, training, or providers based on your career
+                plan or profile.
               </p>
               <p className="text-slate-300 leading-relaxed mt-4">
-                We do not guarantee interviews, job offers, or hiring outcomes. All employment decisions are made solely by employers.
+                Some links may be affiliate links. JobAZ may receive a commission if you click,
+                book, or purchase through those links, at no extra cost to you. Affiliate commission
+                does not mean a course is right for you.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                Before buying or applying, check provider details, prices, eligibility, course
+                content, accreditation, licence requirements, refund policies, and suitability.
+                JobAZ does not provide the courses and is not responsible for third-party provider
+                quality, availability, pricing, refunds, certification, or outcomes.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                If a provider is not listed, JobAZ may show messages such as “coming soon”,
+                “provider not listed”, or “search courses later”.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                6. Intellectual Property
+                6. No Guarantee of Employment, Qualifications or Outcomes
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                All JobAZ branding, design elements, and platform features remain the intellectual property of JobAZ.
+                JobAZ does not guarantee jobs, interviews, course acceptance, licence approval,
+                qualification recognition, salary, visa outcome, career progression, or income.
               </p>
               <p className="text-slate-300 leading-relaxed mt-4">
-                Users retain ownership of their personal CV content and may use generated documents freely for personal job applications.
+                Final decisions are made by employers, providers, regulators, or you.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                7. Limitation of Liability
+                7. User Accounts and Data Accuracy
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                JobAZ is not liable for:
+                You are responsible for keeping your account, Career Identity / profile, CV, phone
+                number (if provided), and career information accurate.
               </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                You must not misuse the platform, submit unlawful content, impersonate others, or
+                create misleading applications.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
+                8. Optional Mobile Number and Reminders
+              </h2>
+              <p className="text-slate-300 leading-relaxed">
+                You may optionally provide a mobile number and optionally opt in to future reminders
+                or opportunity updates. A mobile number is not required to use JobAZ.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                JobAZ will not send marketing messages unless you have opted in where required. You
+                can turn off message reminders or withdraw consent at any time in your profile
+                settings.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
+                9. Free Use, Donations and Future Paid Features
+              </h2>
+              <p className="text-slate-300 leading-relaxed">
+                JobAZ may currently provide some features free of charge. We may add paid features,
+                donations, subscriptions, premium tools, provider partnerships, or affiliate revenue
+                in the future.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                Donations, if available, are voluntary and do not guarantee outcomes.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
+                10. Acceptable Use
+              </h2>
+              <p className="text-slate-300 leading-relaxed">Users must not:</p>
               <ul className="list-disc list-inside text-slate-300 leading-relaxed mt-4 space-y-2 ml-4">
-                <li>Employment outcomes</li>
-                <li>Rejected applications</li>
-                <li>Losses resulting from the use of third-party job platforms</li>
-                <li>Decisions made by employers or recruiters</li>
+                <li>misuse the platform</li>
+                <li>attempt to hack, scrape, overload, or disrupt the service</li>
+                <li>upload malicious content</li>
+                <li>
+                  generate misleading, fraudulent, discriminatory, harmful, or unlawful content
+                </li>
+                <li>impersonate another person</li>
+                <li>use JobAZ to submit false job applications</li>
               </ul>
-            </section>
-
-            <section className="mt-8">
-              <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                8. Acceptable Use
-              </h2>
-              <p className="text-slate-300 leading-relaxed">
-                Users must not misuse the platform, generate misleading content, impersonate others, or use JobAZ for unlawful purposes.
+              <p className="text-slate-300 leading-relaxed mt-4">
+                JobAZ may suspend or terminate accounts that break these rules.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                9. Account Suspension or Termination
+                11. Limitation of Liability
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                JobAZ reserves the right to suspend or terminate accounts that violate the Terms or misuse the platform.
+                JobAZ is provided on an “as is” and “as available” basis.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                JobAZ is not responsible for losses caused by reliance on AI suggestions,
+                third-party links, course providers, job listings, user mistakes, outages, or data
+                entered incorrectly.
+              </p>
+              <p className="text-slate-300 leading-relaxed mt-4">
+                Nothing in these terms limits liability where it cannot legally be limited.
               </p>
             </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-heading font-semibold mb-4 text-white">
-                10. Updates to Terms
+                12. Changes to the Platform or Terms
               </h2>
               <p className="text-slate-300 leading-relaxed">
-                These Terms & Conditions may be updated periodically to reflect platform improvements or legal requirements. Continued use of JobAZ implies acceptance of the latest version.
+                JobAZ may update features, pricing, providers, course links, job integrations, and
+                these terms. Continued use means you accept the updated terms.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-heading font-semibold mb-4 text-white">13. Contact</h2>
+              <p className="text-slate-300 leading-relaxed">
+                Contact us through the support options inside JobAZ, or email{' '}
+                <a
+                  href="mailto:support@jobaz.io"
+                  className="text-violet-400 hover:text-violet-300 underline"
+                >
+                  support@jobaz.io
+                </a>
+                .
               </p>
             </section>
           </div>
@@ -166,7 +261,7 @@ export default function TermsPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="mt-8 text-center"
+          className="mt-8 text-center flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6"
         >
           <Link
             href="/"
@@ -174,6 +269,7 @@ export default function TermsPage() {
           >
             ← Back to Home
           </Link>
+          <CookieSettingsButton className="text-sm text-slate-400 hover:text-violet-300 transition-colors" />
         </motion.div>
       </div>
     </div>

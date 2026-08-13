@@ -68,7 +68,7 @@ export default function CourseDetailView({ course }: Props) {
   return (
     <AppShell className="max-w-4xl">
       <Link
-        href="/career-hub"
+        href="/courses"
         className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 transition mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -129,7 +129,7 @@ export default function CourseDetailView({ course }: Props) {
             <MetaItem icon={ExternalLink} label="Delivery" value={course.deliveryModeLabel} />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2 course-actions">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 pt-2 course-actions min-w-0">
             {canApply ? (
               <button
                 type="button"
@@ -140,13 +140,18 @@ export default function CourseDetailView({ course }: Props) {
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
-              <button
-                type="button"
-                disabled
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium border border-slate-700/50 bg-slate-900/40 text-slate-500 cursor-not-allowed"
-              >
-                Link not available
-              </button>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium border border-slate-700/50 bg-slate-900/40 text-slate-500 cursor-not-allowed"
+                >
+                  Provider not listed yet
+                </button>
+                <p className="text-[11px] text-slate-500">
+                  Coming soon on JobAZ — save interest or search courses later.
+                </p>
+              </div>
             )}
             <button
               type="button"
@@ -251,21 +256,29 @@ export default function CourseDetailView({ course }: Props) {
       {/* SECTION 7 — Apply CTA */}
       <section className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-950/30 to-fuchsia-950/20 p-8 text-center">
         <TrendingUp className="w-8 h-8 text-violet-400 mx-auto mb-3" />
-        <h2 className="text-xl font-semibold text-slate-100 mb-2">Ready to start this course?</h2>
-        <p className="text-sm text-slate-400 mb-6 max-w-md mx-auto">
-          Apply through our partner pathway — we&apos;ll take you to the official enrolment page.
-        </p>
         {canApply ? (
-          <button
-            type="button"
-            onClick={handleApply}
-            className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl text-base font-semibold bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:from-violet-500 hover:to-fuchsia-500 transition"
-          >
-            Apply Now
-            <ArrowRight className="w-5 h-5" />
-          </button>
+          <>
+            <h2 className="text-xl font-semibold text-slate-100 mb-2">Ready to start this course?</h2>
+            <p className="text-sm text-slate-400 mb-6 max-w-md mx-auto">
+              Apply via JobAZ — we&apos;ll take you to the partner provider enrolment page.
+            </p>
+            <button
+              type="button"
+              onClick={handleApply}
+              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl text-base font-semibold bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:from-violet-500 hover:to-fuchsia-500 transition"
+            >
+              Apply Now
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </>
         ) : (
-          <p className="text-sm text-slate-500">Enrolment link not available yet — check back soon.</p>
+          <>
+            <h2 className="text-xl font-semibold text-slate-100 mb-2">Provider not listed yet</h2>
+            <p className="text-sm text-slate-400 max-w-md mx-auto">
+              This course type is listed on JobAZ, but a partner enrolment link is not available yet.
+              Save it to your plan or search courses later.
+            </p>
+          </>
         )}
       </section>
     </AppShell>

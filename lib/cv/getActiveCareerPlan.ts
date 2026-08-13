@@ -312,27 +312,43 @@ export function activePlanFromAssessmentBundle(
 }
 
 /**
- * Async — for logged-in users, Supabase assessment beats localStorage
- * (same as Dashboard My Plan). Uses shared resolveAssessmentBundle cache.
+ * Async — for logged-in users, Supabase active JobAZ plan is source of truth.
+ * localStorage is guest-only / mirror.
  */
 export async function getActiveCareerPlanForUser(
   userId?: string | null
 ): Promise<ActiveCareerPlan | null> {
   const uid = userId ?? (await resolveAuthenticatedUserId())
+
+  if (uid) {
+    try {
+      const { fetchActivePlanFromServer } = await import(
+        '@/lib/career-assistant/add-to-my-plan/activePlanClient'
+      )
+      const active = await fetchActivePlanFromServer()
+      if (active?.jobaz_plan) {
+        return fromJobAZPlan(active.jobaz_plan, 'supabase', active.action_plan_id || 'jaz_active')
+      }
+      const bundle = await resolveAssessmentBundle()
+      const fromSb = activePlanFromAssessmentBundle(bundle, 'supabase')
+      if (fromSb) return fromSb
+    } catch {
+      // fall through
+    }
+    return null
+  }
+
   const localJobaz = readLocalJobazPlan()
+  if (localJobaz) return localJobaz
 
   try {
     const bundle = mergeLocalJobazIntoBundle(await resolveAssessmentBundle())
-    const fromSb = activePlanFromAssessmentBundle(
-      bundle,
-      uid ? 'supabase' : 'localStorage'
-    )
-    if (fromSb) return fromSb
+    const fromLocal = activePlanFromAssessmentBundle(bundle, 'localStorage')
+    if (fromLocal) return fromLocal
   } catch {
     // fall through
   }
 
-  if (localJobaz) return localJobaz
   return readCaSnapshotPlan()
 }
 
@@ -357,7 +373,7 @@ export function activeCareerPlanToCvContext(plan: ActiveCareerPlan): {
     targetRole: plan.currentTarget || plan.targetRole || plan.planTitle,
     pathLabel: plan.planTitle || plan.pathLabel,
     readinessScore: plan.readinessScore,
-    suggestedSkills: plan.cvFocusKeywords.slice(0, 6),
+    suggestedSkills: [], // never use keyword tokens as CV skills
     missingQualifications: plan.recommendedCourses.slice(0, 4),
     currentTarget: plan.currentTarget,
     nextUpgrade: plan.nextUpgrade,

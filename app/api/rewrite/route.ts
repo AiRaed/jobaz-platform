@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 // Formatting instruction for AI Preview output
 const FORMATTING_INSTRUCTION = `CRITICAL FORMATTING REQUIREMENTS FOR OUTPUT:
@@ -55,6 +56,9 @@ export async function POST(req: Request) {
       const mockContent = `[MOCK ${mode}] Rewritten content:\n\n${content}`
       return NextResponse.json({ ok: true, content: mockContent })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'writing_review', 'rewrite')
+    if (!usageGate.allowed) return usageGate.response
 
     const instruction = modeInstructions[mode as keyof typeof modeInstructions] || modeInstructions.enhance
 

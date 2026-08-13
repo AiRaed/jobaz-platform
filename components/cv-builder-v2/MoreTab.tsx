@@ -3,6 +3,7 @@ import { Plus, Trash2, Sparkles, Loader2, CheckCircle2, AlertCircle, AlertTriang
 import { CvData } from '@/app/cv-builder-v2/page'
 import { certificationLabel, certificationTitle, buildCareerPlanCertification } from '@/lib/cv/cvCertification'
 import CvPlanSuggestionChips from '@/components/cv-builder-v2/CvPlanSuggestionChips'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 
 interface MoreTabProps {
   projects: CvData['projects']
@@ -157,6 +158,8 @@ export default function MoreTab({
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (data.ok) {
         if (action === 'check') {
           setPublicationSuggestions({

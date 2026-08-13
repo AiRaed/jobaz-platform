@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export async function POST(req: Request) {
   try {
@@ -21,6 +22,9 @@ export async function POST(req: Request) {
         suggestedSkills: mode === 'skills' ? ['Mock Skill 1', 'Mock Skill 2', 'Mock Skill 3'] : null,
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', `ai-tailor-${mode || 'default'}`)
+    if (!usageGate.allowed) return usageGate.response
 
     switch (mode) {
       case 'analyze': {

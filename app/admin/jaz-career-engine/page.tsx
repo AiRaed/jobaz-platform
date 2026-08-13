@@ -2,8 +2,9 @@ import dynamic from 'next/dynamic'
 import AppShell from '@/components/layout/AppShell'
 
 export const metadata = {
-  title: 'JAZ Career Engine | JobAZ Admin',
-  description: 'Monitor Career Assistant engine health, plans, and affiliate matching',
+  title: 'Career Assistant Engine | JobAZ Admin',
+  description:
+    'UK Career Assistant — JAZ engine status, logs, behaviour analytics, course matching, and test tools',
 }
 
 const AdminJazCareerEnginePage = dynamic(

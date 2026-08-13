@@ -206,16 +206,16 @@ export function generateSearchQueryFromCV(cvData: {
     }
   }
 
-  // Priority 4: Default fallback
-  // Check if we have any data at all to decide between "customer service" and "warehouse"
+  // Priority 4: Default fallback — only when there is truly no usable content
+  // Prefer empty-ish warehouse over customer service when no CV signals exist.
+  // Jobs For You uses inferCvPrimaryQuery instead and never lands here for Animation CVs.
   const hasAnyData = !!(
     cvData.summary?.trim() ||
     (cvData.skills && cvData.skills.length > 0) ||
     (cvData.experience && cvData.experience.length > 0)
   )
   
-  // If user has no data at all, use "warehouse", otherwise "customer service"
-  return hasAnyData ? 'customer service' : 'warehouse'
+  return hasAnyData ? 'warehouse operative' : 'warehouse operative'
 }
 
 /**

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 type ExperienceAIMode = 'responsibilities' | 'achievements' | 'both'
 type CareerDomain = 'tech' | 'hospitality' | 'production' | 'customer_service' | 'supervisor' | 'general'
@@ -77,6 +78,9 @@ export async function POST(req: Request) {
         })
       }
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'experience-bullets')
+    if (!usageGate.allowed) return usageGate.response
 
     // Build contextText for domain detection
     const contextText = [

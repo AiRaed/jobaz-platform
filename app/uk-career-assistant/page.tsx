@@ -83,6 +83,9 @@ interface QuestionOption {
   value: string
   label: string
   description?: string
+  disabled?: boolean
+  badge?: string
+  helperText?: string
 }
 
 export interface Question {
@@ -979,6 +982,11 @@ export default function UKCareerAssistantPage() {
 
     if (currentQuestionId === 'cb_user_goal' && !pathStoryOnly) {
       const goalInput = Array.isArray(input) ? input[0] : input
+      // Launch: Coming Soon goals stay in the list but must not navigate
+      if (goalInput === 'grow_career' || goalInput === 'start_business') {
+        setLoading(false)
+        return
+      }
       const redirect = CAREER_ENGINE_GOAL_REDIRECTS[goalInput as StrategicGoalId]
       if (redirect) {
         clearCareerEngineConversationCaches(goalInput as StrategicGoalId)
@@ -1218,6 +1226,13 @@ export default function UKCareerAssistantPage() {
 
   const handleOptionClick = (optionValue: string) => {
     if (!current?.question) return
+    // Launch: Coming Soon goals never start a flow
+    if (
+      current.question.id === 'cb_user_goal' &&
+      (optionValue === 'grow_career' || optionValue === 'start_business')
+    ) {
+      return
+    }
     const options = current.question.options ?? []
     if (options.length === 0 && current.question.allow_free_text !== true) return
 

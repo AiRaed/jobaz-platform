@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ArrowRight, BookmarkPlus, Check, Clock, ExternalLink, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { TrainingCourseItem } from '@/lib/training/types'
-import { openCourseApply } from '@/lib/career-hub/marketplace/apply'
+import { canApplyToCourse, openCourseApply } from '@/lib/career-hub/marketplace/apply'
 import { upsertCareerPlanItem } from '@/lib/career-hub/myPlan'
 import UkCareerAssistantLink from '@/components/uk-career-assistant/UkCareerAssistantLink'
 
@@ -24,6 +24,11 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function TrainingCourseCard({ course, variant, onUpdate }: Props) {
+  const canApply = canApplyToCourse({
+    referralUrl: course.referralUrl ?? course.affiliateUrl,
+    officialUrl: course.courseHref,
+  })
+
   const handleSave = () => {
     upsertCareerPlanItem({
       courseName: course.name,
@@ -162,14 +167,20 @@ export default function TrainingCourseCard({ course, variant, onUpdate }: Props)
                 <BookmarkPlus className="w-3 h-3" />
                 Save
               </button>
-              <button
-                type="button"
-                onClick={handleApply}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-violet-600 text-white hover:bg-violet-500 transition"
-              >
-                Apply Now
-                <ExternalLink className="w-3 h-3" />
-              </button>
+              {canApply ? (
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-violet-600 text-white hover:bg-violet-500 transition"
+                >
+                  Apply Now
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              ) : (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium border border-slate-700/60 text-slate-500">
+                  Provider not listed yet
+                </span>
+              )}
             </>
           )}
 

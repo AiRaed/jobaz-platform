@@ -9,7 +9,26 @@ import {
   resolveCommercialStatusForOpportunity,
   resolveVisibilityForOpportunity,
 } from '@/lib/recommendations/visibility'
-import { normMatchLabel } from '@/lib/recommendations/educationFieldLabels'
+import {
+  classifyOpportunityLike,
+  type WieAdminBadge,
+} from '@/lib/career-engine/work-in-education/course-alignment'
+import { isGeneratedWieCourseOpportunity } from './seedWieGeneratedCourseTypes'
+import {
+  opportunityMatchesEducationField,
+  opportunityMatchesSpecialism,
+  opportunityMatchesStage,
+  opportunityPassesWieContaminationGate,
+} from './wieTrackerFilters'
+import {
+  isGeneratedWipCourseOpportunity,
+  isWorkInProfessionOpportunity,
+  opportunityMatchesGoalPath,
+  opportunityMatchesProfessionField,
+  opportunityMatchesProfessionSpecialism,
+  opportunityMatchesProfessionalLevel,
+  opportunityPassesWipContaminationGate,
+} from './wipTrackerFilters'
 
 export type OpportunityQuickView =
   | 'all'
@@ -21,6 +40,17 @@ export type OpportunityQuickView =
   | 'published'
   | 'later'
   | 'recommendation-cards'
+  | 'wie-aligned'
+  | 'wie-not-aligned'
+  | 'wie-needs-mapping'
+  | 'wie-contamination'
+  | 'wie-needs-provider'
+  | 'wie-generated'
+  | 'wie-affiliate-ready'
+  | 'wip-aligned'
+  | 'wip-generated'
+  | 'wip-needs-provider'
+  | 'wip-affiliate-ready'
 
 export type OpportunityFilters = {
   search: string
@@ -35,6 +65,17 @@ export type OpportunityFilters = {
   canBeCourseCard: string
   educationField: string
   specialisation: string
+  /** WIE stage filter value from WIE_STAGE_FILTER_OPTIONS, or 'all' */
+  stage?: string
+  wieBadge?: string
+  /** Goal path key, e.g. work_in_profession */
+  goalPath?: string
+  /** Profession library field label for WIP filters */
+  professionField?: string
+  /** Profession specialism label for WIP filters */
+  professionSpecialism?: string
+  /** Professional level key for WIP filters */
+  professionalLevel?: string
   quickView?: OpportunityQuickView
 }
 
@@ -112,6 +153,7 @@ export function findDuplicatePublishedLinks(
 }
 
 export function matchesQuickView(opp: CourseOpportunity, view: OpportunityQuickView): boolean {
+  const wie = view.startsWith('wie-') ? classifyOpportunityLike(opp) : null
   switch (view) {
     case 'all':
       return true
@@ -131,6 +173,41 @@ export function matchesQuickView(opp: CourseOpportunity, view: OpportunityQuickV
       return isLaterOpportunity(opp)
     case 'recommendation-cards':
       return isRecommendationCardOpportunity(opp)
+    case 'wie-aligned':
+      return Boolean(wie?.admin_badges.includes('work_in_education_aligned'))
+    case 'wie-not-aligned':
+      return Boolean(wie?.admin_badges.includes('not_for_work_in_education'))
+    case 'wie-needs-mapping':
+      return Boolean(
+        wie?.admin_badges.some((b) =>
+          [
+            'needs_education_field_mapping',
+            'needs_specialism_mapping',
+            'needs_stage_mapping',
+          ].includes(b)
+        )
+      )
+    case 'wie-contamination':
+      return Boolean(wie?.contamination_risk)
+    case 'wie-needs-provider':
+      return (
+        Boolean(wie?.admin_badges.includes('work_in_education_aligned')) && needsProvider(opp)
+      )
+    case 'wie-generated':
+      return isGeneratedWieCourseOpportunity(opp)
+    case 'wie-affiliate-ready':
+      return (
+        Boolean(wie?.admin_badges.includes('work_in_education_aligned')) &&
+        isCourseAffiliateReady(opp)
+      )
+    case 'wip-aligned':
+      return isWorkInProfessionOpportunity(opp)
+    case 'wip-generated':
+      return isGeneratedWipCourseOpportunity(opp)
+    case 'wip-needs-provider':
+      return isWorkInProfessionOpportunity(opp) && needsProvider(opp)
+    case 'wip-affiliate-ready':
+      return isWorkInProfessionOpportunity(opp) && isCourseAffiliateReady(opp)
     default:
       return true
   }
@@ -156,6 +233,13 @@ export function filterOpportunities(
 ): CourseOpportunity[] {
   const q = filters.search.trim().toLowerCase()
   const quickView = filters.quickView ?? 'all'
+  const stageFilter = filters.stage ?? 'all'
+  const educationField = filters.educationField ?? 'all'
+  const specialisation = filters.specialisation ?? 'all'
+  const goalPath = filters.goalPath ?? 'all'
+  const professionField = filters.professionField ?? 'all'
+  const professionSpecialism = filters.professionSpecialism ?? 'all'
+  const professionalLevel = filters.professionalLevel ?? 'all'
 
   return opportunities.filter((opp) => {
     if (quickView !== 'all' && !matchesQuickView(opp, quickView)) return false
@@ -165,8 +249,11 @@ export function filterOpportunities(
         opp.courseName,
         opp.shortLabel,
         opp.notes,
+        opp.adminNotes,
         opp.nextAction,
         opp.linkedPublishedCourseTitle,
+        ...(opp.educationFields ?? []),
+        ...(opp.specialisations ?? []),
         ...opp.routes.map((r) => r.routeLabel),
         ...(opp.goals ?? []).map((g) => g.goalLabel),
         ...opp.providers.map((p) => p.providerName),
@@ -215,16 +302,23 @@ export function filterOpportunities(
       if (Boolean(opp.canBeCourseCard) !== wantsCard) return false
     }
 
-    if (filters.educationField !== 'all') {
-      const field = normMatchLabel(filters.educationField)
-      const fields = (opp.educationFields ?? []).map(normMatchLabel)
-      if (!fields.includes(field)) return false
-    }
+    if (!opportunityMatchesGoalPath(opp, goalPath)) return false
 
-    if (filters.specialisation !== 'all') {
-      const spec = normMatchLabel(filters.specialisation)
-      const specs = (opp.specialisations ?? []).map(normMatchLabel)
-      if (!specs.some((s) => s === spec || s.includes(spec) || spec.includes(s))) return false
+    if (!opportunityMatchesEducationField(opp, educationField)) return false
+    if (!opportunityMatchesSpecialism(opp, specialisation)) return false
+    if (!opportunityMatchesStage(opp, stageFilter)) return false
+
+    // When WIE path filters are active, hide SIA/Forklift/Taxi etc. unless allowed
+    if (!opportunityPassesWieContaminationGate(opp, educationField, specialisation)) return false
+
+    if (!opportunityMatchesProfessionField(opp, professionField)) return false
+    if (!opportunityMatchesProfessionSpecialism(opp, professionSpecialism)) return false
+    if (!opportunityMatchesProfessionalLevel(opp, professionalLevel)) return false
+    if (!opportunityPassesWipContaminationGate(opp, professionField, professionSpecialism)) return false
+
+    if (filters.wieBadge && filters.wieBadge !== 'all') {
+      const alignment = classifyOpportunityLike(opp)
+      if (!alignment.admin_badges.includes(filters.wieBadge as WieAdminBadge)) return false
     }
 
     return true

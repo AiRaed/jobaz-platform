@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { analyzeAboutTone } from '@/lib/profile'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 import type { AboutToneAnalysis } from '@/lib/profile/types'
 import ProfileCard from './ProfileCard'
 import {
@@ -52,6 +53,8 @@ async function rewriteAbout(text: string, mode: string, instruction?: string): P
     }),
   })
   const data = await response.json()
+  const limitErr = aiLimitErrorFromResponse(response, data)
+  if (limitErr) throw limitErr
   if (!data.ok) throw new Error(data.error || 'Rewrite failed')
   return data.content?.trim() || text
 }

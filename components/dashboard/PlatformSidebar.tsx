@@ -123,7 +123,7 @@ export default function PlatformSidebar() {
       aria-label="Platform tools"
     >
       {/* Sidebar-only scroll if the menu is taller than the viewport */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain py-3 px-2 space-y-5">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2 pt-3 pb-3 space-y-5">
         {SIDEBAR_SECTIONS.map((section) => {
           const childItems = section.items.filter((i) => i.navLevel === 'child')
           const rootItems = section.items.filter((i) => i.navLevel !== 'child')

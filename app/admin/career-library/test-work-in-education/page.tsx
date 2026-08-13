@@ -3,7 +3,7 @@ import AppShell from '@/components/layout/AppShell'
 
 export const metadata = {
   title: 'Work in My Education Match Test | JobAZ Admin',
-  description: 'Admin diagnostic harness for Career Knowledge Library matching',
+  description: 'Admin diagnostic harness for Work in My Education Library matching',
 }
 
 const TestWorkInEducationPage = dynamic(

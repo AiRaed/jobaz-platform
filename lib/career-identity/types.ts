@@ -50,6 +50,14 @@ export type UserCareerIdentity = {
   short_bio: string | null
   looking_for: string | null
   barriers: Barrier[]
+  /** Optional private mobile — never shown on public profiles */
+  mobile_phone: string | null
+  mobile_country_code: string | null
+  /** Explicit message reminders opt-in — defaults false */
+  message_reminders_opt_in: boolean
+  message_reminders_opted_in_at: string | null
+  message_reminders_opted_out_at: string | null
+  message_consent_source: string | null
   created_at?: string
   updated_at?: string
 }
@@ -86,5 +94,11 @@ export function emptyCareerIdentity(userId: string): UserCareerIdentity {
     short_bio: null,
     looking_for: null,
     barriers: [],
+    mobile_phone: null,
+    mobile_country_code: null,
+    message_reminders_opt_in: false,
+    message_reminders_opted_in_at: null,
+    message_reminders_opted_out_at: null,
+    message_consent_source: 'profile',
   }
 }

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import ManagePlanDataControls from '@/components/dashboard/ManagePlanDataControls'
+import CookieSettingsButton from '@/components/CookieSettingsButton'
 
 type Props = {
   onDeleteAccount?: () => void
@@ -47,6 +48,7 @@ export default function DashboardSupportFooter({
           <Link href="/terms" className="hover:text-violet-300 transition-colors">
             Terms & Conditions
           </Link>
+          <CookieSettingsButton className="hover:text-violet-300 transition-colors" />
           {onDeleteAccount && (
             <button
               type="button"

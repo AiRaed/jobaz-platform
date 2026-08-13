@@ -1,37 +1,26 @@
 import type { Metadata } from 'next'
-import Script from 'next/script'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import ClientProviders from './client-providers'
+import { JOBAZ_SITE_URL, UK_COURSE_KEYWORDS } from '@/lib/seo/site'
 
 const inter = Inter({ subsets: ['latin'] })
 
-const appUrl = 'https://jobaz.io'
-const GA_MEASUREMENT_ID = 'G-PDGHSSX1XK'
+const appUrl = JOBAZ_SITE_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: 'JobAZ — Find Work & Build Your Career in the UK',
   description:
-    'Find UK jobs, improve your CV, prepare for interviews, and follow a guided career path — a free UK career platform with smart support.',
+    'Find UK jobs, explore career courses and licences, improve your CV, and get guided career recommendations — a free UK career platform.',
   keywords: [
+    'UK career platform',
     'AI career assistant',
     'CV builder',
-    'job finder',
-    'interview practice',
-    'writing review',
-    'proofreading',
-    'multilingual',
-    'CV generator',
-    'resume builder',
-    'AI resume',
-    'ATS optimization',
-    'cover letter',
-    'professional CV',
-    'job search',
-    'career path',
-    'build your path',
+    'job finder UK',
     'career guidance',
+    'UK training courses',
+    ...UK_COURSE_KEYWORDS,
   ],
   authors: [{ name: 'JobAZ' }],
   creator: 'JobAZ',
@@ -49,12 +38,12 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    locale: 'en_US',
+    locale: 'en_GB',
     url: appUrl,
     siteName: 'JobAZ',
     title: 'JobAZ — Find Work & Build Your Career in the UK',
     description:
-      'Find UK jobs, improve your CV, prepare for interviews, and follow a guided career path.',
+      'Find UK jobs, explore courses and licences, improve your CV, and follow guided career recommendations.',
     images: [
       {
         url: `${appUrl}/og-image`,
@@ -67,8 +56,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'JobAZ — UK Career Platform',
-    description:
-      'Find UK jobs, improve your CV, and follow a guided career path.',
+    description: 'Find UK jobs, explore courses and licences, and follow a guided career path.',
     images: [`${appUrl}/og-image`],
     creator: '@jobaz',
     site: '@jobaz',
@@ -104,51 +92,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var t=localStorage.getItem('jobaz-theme-v1')||'dark';if(t!=='day'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-jobaz-theme',t);document.documentElement.classList.toggle('dark',t==='dark');document.documentElement.style.colorScheme=t==='day'?'light':'dark';var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='day'?'#08122f':'#7C3AED');}catch(e){}})();`,
           }}
         />
-
-        {/* Structured Data – WebSite */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
-              '@type': 'WebSite',
-              name: 'JobAZ',
-              url: appUrl,
-              description:
-                'AI career assistant: build CVs, find jobs, tailor applications, practice interviews, writing review, and multilingual support.',
-              potentialAction: {
-                '@type': 'SearchAction',
-                target: `${appUrl}/build-your-path`,
-                'query-input': 'required name=search_term_string',
-              },
+              '@graph': [
+                {
+                  '@type': 'Organization',
+                  name: 'JobAZ',
+                  url: appUrl,
+                  logo: `${appUrl}/icon.svg`,
+                  description:
+                    'UK career platform for jobs, courses, licences, CV tools, and guided career recommendations.',
+                },
+                {
+                  '@type': 'WebSite',
+                  name: 'JobAZ',
+                  url: appUrl,
+                  description:
+                    'Find UK jobs, explore career courses and licences, build your CV, and get guided career recommendations.',
+                  publisher: { '@type': 'Organization', name: 'JobAZ' },
+                },
+              ],
             }),
           }}
         />
       </head>
-
       <body
         className={`${inter.className} transition-colors duration-300 jobaz-page-bg min-h-screen`}
       >
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-PDGHSSX1XK"
-          strategy="afterInteractive"
-        />
-        <Script id="ga4-init" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            window.gtag = gtag;
-            gtag('js', new Date());
-            gtag('config', 'G-PDGHSSX1XK', { send_page_view: false });
-            function sendPV(){ gtag('event','page_view',{page_location: location.href, page_path: location.pathname + location.search, page_title: document.title}); }
-            sendPV();
-            var _push = history.pushState;
-            history.pushState = function(){ _push.apply(this, arguments); sendPV(); };
-            var _rep = history.replaceState;
-            history.replaceState = function(){ _rep.apply(this, arguments); sendPV(); };
-            window.addEventListener('popstate', sendPV);
-          `}
-        </Script>
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>

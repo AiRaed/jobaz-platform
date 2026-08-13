@@ -23,7 +23,7 @@ interface AppShellProps {
 export default function AppShell({ children, className = '', wide, platform }: AppShellProps) {
   return (
     <div
-      className="min-h-screen relative jobaz-page-bg text-white"
+      className="min-h-screen relative jobaz-page-bg text-[var(--text-primary)]"
       style={
         {
           ['--jobaz-header-h' as string]: PLATFORM_HEADER_HEIGHT,

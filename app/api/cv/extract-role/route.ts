@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export async function POST(req: Request) {
   try {
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
       }
       return NextResponse.json({ ok: true, role: 'professional' })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'extract-role')
+    if (!usageGate.allowed) return usageGate.response
 
     // Build system prompt with domain detection hints
     const systemPrompt = `You are an expert career advisor specializing in job title extraction from CV content.

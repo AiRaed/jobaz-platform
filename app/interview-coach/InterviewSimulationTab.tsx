@@ -11,6 +11,7 @@ import InterviewFinalReport from '@/components/interview-coach/premium/Interview
 import InterviewNextActions, { buildSimulationNextActions } from '@/components/interview-coach/premium/InterviewNextActions'
 import { PremiumCard, HorizontalProgressBar } from '@/components/interview-coach/premium/shared'
 import { buildInterviewBrief } from '@/lib/interview-coach/briefConfig'
+import { messageFromAiLimitPayload } from '@/lib/ai-usage/client'
 
 type Status = 'idle' | 'countdown' | 'asking' | 'ready' | 'recording' | 'processing' | 'thankyou' | 'finished'
 
@@ -449,7 +450,8 @@ export default function InterviewSimulationTab({
       })
 
       if (!response.ok) {
-        throw new Error('Transcription failed')
+        const errBody = await response.json().catch(() => ({}))
+        throw new Error(messageFromAiLimitPayload(errBody, response.status) || 'Transcription failed')
       }
 
       const data = await response.json()

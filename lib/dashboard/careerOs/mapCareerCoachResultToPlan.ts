@@ -85,6 +85,43 @@ export type JobAZPlan = {
   }
   /** Structured course cards from resolver — preserve for Apply Now resolution */
   structured_cards: RecommendationCourseCardData[]
+  /** Exact Career Assistant selections — drives My Plan "Selected from Career Assistant" */
+  ca_selection?: {
+    source: 'career_assistant'
+    goal_path: string
+    goal_label: string
+    route_title: string
+    field?: string
+    specialism?: string
+    selected_at: string
+    source_result_id?: string | null
+    /** Canonical current focus — selected immediate role when present */
+    immediate_role?: string
+    current_focus_role?: string
+    future_route?: string | null
+    focus_source?: string
+    replaced_previous_plan?: boolean
+    /** Immediate / start-now target roles only */
+    roles: Array<{ title: string; reason?: string; badge?: string; suggested?: boolean }>
+    selected_roles?: Array<{ title: string; reason?: string; badge?: string }>
+    selected_courses?: Array<{
+      title: string
+      reason?: string
+      provider_status?: string
+      provider_label?: string
+    }>
+    selected_actions?: Array<{ title: string; kind?: string; reason?: string }>
+    selected_future_routes?: Array<{ title: string; reason?: string; badge?: string }>
+    training: Array<{
+      title: string
+      reason?: string
+      provider_status?: string
+      provider_label?: string
+    }>
+    /** Progression / future roles — never current focus */
+    future_routes?: Array<{ title: string; reason?: string; badge?: string }>
+    boosters: Array<{ title: string; kind?: string; reason?: string }>
+  }
 }
 
 export type CareerCoachPersistableResult =
@@ -197,10 +234,9 @@ function mapTrainingFromQual(params: {
   const type = resolveTrainingType(card, hasApply || Boolean(officialUrl && card?.publishedCourseId))
 
   let action_label: JobAZTrainingItem['action_label'] = 'View recommendation'
-  if (type === 'published_course' && hasApply) action_label = 'Apply Now'
-  else if (type === 'published_course' && officialUrl) action_label = 'Apply Now'
-  else if (type === 'recommendation_only') action_label = 'View recommendation'
-  else if (type === 'course_type') action_label = 'View recommendation'
+  if (hasApply) action_label = 'Apply Now'
+  else if (type === 'recommendation_only' || type === 'course_type') action_label = 'View recommendation'
+  else if (officialUrl) action_label = 'View recommendation'
 
   return {
     title: card?.title || params.title,
@@ -213,8 +249,7 @@ function mapTrainingFromQual(params: {
     provider_name: (card?.publicOfferLabel || '').trim() || undefined,
     apply_url: applyUrl,
     official_url: officialUrl,
-    action_label:
-      hasApply || (type === 'published_course' && officialUrl) ? 'Apply Now' : action_label,
+    action_label: hasApply ? 'Apply Now' : action_label,
     id: params.id || card?.id,
     published_course_id: card?.publishedCourseId,
     slug: card?.slug,
@@ -934,8 +969,15 @@ export function mapCareerCoachResultToPlan(result: unknown): JobAZPlan | null {
 /** Convert JobAZPlan into PathPlanLadder so My Plan stays aligned with Assistant handoff. */
 export function jobazPlanToPathLadder(plan: JobAZPlan): PathPlanLadder {
   const train = plan.training_next
+  // Prefer selected immediate role for the plan title — never bare field/specialism
+  const focusTitle =
+    plan.ca_selection?.immediate_role ||
+    plan.ca_selection?.current_focus_role ||
+    plan.route_summary.current_target_role ||
+    plan.work_now[0]?.title ||
+    plan.route_summary.route_title
   return {
-    routeLabel: plan.route_summary.route_title,
+    routeLabel: focusTitle,
     startNow: plan.work_now.map((j) => ({
       title: j.title,
       description: j.why_it_matches,
@@ -975,16 +1017,76 @@ export function jobazPlanToPathLadder(plan: JobAZPlan): PathPlanLadder {
     ],
     structuredCards: plan.structured_cards,
     pathId: plan.source_path_id,
-    isSecurityRoute: /security/i.test(plan.route_summary.route_title),
+    isSecurityRoute: /security/i.test(
+      `${plan.route_summary.route_title} ${plan.ca_selection?.field || ''} ${plan.ca_selection?.specialism || ''}`
+    ),
   }
 }
 
 export function isJobAZPlan(value: unknown): value is JobAZPlan {
+  if (!value || typeof value !== 'object') return false
+  const plan = value as Partial<JobAZPlan>
   return Boolean(
-    value &&
-      typeof value === 'object' &&
-      (value as JobAZPlan).version === 1 &&
-      (value as JobAZPlan).route_summary &&
-      Array.isArray((value as JobAZPlan).work_now)
+    plan.version === 1 &&
+      plan.route_summary &&
+      typeof plan.route_summary === 'object' &&
+      Array.isArray(plan.work_now)
   )
+}
+
+/**
+ * Coerce a loosely-shaped JobAZ plan (stale localStorage / partial Supabase raw_plan)
+ * into a safe renderable object. Never throws.
+ */
+export function normalizeJobAZPlan(value: unknown): JobAZPlan | null {
+  if (!isJobAZPlan(value)) return null
+  try {
+    const plan = value as JobAZPlan
+    const summary = plan.route_summary || ({} as JobAZPlan['route_summary'])
+    const ca = plan.ca_selection
+    return {
+      ...plan,
+      version: 1,
+      source_path_id: plan.source_path_id || 'career_assistant',
+      route_summary: {
+        route_title: summary.route_title || 'Your career plan',
+        one_sentence_summary: summary.one_sentence_summary || '',
+        current_target_role: summary.current_target_role || summary.route_title || 'Your career plan',
+        next_upgrade_role: summary.next_upgrade_role || '',
+        readiness_score:
+          typeof summary.readiness_score === 'number' ? summary.readiness_score : 50,
+        match_score: summary.match_score,
+      },
+      work_now: Array.isArray(plan.work_now) ? plan.work_now : [],
+      training_next: plan.training_next ?? null,
+      optional_training: Array.isArray(plan.optional_training) ? plan.optional_training : [],
+      after_training: Array.isArray(plan.after_training) ? plan.after_training : [],
+      cv_action: plan.cv_action || 'Create / improve your CV',
+      cv_target_role: plan.cv_target_role,
+      this_week_plan: Array.isArray(plan.this_week_plan) ? plan.this_week_plan : [],
+      dashboard_handoff: plan.dashboard_handoff || {
+        save_label: 'Add to My Plan',
+        open_dashboard_label: 'Go to My Plan',
+        continue_guest_label: 'Continue exploring',
+      },
+      structured_cards: Array.isArray(plan.structured_cards) ? plan.structured_cards : [],
+      ca_selection: ca
+        ? {
+            ...ca,
+            roles: Array.isArray(ca.roles) ? ca.roles : [],
+            training: Array.isArray(ca.training) ? ca.training : [],
+            boosters: Array.isArray(ca.boosters) ? ca.boosters : [],
+            future_routes: Array.isArray(ca.future_routes) ? ca.future_routes : [],
+            selected_roles: Array.isArray(ca.selected_roles) ? ca.selected_roles : undefined,
+            selected_courses: Array.isArray(ca.selected_courses) ? ca.selected_courses : undefined,
+            selected_actions: Array.isArray(ca.selected_actions) ? ca.selected_actions : undefined,
+            selected_future_routes: Array.isArray(ca.selected_future_routes)
+              ? ca.selected_future_routes
+              : undefined,
+          }
+        : undefined,
+    }
+  } catch {
+    return null
+  }
 }

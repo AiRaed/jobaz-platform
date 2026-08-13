@@ -11,8 +11,16 @@ export const PLATFORM_SIDEBAR_WIDTH_COLLAPSED = '3.25rem' // 52px
 export const PLATFORM_STICKY_CHROME =
   'sticky top-0 z-[60] mb-0 jobaz-platform-header border-b border-[var(--shell-border)] min-h-[var(--jobaz-header-h,4.5rem)]'
 
+/** Main header row (tagline + actions). Brand/logo lives in the sidebar-width column beside this. */
 export const PLATFORM_HEADER_INNER =
   'px-4 md:px-6 lg:px-8 min-h-[var(--jobaz-header-h,4.5rem)] flex items-center'
+
+/** Desktop logo column — matches sidebar width; center the wordmark with nav padding rhythm */
+export const PLATFORM_SIDEBAR_BRAND =
+  'jobaz-sidebar-brand hidden lg:flex shrink-0 items-center justify-center border-r border-[var(--shell-sidebar-border)] transition-[width] duration-200 ease-out'
+
+export const PLATFORM_SIDEBAR_BRAND_LINK =
+  'jobaz-sidebar-brand__link flex w-full items-center justify-center px-2'
 
 export const PLATFORM_TOOLS_INNER = 'px-4 pb-3 md:px-8'
 
@@ -34,16 +42,18 @@ export const PLATFORM_SECTION_GAP = 'mb-6'
 export const PLATFORM_MAIN_PADDING =
   'px-4 sm:px-6 lg:px-8 xl:px-10 py-5 md:py-6 pb-10 lg:pb-12'
 
-/** Page / section typography */
+/** Page / section typography — CSS vars so Day mode stays dark-on-light */
 export const PLATFORM_PAGE_TITLE =
-  'text-xl md:text-2xl font-semibold text-slate-50 tracking-tight'
+  'text-xl md:text-2xl font-semibold text-[var(--text-primary)] tracking-tight'
 
 export const PLATFORM_SECTION_TITLE =
-  'text-xl font-semibold text-slate-50 tracking-tight flex items-center gap-2'
+  'text-xl font-semibold text-[var(--text-primary)] tracking-tight flex items-center gap-2'
 
-export const PLATFORM_PAGE_DESCRIPTION = 'text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed'
+export const PLATFORM_PAGE_DESCRIPTION =
+  'text-sm text-[var(--text-secondary)] mt-1 max-w-2xl leading-relaxed'
 
-export const PLATFORM_SECTION_DESCRIPTION = 'text-sm text-slate-400 mt-1 leading-relaxed'
+export const PLATFORM_SECTION_DESCRIPTION =
+  'text-sm text-[var(--text-secondary)] mt-1 leading-relaxed'
 
 export const PLATFORM_PAGE_HEADER = 'mb-5 md:mb-6 relative'
 export const PLATFORM_PAGE_DIVIDER =
@@ -51,12 +61,12 @@ export const PLATFORM_PAGE_DIVIDER =
 
 /** Cards */
 export const PLATFORM_CARD =
-  'rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-soft)] dark:border-slate-700/60 dark:bg-slate-950/50'
+  'rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-soft)]'
 
 export const PLATFORM_CARD_PADDING = 'px-4 py-3 md:px-5 md:py-4'
 
 export const PLATFORM_CARD_HOVER =
-  'hover:border-violet-500/50 hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)] transition'
+  'hover:border-violet-500/40 hover:shadow-[var(--shadow-soft)] transition dark:hover:border-violet-500/50 dark:hover:shadow-[0_18px_50px_rgba(76,29,149,0.65)]'
 
 /** Ambient workspace glow (optional behind content) */
 export const PLATFORM_AMBIENT_VIOLET =
@@ -69,10 +79,10 @@ export const PLATFORM_PILL_BASE =
   'rounded-full font-medium transition-all duration-200 whitespace-nowrap cursor-pointer inline-flex items-center justify-center border'
 
 export const PLATFORM_PILL_TOOL_ACTIVE =
-  'px-3 py-1.5 text-xs border-violet-500/50 bg-violet-500/20 text-violet-100 shadow-[0_0_14px_rgba(139,92,246,0.35)]'
+  'px-3 py-1.5 text-xs border-blue-300 bg-blue-50 text-blue-800 shadow-sm dark:border-violet-500/50 dark:bg-violet-500/20 dark:text-violet-100 dark:shadow-[0_0_14px_rgba(139,92,246,0.35)]'
 
 export const PLATFORM_PILL_TOOL_INACTIVE =
-  'px-3 py-1.5 text-xs bg-slate-900/70 text-slate-400 border-slate-700/50 hover:border-violet-500/40 hover:text-violet-200 hover:bg-slate-800/90 hover:shadow-[0_0_12px_rgba(139,92,246,0.2)]'
+  'px-3 py-1.5 text-xs bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-800 hover:bg-slate-50 dark:bg-slate-900/70 dark:text-slate-400 dark:border-slate-700/50 dark:hover:border-violet-500/40 dark:hover:text-violet-200 dark:hover:bg-slate-800/90'
 
 export const PLATFORM_PILL_NAV_ACTIVE =
   'px-2.5 py-1 text-[11px] bg-[var(--bg-surface-alt)] text-[var(--bg-primary)] border-[var(--border-subtle)] dark:bg-violet-500/20 dark:text-violet-100 dark:border-violet-400/35'

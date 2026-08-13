@@ -3,6 +3,11 @@
  */
 
 import {
+  academicRankFromQualification,
+  resolveNormalizedQualification,
+  type NormalizedQualification,
+} from '@/lib/career-engine/qualification-taxonomy'
+import {
   aliasKey,
   buildAliasIndex,
   resolveAlias,
@@ -63,7 +68,6 @@ function expandWithAliases(text: string, index: AliasIndex): {
   const hits: string[] = []
   if (resolved.hit) hits.push(`${resolved.hit.kind}:${resolved.hit.canonical}`)
 
-  // Expand individual tokens through aliases
   const parts = base.split(' ')
   const expanded: string[] = []
   for (const p of parts) {
@@ -82,6 +86,20 @@ function expandWithAliases(text: string, index: AliasIndex): {
 export function isUkCountry(value: string | null | undefined): boolean {
   if (!value) return false
   return UK_COUNTRY_KEYS.has(aliasKey(value))
+}
+
+function resolveProfileQualification(profile: WorkInEducationProfile): NormalizedQualification {
+  if (profile.qualification && profile.qualification.group && profile.qualification.type) {
+    return profile.qualification
+  }
+  return resolveNormalizedQualification({
+    qualification_group: profile.qualification_group,
+    qualification_type: profile.qualification_type,
+    education_level: profile.education_level,
+    qualification_title: profile.qualification_title,
+    qualification_country: profile.qualification_country ?? profile.institution_country,
+    equivalence_status: profile.equivalence_status,
+  })
 }
 
 export function normaliseWorkInEducationProfile(
@@ -109,8 +127,12 @@ export function normaliseWorkInEducationProfile(
     profile.subject?.trim() ?? ''
   )
 
+  const qualification = resolveProfileQualification(profile)
+  const education_level = (qualification.education_level_legacy ||
+    profile.education_level) as EducationLevel
+
   return {
-    education_level: profile.education_level,
+    education_level,
     qualification_title_raw: profile.qualification_title?.trim() ?? '',
     qualification_title_normalised: title.normalised,
     subject_raw: profile.subject?.trim() ?? '',
@@ -129,7 +151,9 @@ export function normaliseWorkInEducationProfile(
     current_job_tokens: jobTitle ? tokensFrom(jobTitle) : [],
     has_uk_experience: profile.has_uk_experience ?? null,
     professional_registration: regs,
-    licences: Array.isArray(profile.licences) ? profile.licences.map((l) => l.trim()).filter(Boolean) : [],
+    licences: Array.isArray(profile.licences)
+      ? profile.licences.map((l) => l.trim()).filter(Boolean)
+      : [],
     skills: Array.isArray(profile.skills) ? profile.skills.map((s) => s.trim()).filter(Boolean) : [],
     skill_tokens: (profile.skills ?? []).flatMap((s) => tokensFrom(s)),
     languages: Array.isArray(profile.languages) ? profile.languages : [],
@@ -142,9 +166,14 @@ export function normaliseWorkInEducationProfile(
       preferred_locations: prefs.preferred_locations ?? [],
     },
     alias_hits,
+    qualification,
   }
 }
 
+/**
+ * @deprecated Prefer profileAcademicRank(profile) — uses UK level taxonomy.
+ * Kept for callers that only have a coarse EducationLevel.
+ */
 export function educationLevelRank(level: EducationLevel): number {
   switch (level) {
     case 'college':
@@ -152,7 +181,8 @@ export function educationLevelRank(level: EducationLevel): number {
     case 'bachelor':
       return 2
     case 'professional':
-      return 2
+      // Professional registration/licence is not an academic degree level.
+      return 0
     case 'master':
       return 3
     case 'doctorate':
@@ -160,6 +190,13 @@ export function educationLevelRank(level: EducationLevel): number {
     default:
       return 1
   }
+}
+
+/** Academic rank from normalized taxonomy (preferred). */
+export function profileAcademicRank(profile: NormalisedWorkInEducationProfile): number {
+  const fromTaxonomy = academicRankFromQualification(profile.qualification)
+  if (fromTaxonomy != null) return fromTaxonomy
+  return educationLevelRank(profile.education_level)
 }
 
 export { tokensFrom, aliasKey }

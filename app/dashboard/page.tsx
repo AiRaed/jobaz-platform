@@ -20,7 +20,18 @@ import RecommendedJobCard from '@/components/dashboard/RecommendedJobCard'
 import { type AppliedJob } from '@/lib/applied-jobs-storage'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { DeleteAccountModal } from '@/components/DeleteAccountModal'
-import { extractCVKeywords, calculateMatchPercentage, generateSearchQueryFromCV, extractSummaryKeywords, filterJobsByRelevance, isTrainingJob } from '@/lib/job-matching'
+import { calculateMatchPercentage, filterJobsByRelevance, isTrainingJob } from '@/lib/job-matching'
+import {
+  JOBS_FOR_YOU_REFRESH_EVENT,
+  resolveJobsForYouSource,
+  type JobsForYouSource,
+} from '@/lib/jobs/resolveJobsForYouSource'
+import {
+  clearJobsForYouLocalCache,
+  filterJobsByForbiddenAndScore,
+} from '@/lib/jobs/mapPlanOrCvToJobQueries'
+import { CAREER_PLAN_REFRESH_EVENT } from '@/lib/dashboard/careerOs/types'
+import { isAdminUser } from '@/lib/auth/adminEmails'
 import { supabase } from '@/lib/supabase'
 import { clearCurrentUserStorage, initUserStorageCache, getCurrentUserIdSync, getUserScopedKeySync } from '@/lib/user-storage'
 import { clearCachesOnLogout } from '@/lib/career-engine/clearSharedCareerCache'
@@ -148,7 +159,25 @@ export default function DashboardPage() {
   const [loadingRecommendedJobs, setLoadingRecommendedJobs] = useState(false)
   const [savedJobsFromJobFinder, setSavedJobsFromJobFinder] = useState<Job[]>([])
   const [isSavedJobsInitialized, setIsSavedJobsInitialized] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<{ query: string; keywords: string[]; apiUrl?: string; location?: string } | null>(null)
+  const [debugInfo, setDebugInfo] = useState<{
+    query: string
+    keywords: string[]
+    apiUrl?: string
+    location?: string
+    matchSource?: string
+  } | null>(null)
+  const [jobsForYouQuery, setJobsForYouQuery] = useState<string>('')
+  const [jobsForYouMatchLabel, setJobsForYouMatchLabel] = useState<string>('')
+  const [jobsForYouSourceType, setJobsForYouSourceType] = useState<JobsForYouSource['sourceType']>('empty')
+  const [jobsForYouMeta, setJobsForYouMeta] = useState<{
+    planId?: string
+    cvId?: string
+    targetRole?: string
+    route?: string
+    forbiddenTerms?: string[]
+    alternativeQueries?: string[]
+  }>({})
+  const [isAdminDebug, setIsAdminDebug] = useState(false)
   const [filterMode, setFilterMode] = useState<'strict' | 'balanced' | 'loose'>('balanced')
   const [resultType, setResultType] = useState<'all' | 'jobs-only' | 'training-only'>('all')
   const [fallbackToAll, setFallbackToAll] = useState(false) // Track if we fell back from Jobs Only
@@ -450,6 +479,40 @@ export default function DashboardPage() {
           fetchCvFromApi()
           fetchCoverFromApi()
           fetchAppliedJobsFromApi()
+          setIsAdminDebug(isAdminUser(email))
+
+          // Load user-scoped saved jobs
+          void (async () => {
+            try {
+              const res = await fetch('/api/saved-jobs/list')
+              if (!res.ok) {
+                setIsSavedJobsInitialized(true)
+                return
+              }
+              const data = await res.json()
+              if (data.ok && Array.isArray(data.items)) {
+                const mapped: Job[] = data.items.map((item: any) => {
+                  const j = item.job || {}
+                  return {
+                    id: item.job_key || j.id || '',
+                    title: j.title || '',
+                    company: j.company || '',
+                    location: j.location || '',
+                    description: j.description || '',
+                    type: j.type || '',
+                    link: j.link || j.redirect_url || j.url,
+                  }
+                }).filter((j: Job) => j.id)
+                setSavedJobsFromJobFinder(mapped)
+              }
+            } catch {
+              // ignore — empty saved list
+            } finally {
+              setIsSavedJobsInitialized(true)
+            }
+          })()
+
+          // Jobs For You always resolves from Supabase via resolveJobsForYouSource on refresh
         } else {
           // No user - redirect to login
           setLoadingCv(false)
@@ -612,176 +675,143 @@ export default function DashboardPage() {
     // No-op: localStorage persistence has been removed
   }, [recommendedLocation])
 
-  // Create CV signature to track CV changes for auto-refresh
-  const cvSignature = useMemo(() => {
-    if (!baseCv) {
-      return 'no-cv' // No CV exists
-    }
-    
-    // Create signature from relevant CV fields
-    const summary = baseCv.summary || ''
-    const skills = Array.isArray(baseCv.skills) ? baseCv.skills.join(',') : ''
-    const experience = Array.isArray(baseCv.experience) ? baseCv.experience : []
-    
-    // Get latest role (most recent experience)
-    const latestRole = experience.length > 0 
-      ? (experience[0]?.jobTitle || experience[0]?.title || '').toLowerCase()
-      : ''
-    
-    // Create signature: summary length + skills + latest role
-    const signature = `${summary.length}_${skills.length}_${latestRole}_${cvLastUpdated || ''}`
-    return signature
-  }, [baseCv, cvLastUpdated])
-
   // AbortController ref for canceling previous fetches
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Function to fetch recommended jobs - ALWAYS fetches, even with incomplete CV
-  const fetchRecommendedJobs = useCallback(async (signal?: AbortSignal) => {
-    // Cancel previous fetch if still in progress
+  /**
+   * Jobs For You — always re-resolve source from Supabase (active plan + saved CV)
+   * for the signed-in user, then search. Never uses stale localStorage as primary.
+   */
+  const fetchRecommendedJobs = useCallback(async (opts?: { showToast?: 'cv' | 'plan' | 'manual' }) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
-    
-    // Create new AbortController for this fetch
     const controller = new AbortController()
     abortControllerRef.current = controller
-    const fetchSignal = signal || controller.signal
+    const fetchSignal = controller.signal
 
     setLoadingRecommendedJobs(true)
+    setRecommendedJobs([])
+    clearJobsForYouLocalCache()
     try {
-      // Use baseCv if available, otherwise use empty object
-      const cvData = baseCv || {
-        summary: undefined,
-        skills: undefined,
-        experience: undefined,
-        city: undefined,
+      const source = await resolveJobsForYouSource()
+      if (fetchSignal.aborted) return
+
+      setJobsForYouQuery(source.primaryQuery)
+      setJobsForYouMatchLabel(source.matchLabel)
+      setJobsForYouSourceType(source.sourceType)
+      setJobsForYouMeta({
+        planId: source.planId,
+        cvId: source.cvId,
+        targetRole: source.targetRole,
+        route: source.route,
+        forbiddenTerms: source.forbiddenTerms,
+        alternativeQueries: source.alternativeQueries,
+      })
+
+      // Keep dashboard CV state in sync with latest saved CV from Supabase
+      if (source.cvRaw) {
+        setBaseCv(source.cvRaw)
+        if (source.cvId) setCvId(source.cvId)
+        if (source.cvUpdatedAt) setCvLastUpdated(source.cvUpdatedAt)
       }
 
-      // Generate search query from CV (with fallbacks)
-      const searchQuery = generateSearchQueryFromCV({
-        summary: cvData.summary,
-        skills: cvData.skills,
-        experience: cvData.experience,
-      })
+      if (opts?.showToast === 'cv') {
+        setToast({ type: 'success', message: 'CV saved — job matches updated' })
+      } else if (opts?.showToast === 'plan') {
+        setToast({ type: 'success', message: 'Career plan saved — job matches updated' })
+      }
 
-      // Extract CV keywords for matching (will return empty array if no CV)
-      const cvKeywords = extractCVKeywords({
-        summary: cvData.summary,
-        skills: cvData.skills,
-        experience: cvData.experience,
-      })
+      if (!source.primaryQuery || source.sourceType === 'empty') {
+        setRecommendedJobs([])
+        setDebugInfo(null)
+        return
+      }
 
-      // Extract summary keywords for debug info
-      const summaryKeywords = extractSummaryKeywords({
-        summary: cvData.summary,
-      })
-
-      // Use selected location from dropdown
+      const searchQuery = source.primaryQuery
+      const matchKeywords = [
+        ...source.supportingKeywords,
+        ...(source.alternativeQueries || []),
+      ]
+      const forbiddenTerms = source.forbiddenTerms || []
       const location = getLocationValue(recommendedLocation)
 
-      // Fetch jobs from API
       const params = new URLSearchParams()
       params.set('keyword', searchQuery.trim())
       params.set('location', location)
-
       const apiUrl = `/api/jobs/search?${params.toString()}`
-      
-      // Log API request (DEV only)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[DEV] API Request:', {
-          url: apiUrl,
-          keyword: searchQuery.trim(),
-          location: location,
-          queryUsed: searchQuery,
+
+      if (isAdminDebug && process.env.NODE_ENV === 'development') {
+        console.log('[Admin/Dev] Jobs For You source:', {
+          sourceType: source.sourceType,
+          query: searchQuery,
+          alternatives: source.alternativeQueries,
+          forbidden: forbiddenTerms,
+          planId: source.planId,
+          cvId: source.cvId,
         })
         setDebugInfo({
           query: searchQuery,
-          keywords: summaryKeywords.length > 0 ? summaryKeywords : cvKeywords.slice(0, 6),
-          apiUrl: apiUrl,
-          location: location,
+          keywords: matchKeywords.slice(0, 12),
+          apiUrl,
+          location,
+          matchSource: source.sourceType,
         })
       } else {
         setDebugInfo(null)
       }
 
-      const response = await fetch(apiUrl, { signal: fetchSignal })
-
-      // Check if request was aborted
-      if (fetchSignal.aborted) {
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch recommended jobs')
-      }
+      const response = await fetch(apiUrl, { signal: fetchSignal, cache: 'no-store' })
+      if (fetchSignal.aborted) return
+      if (!response.ok) throw new Error('Failed to fetch recommended jobs')
 
       const data = await response.json()
-      let results: Job[] = (data.results || []).slice(0, 20) // Get up to 20 jobs for filtering
+      let results: Job[] = (data.results || []).slice(0, 24)
+      if (fetchSignal.aborted) return
 
-      // Check again if aborted after fetch
-      if (fetchSignal.aborted) {
-        return
-      }
-
-      // Apply relevance filtering
-      if (results.length > 0 && cvKeywords.length > 0) {
-        // Try filtering with current mode
-        let filtered = filterJobsByRelevance(results, cvKeywords, searchQuery, filterMode) as Job[]
-        
-        // If filtering removes too many, fall back gradually
+      if (results.length > 0 && matchKeywords.length > 0) {
+        let filtered = filterJobsByRelevance(results, matchKeywords, searchQuery, filterMode) as Job[]
         if (filtered.length === 0 && filterMode === 'strict') {
-          filtered = filterJobsByRelevance(results, cvKeywords, searchQuery, 'balanced') as Job[]
+          filtered = filterJobsByRelevance(results, matchKeywords, searchQuery, 'balanced') as Job[]
         }
         if (filtered.length === 0 && filterMode === 'balanced') {
-          filtered = filterJobsByRelevance(results, cvKeywords, searchQuery, 'loose') as Job[]
+          filtered = filterJobsByRelevance(results, matchKeywords, searchQuery, 'loose') as Job[]
         }
-        
-        results = filtered.slice(0, 12) // Take top 12 after filtering
+        results = filtered.slice(0, 16)
       } else {
-        results = results.slice(0, 12) // Take top 12 if no filtering
+        results = results.slice(0, 16)
       }
 
-      // Check again if aborted before processing
-      if (fetchSignal.aborted) {
-        return
-      }
+      if (fetchSignal.aborted) return
 
-      // Classify and calculate match percentage for each job
-      const jobsWithClassification = results.map(job => {
+      let jobsWithClassification = results.map((job) => {
         const isTraining = isTrainingJob(job)
         const matchPercentage = calculateMatchPercentage(
-          cvKeywords,
+          matchKeywords,
           job.title,
           job.description,
-          searchQuery // Pass queryUsed for better matching
+          searchQuery
         )
-        return {
-          ...job,
-          matchPercentage,
-          isTraining,
-        }
+        return { ...job, matchPercentage, isTraining }
       })
 
-      // Separate jobs and training
-      const realJobs = jobsWithClassification.filter(job => !job.isTraining)
-      const trainingJobs = jobsWithClassification.filter(job => job.isTraining)
+      jobsWithClassification = filterJobsByForbiddenAndScore(
+        jobsWithClassification,
+        forbiddenTerms,
+        1
+      )
 
-      // Sort each category by match percentage (highest first)
+      const realJobs = jobsWithClassification.filter((job) => !job.isTraining)
+      const trainingJobs = jobsWithClassification.filter((job) => job.isTraining)
       realJobs.sort((a, b) => (b.matchPercentage || 0) - (a.matchPercentage || 0))
       trainingJobs.sort((a, b) => (b.matchPercentage || 0) - (a.matchPercentage || 0))
 
-      // Apply result type filter
       let filteredJobs: typeof jobsWithClassification = []
-
       if (resultType === 'jobs-only') {
         filteredJobs = realJobs
-        // If empty, fall back to showing all with a message
         if (filteredJobs.length === 0 && jobsWithClassification.length > 0) {
           setFallbackToAll(true)
-          filteredJobs = jobsWithClassification // Show all instead
-          // Automatically switch filter back to 'all' for better UX
-          // Use setTimeout to avoid triggering useEffect during render
+          filteredJobs = jobsWithClassification
           setTimeout(() => setResultType('all'), 0)
         } else {
           setFallbackToAll(false)
@@ -790,99 +820,115 @@ export default function DashboardPage() {
         filteredJobs = trainingJobs
         setFallbackToAll(false)
       } else {
-        // 'all' mode: real jobs first, then training
         filteredJobs = [...realJobs, ...trainingJobs]
         setFallbackToAll(false)
       }
 
-      // Final check before setting state
       if (!fetchSignal.aborted) {
-        setRecommendedJobs(filteredJobs)
-
-        // Cache Adzuna jobs to sessionStorage when loaded
-        if (typeof window !== 'undefined') {
-          filteredJobs.forEach((job: Job) => {
-            if (job.id?.startsWith('adzuna_')) {
-              try {
-                const rawId = job.id.replace('adzuna_', '')
-                const cacheKey = `adzuna_job_${rawId}`
-                
-                const cachedJob = {
-                  id: job.id,
-                  title: job.title || '',
-                  company: job.company || '',
-                  description: job.description || '',
-                  location: job.location || '',
-                  type: job.type || '',
-                  link: job.link || '',
-                  salary: (job as any).salary,
-                  contract: (job as any).contract,
-                  redirect_url: (job as any).redirect_url || job.link,
-                  created: (job as any).created,
-                  category: (job as any).category,
-                }
-                
-                // NOTE: sessionStorage persistence has been removed
-                // sessionStorage.setItem(cacheKey, JSON.stringify(cachedJob))
-              } catch (error) {
-                console.error('Error caching Adzuna job:', error)
-              }
-            }
-          })
-        }
+        setRecommendedJobs(filteredJobs.slice(0, 12))
       }
     } catch (error: any) {
-      // Ignore abort errors
-      if (error.name === 'AbortError' || fetchSignal.aborted) {
-        return
-      }
+      if (error.name === 'AbortError' || fetchSignal.aborted) return
       console.error('Error fetching recommended jobs:', error)
-      if (!fetchSignal.aborted) {
-        setRecommendedJobs([])
-      }
+      if (!fetchSignal.aborted) setRecommendedJobs([])
     } finally {
-      if (!fetchSignal.aborted) {
-        setLoadingRecommendedJobs(false)
-      }
+      if (!fetchSignal.aborted) setLoadingRecommendedJobs(false)
     }
-  }, [baseCv, filterMode, resultType, fallbackToAll, recommendedLocation])
+  }, [filterMode, resultType, recommendedLocation, isAdminDebug])
 
-  // Auto-refresh recommended jobs when CV signature changes
+  // Page load + filter/location change — resolve from Supabase (no polling)
   useEffect(() => {
-    // Debounce for rapid changes (like typing), but immediate for saves
-    // If cvSignature changed from 'no-cv' to something, it's a save - update immediately
-    // Otherwise, debounce by 400ms
     const timeoutId = setTimeout(() => {
-      fetchRecommendedJobs()
-    }, 400)
-
+      void fetchRecommendedJobs()
+    }, 300)
     return () => {
       clearTimeout(timeoutId)
-      // Cancel fetch on cleanup
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
+      if (abortControllerRef.current) abortControllerRef.current.abort()
     }
-  }, [cvSignature, fetchRecommendedJobs])
+  }, [fetchRecommendedJobs])
 
-  // Handler for saving a job to Job Finder
-  // NOTE: localStorage persistence has been removed - saved jobs are now in-memory only
-  const handleSaveRecommendedJob = (job: Job) => {
+  // CV / plan save events → refetch Supabase source
+  useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // No-op: localStorage persistence has been removed - use in-memory state only
-    // Jobs can still be saved to in-memory state via setSavedJobsFromJobFinder
-    setSavedJobsFromJobFinder(prev => {
-      // Check if job is already saved
-      if (prev.some((j) => j.id === job.id)) {
-        return prev // Already saved
+    const onCvSaved = () => {
+      void fetchCvFromApi()
+      void fetchRecommendedJobs()
+    }
+    const onJobsRefresh = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail as { reason?: string } | undefined
+      const reason = detail?.reason
+      void fetchRecommendedJobs({
+        showToast: reason === 'plan' ? 'plan' : undefined,
+      })
+    }
+    const onPlanRefresh = () => {
+      // Prefer JOBS_FOR_YOU_REFRESH_EVENT for toast; this covers older callers
+      void fetchRecommendedJobs()
+    }
+
+    window.addEventListener('jobaz-cv-saved', onCvSaved)
+    window.addEventListener(JOBS_FOR_YOU_REFRESH_EVENT, onJobsRefresh as EventListener)
+    window.addEventListener(CAREER_PLAN_REFRESH_EVENT, onPlanRefresh)
+    window.addEventListener('jobaz-career-plan-generated-updated', onPlanRefresh)
+
+    return () => {
+      window.removeEventListener('jobaz-cv-saved', onCvSaved)
+      window.removeEventListener(JOBS_FOR_YOU_REFRESH_EVENT, onJobsRefresh as EventListener)
+      window.removeEventListener(CAREER_PLAN_REFRESH_EVENT, onPlanRefresh)
+      window.removeEventListener('jobaz-career-plan-generated-updated', onPlanRefresh)
+    }
+  }, [fetchRecommendedJobs, fetchCvFromApi])
+
+  // Handler for saving a job (user-scoped via /api/saved-jobs/toggle)
+  const handleSaveRecommendedJob = async (job: Job) => {
+    if (typeof window === 'undefined') return
+
+    const jobKey = job.id
+    const already = savedJobsFromJobFinder.some((j) => j.id === jobKey)
+    if (already) return
+
+    setSavedJobsFromJobFinder((prev) => [...prev, job])
+
+    try {
+      const response = await fetch('/api/saved-jobs/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_key: jobKey, job }),
+      })
+      if (!response.ok) {
+        setSavedJobsFromJobFinder((prev) => prev.filter((j) => j.id !== jobKey))
+        return
       }
-      // Add job to saved jobs (in-memory only)
-      return [...prev, job]
-    })
-    
-    // Dispatch custom event to notify other components
-    window.dispatchEvent(new Event('jobaz-saved-jobs-changed'))
+      window.dispatchEvent(new Event('jobaz-saved-jobs-changed'))
+    } catch {
+      setSavedJobsFromJobFinder((prev) => prev.filter((j) => j.id !== jobKey))
+    }
+  }
+
+  const handleMarkRecommendedApplied = async (job: Job) => {
+    try {
+      const response = await fetch('/api/jobs/applied/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobKey: job.id,
+          jobTitle: job.title,
+          company: job.company,
+          location: job.location,
+          url: job.link,
+          source: 'jobs_for_you',
+          data: { status: 'submitted', from: 'jobs_for_you' },
+        }),
+      })
+      if (response.ok) {
+        await fetchAppliedJobsFromApi()
+        setToast({ type: 'success', message: 'Marked as applied.' })
+      }
+    } catch (error) {
+      console.error('Failed to mark job as applied:', error)
+      setToast({ type: 'error', message: 'Could not mark as applied.' })
+    }
   }
 
   // Cache Adzuna job to sessionStorage before navigation
@@ -1124,18 +1170,13 @@ export default function DashboardPage() {
         description: 'Search for jobs that match your skills',
         action: () => {
           const params = new URLSearchParams()
-          if (baseCv) {
-            const searchQuery = generateSearchQueryFromCV({
-              summary: baseCv.summary,
-              skills: baseCv.skills,
-              experience: baseCv.experience,
-            })
-            if (searchQuery) {
-              params.set('jobTitle', searchQuery)
-            }
-            if (baseCv.city) {
-              params.set('location', baseCv.city)
-            }
+          const searchQuery = jobsForYouQuery.trim()
+          if (searchQuery) {
+            params.set('jobTitle', searchQuery)
+            params.set('query', searchQuery)
+          }
+          if (baseCv?.city) {
+            params.set('location', baseCv.city)
           }
           router.push(`/job-finder?${params.toString()}`)
         },
@@ -1296,7 +1337,7 @@ export default function DashboardPage() {
           {/* Skeleton Header */}
           <div className="mb-8">
             <div className="h-10 w-64 bg-slate-800/50 rounded-lg mb-3 animate-pulse" />
-            <div className="h-5 w-96 bg-slate-800/30 rounded-lg animate-pulse" />
+            <div className="h-5 w-full max-w-sm bg-slate-800/30 rounded-lg animate-pulse" />
           </div>
 
           {/* Skeleton Stats Cards */}
@@ -1475,7 +1516,7 @@ export default function DashboardPage() {
               <p className="text-sm text-slate-400">
                 You have {appliedJobs.length} application{appliedJobs.length !== 1 ? 's' : ''} — use the{' '}
                 <Link href={dashboardTabHref('jobs')} className="text-violet-400 hover:text-violet-300 underline">
-                  Saved Jobs tab
+                  Jobs For You tab
                 </Link>{' '}
                 to train for specific roles.
               </p>
@@ -1486,28 +1527,53 @@ export default function DashboardPage() {
         {activeTab === 'jobs' && (
         <>
         <PlatformSectionHeader
-          title="Saved Jobs"
-          description="Jobs you saved or applied to — your private job workspace on JobAZ."
+          title="Jobs For You"
+          description="Personalised job matches based on your CV and current career plan."
           dotColor="amber"
         />
 
         <section ref={recommendedJobsRef}>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
+          <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-3 mb-2">
                 <h2 className="text-xl font-bold text-slate-50 tracking-tight flex items-center gap-2">
                   <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)] animate-pulse" />
-                  Recommended Jobs for You
+                  Recommended Jobs
                 </h2>
-                <span className="text-xs text-slate-400 font-normal">
-                  AI-powered recommendations
-                </span>
+                {jobsForYouMatchLabel && (
+                  <span className="text-xs text-violet-300/90 font-medium rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5">
+                    {jobsForYouMatchLabel}
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-slate-400">Personalized recommendations based on your CV and career goals</p>
+              <p className="text-sm text-slate-400">
+                {jobsForYouSourceType === 'plan_and_cv' || jobsForYouSourceType === 'plan_only'
+                  ? `Prioritising your ${jobsForYouMeta.targetRole || jobsForYouMeta.route || 'career'} plan${
+                      jobsForYouSourceType === 'plan_and_cv' ? ', with CV skills as supporting fit' : ''
+                    }.`
+                  : jobsForYouSourceType === 'cv_only'
+                    ? 'Based on your saved CV — add a Career Assistant plan to steer recommendations.'
+                    : 'Build a CV or create a career plan to get personalised matches.'}
+              </p>
+              {jobsForYouQuery && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Search focus: <span className="text-slate-300">{jobsForYouQuery}</span>
+                </p>
+              )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
-                onClick={() => router.push('/job-finder')}
+                onClick={() => {
+                  const params = new URLSearchParams()
+                  if (jobsForYouQuery.trim()) {
+                    params.set('query', jobsForYouQuery.trim())
+                    params.set('jobTitle', jobsForYouQuery.trim())
+                  }
+                  const loc = getLocationValue(recommendedLocation)
+                  if (loc) params.set('location', loc)
+                  const qs = params.toString()
+                  router.push(qs ? `/job-finder?${qs}` : '/job-finder')
+                }}
                 className="flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-sm font-medium text-white hover:from-violet-500 hover:to-purple-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)] hover:shadow-[0_0_25px_rgba(139,92,246,1)]"
               >
                 <Search className="w-4 h-4" />
@@ -1520,7 +1586,7 @@ export default function DashboardPage() {
                 onChange={(e) => {
                   const newType = e.target.value as 'all' | 'jobs-only' | 'training-only'
                   setResultType(newType)
-                  setFallbackToAll(false) // Reset fallback when changing filter
+                  setFallbackToAll(false)
                 }}
                 className="rounded-full bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 border border-slate-600/70 hover:border-violet-400/60 transition"
               >
@@ -1534,7 +1600,6 @@ export default function DashboardPage() {
                 value={recommendedLocation}
                 onChange={(e) => {
                   setRecommendedLocation(e.target.value)
-                  // Refetch with new location
                   fetchRecommendedJobs()
                 }}
                 className="rounded-full bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 border border-slate-600/70 hover:border-violet-400/60 transition"
@@ -1546,17 +1611,17 @@ export default function DashboardPage() {
                 ))}
               </select>
               
-              {/* Refine Results Dropdown (DEV only) */}
-              {process.env.NODE_ENV === 'development' && (
+              {/* Refine Results — Admin / Dev debug only */}
+              {isAdminDebug && process.env.NODE_ENV === 'development' && (
                 <select
                   value={filterMode}
                   onChange={(e) => {
                     const newMode = e.target.value as 'strict' | 'balanced' | 'loose'
                     setFilterMode(newMode)
-                    // Refetch with new filter mode
                     fetchRecommendedJobs()
                   }}
-                  className="rounded-full bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 border border-slate-600/70 hover:border-violet-400/60 transition"
+                  className="rounded-full bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-200 border border-amber-500/40 hover:border-amber-400/60 transition"
+                  title="Admin / Dev debug only"
                 >
                   <option value="strict">Strict (2 keywords)</option>
                   <option value="balanced">Balanced (1 keyword)</option>
@@ -1564,22 +1629,25 @@ export default function DashboardPage() {
                 </select>
               )}
               <button
-                onClick={() => fetchRecommendedJobs()}
+                onClick={() => void fetchRecommendedJobs({ showToast: undefined })}
                 disabled={loadingRecommendedJobs}
                 className="flex items-center gap-2 rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RefreshCw className={cn("w-3 h-3", loadingRecommendedJobs && "animate-spin")} />
-                Refresh
+                Refresh matches
               </button>
             </div>
           </div>
 
-          {/* Debug Info (Development Only) */}
-          {process.env.NODE_ENV === 'development' && debugInfo && (
-            <div className="mb-4 p-3 rounded-lg bg-slate-900/50 border border-slate-700/50 text-xs text-slate-400">
-              <div className="font-semibold text-slate-300 mb-1">Debug Info:</div>
+          {/* Admin / Dev debug only — never shown to public users */}
+          {isAdminDebug && process.env.NODE_ENV === 'development' && debugInfo && (
+            <div className="mb-4 p-3 rounded-lg bg-amber-950/40 border border-amber-500/40 text-xs text-amber-100/90">
+              <div className="font-semibold text-amber-200 mb-1">Admin / Dev debug only</div>
               <div>Query used: <span className="text-violet-300">{debugInfo.query || 'N/A'}</span></div>
-              <div>Keywords extracted: <span className="text-violet-300">{debugInfo.keywords.length > 0 ? debugInfo.keywords.join(', ') : 'N/A'}</span></div>
+              <div>Keywords: <span className="text-violet-300">{debugInfo.keywords.length > 0 ? debugInfo.keywords.join(', ') : 'N/A'}</span></div>
+              {debugInfo.matchSource && (
+                <div>Match source: <span className="text-violet-300">{debugInfo.matchSource}</span></div>
+              )}
               {debugInfo.location && (
                 <div className="mt-1">
                   Location: <span className="text-violet-300">{debugInfo.location}</span>
@@ -1588,6 +1656,16 @@ export default function DashboardPage() {
               {debugInfo.apiUrl && (
                 <div className="mt-1">
                   API URL: <span className="text-violet-300 break-all">{debugInfo.apiUrl}</span>
+                </div>
+              )}
+              {(jobsForYouMeta.forbiddenTerms?.length || 0) > 0 && (
+                <div className="mt-1">
+                  Forbidden: <span className="text-violet-300">{jobsForYouMeta.forbiddenTerms?.join(', ')}</span>
+                </div>
+              )}
+              {(jobsForYouMeta.alternativeQueries?.length || 0) > 0 && (
+                <div className="mt-1">
+                  Alternatives: <span className="text-violet-300">{jobsForYouMeta.alternativeQueries?.join(', ')}</span>
                 </div>
               )}
               <div className="mt-1">
@@ -1599,61 +1677,65 @@ export default function DashboardPage() {
           {loadingRecommendedJobs ? (
             <div className="text-center py-12 rounded-2xl border border-slate-700/60 bg-slate-950/50">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500 mb-4"></div>
-              <p className="text-slate-400">Finding jobs that match your CV...</p>
+              <p className="text-slate-400">Finding jobs that match your plan and CV...</p>
+            </div>
+          ) : jobsForYouSourceType === 'empty' || (!baseCv && !jobsForYouMeta.planId) ? (
+            <div className="text-center py-12 rounded-2xl border border-slate-700/60 bg-slate-950/50">
+              <Star className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+              <p className="text-slate-300 text-lg mb-2">
+                Build a CV or create a career plan to get personalised job matches.
+              </p>
+              <p className="text-slate-400 text-sm mb-6">
+                We combine your Career Assistant plan with your saved CV to recommend the right UK roles.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  onClick={() => router.push('/uk-career-assistant')}
+                  className="rounded-full bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
+                >
+                  Start Career Assistant
+                </button>
+                <button
+                  onClick={() => router.push('/cv-builder-v2')}
+                  className="rounded-full border border-slate-600/70 bg-slate-900/60 px-4 py-2 text-sm font-medium text-slate-200 hover:border-violet-400/50 transition"
+                >
+                  Open CV Builder
+                </button>
+              </div>
             </div>
           ) : recommendedJobs.length === 0 ? (
             <div className="text-center py-12 rounded-2xl border border-slate-700/60 bg-slate-950/50">
               <Star className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-              {!baseCv ? (
-                <>
-                  <p className="text-slate-300 text-lg mb-2">Create your CV to get personalized job recommendations</p>
-                  <p className="text-slate-400 text-sm mb-4">
-                    We'll analyze your skills and experience to find the best matches for you.
-                  </p>
-                  <button
-                    onClick={() => router.push('/cv-builder-v2')}
-                    className="rounded-full bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                  >
-                    Create your CV
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-slate-300 text-lg mb-2">We're still learning about your experience. Update your CV to get more accurate matches.</p>
-                  <p className="text-slate-400 text-sm mb-4">
-                    Try Refresh or broaden your CV keywords.
-                  </p>
-                  {debugInfo && debugInfo.query && (
-                    <button
-                      onClick={() => {
-                        const params = new URLSearchParams()
-                        params.set('jobTitle', debugInfo.query)
-                        if (baseCv?.city) {
-                          params.set('location', baseCv.city)
-                        }
-                        router.push(`/job-finder?${params.toString()}`)
-                      }}
-                      className="rounded-full bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
-                    >
-                      Open Job Finder with &quot;{debugInfo.query}&quot;
-                    </button>
-                  )}
-                </>
+              <p className="text-slate-300 text-lg mb-2">No matches yet — try Refresh jobs or broaden your location.</p>
+              <p className="text-slate-400 text-sm mb-4">
+                Update your CV or Career Assistant plan to improve results.
+              </p>
+              {jobsForYouQuery && (
+                <button
+                  onClick={() => {
+                    const params = new URLSearchParams()
+                    params.set('query', jobsForYouQuery)
+                    params.set('jobTitle', jobsForYouQuery)
+                    if (baseCv?.city) params.set('location', baseCv.city)
+                    router.push(`/job-finder?${params.toString()}`)
+                  }}
+                  className="rounded-full bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)]"
+                >
+                  Open Job Finder
+                </button>
               )}
             </div>
           ) : (
             <>
-              {/* Show hint if CV exists but is light */}
-              {baseCv && (!baseCv.summary?.trim() || (baseCv.skills?.length || 0) < 5 || (baseCv.experience?.length || 0) < 1) && (
+              {baseCv && (!baseCv.summary?.trim() || (baseCv.skills?.length || 0) < 5 || (baseCv.experience?.length || 0) < 1) && jobsForYouSourceType === 'cv_only' && (
                 <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200">
-                  💡 Add more skills/experience to improve matching.
+                  Add more skills/experience to improve matching.
                 </div>
               )}
 
-              {/* Fallback message when Jobs Only filter returned empty */}
               {fallbackToAll && recommendedJobs.length > 0 && (
                 <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200">
-                  ⚠️ No direct job openings found. Showing training options instead.
+                  No direct job openings found. Showing training options instead.
                 </div>
               )}
               
@@ -1663,8 +1745,10 @@ export default function DashboardPage() {
                     key={job.id}
                     job={job}
                     isSaved={isRecommendedJobSaved(job.id)}
+                    isApplied={appliedJobs.some((a) => a.id === job.id)}
                     onView={() => handleViewRecommendedJob(job)}
                     onSave={() => handleSaveRecommendedJob(job)}
+                    onMarkApplied={() => handleMarkRecommendedApplied(job)}
                     onTailorCv={() => handleTailorCVFromRecommended(job.id)}
                     onTrainInterview={() => handleTrainInterviewFromRecommended(job)}
                   />
@@ -1674,43 +1758,53 @@ export default function DashboardPage() {
           )}
         </section>
 
-        {/* Saved Jobs from Job Finder */}
-        {savedJobsFromJobFinder.length > 0 && (
-          <section className="mt-10">
-            <h2 className="text-xl font-bold text-slate-50 tracking-tight mb-4 flex items-center gap-2">
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.9)]" />
-              Saved Jobs
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {savedJobsFromJobFinder.map((job) => (
-                <RecommendedJobCard
-                  key={job.id}
-                  job={job}
-                  isSaved
-                  onView={() => handleViewRecommendedJob(job)}
-                  onSave={() => {}}
-                  onTailorCv={() => handleTailorCVFromRecommended(job.id)}
-                  onTrainInterview={() => handleTrainInterviewFromRecommended(job)}
-                />
-              ))}
+        {/* Saved / Applied Jobs — private to signed-in user */}
+        {(savedJobsFromJobFinder.length > 0 || appliedJobs.length > 0) && (
+          <section className="mt-10 space-y-8">
+            <div>
+              <h2 className="text-xl font-bold text-slate-50 tracking-tight mb-1 flex items-center gap-2">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.9)]" />
+                Saved / Applied Jobs
+              </h2>
+              <p className="text-sm text-slate-400 mb-4">
+                Your private shortlist — only visible to you while signed in.
+              </p>
             </div>
-          </section>
-        )}
+
+            {savedJobsFromJobFinder.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-300 mb-3">Saved Jobs</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {savedJobsFromJobFinder.map((job) => (
+                    <RecommendedJobCard
+                      key={job.id}
+                      job={job}
+                      isSaved
+                      isApplied={appliedJobs.some((a) => a.id === job.id)}
+                      onView={() => handleViewRecommendedJob(job)}
+                      onSave={() => {}}
+                      onMarkApplied={() => handleMarkRecommendedApplied(job)}
+                      onTailorCv={() => handleTailorCVFromRecommended(job.id)}
+                      onTrainInterview={() => handleTrainInterviewFromRecommended(job)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
         {/* Jobs you applied for */}
-        <section ref={appliedJobsRef} className="mt-10">
+        {appliedJobs.length > 0 && (
+        <section ref={appliedJobsRef} className={savedJobsFromJobFinder.length > 0 ? 'mt-2' : ''}>
           <div className="flex items-center justify-between mb-6">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-xl font-bold text-slate-50 tracking-tight flex items-center gap-2">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" />
+                <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
                   Jobs You Applied For
-                </h2>
-                {appliedJobs.length > 0 && (
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs font-medium text-emerald-300">
-                    {appliedJobs.length} {appliedJobs.length === 1 ? 'Job' : 'Jobs'}
-                  </span>
-                )}
+                </h3>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs font-medium text-emerald-300">
+                  {appliedJobs.length} {appliedJobs.length === 1 ? 'Job' : 'Jobs'}
+                </span>
               </div>
               <p className="text-sm text-slate-400">Track your application progress and manage your job applications</p>
             </div>
@@ -1720,24 +1814,6 @@ export default function DashboardPage() {
             <div className="text-center py-12 rounded-2xl border border-slate-700/60 bg-slate-950/50">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500 mb-4"></div>
               <p className="text-slate-400">Loading your jobs...</p>
-            </div>
-          ) : appliedJobs.length === 0 ? (
-            <div className="text-center py-16 rounded-2xl border-2 border-dashed border-slate-700/60 bg-gradient-to-br from-slate-950/50 to-slate-900/30">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-800/50 mb-4">
-                <Briefcase className="w-8 h-8 text-slate-500" />
-              </div>
-              <p className="text-slate-300 text-lg font-semibold mb-2">You haven't applied for any jobs yet</p>
-              <p className="text-slate-400 text-sm mb-6 max-w-md mx-auto">
-                Start your job search journey by finding and applying for jobs that match your skills
-              </p>
-              <button
-                onClick={() => router.push('/job-finder')}
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-3 text-sm font-medium text-white hover:from-violet-500 hover:to-purple-500 transition shadow-[0_0_18px_rgba(139,92,246,0.8)] hover:shadow-[0_0_25px_rgba(139,92,246,1)]"
-              >
-                <Search className="w-4 h-4" />
-                Find Jobs Now
-                <ArrowRight className="w-4 h-4" />
-              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1886,6 +1962,9 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
+          )}
+        </section>
+        )}
         </>
         )}
 

@@ -86,8 +86,26 @@ export const LEGACY_COMMERCIAL_STATUS_OPTIONS = [
 
 export const EDUCATION_FIELD_FILTER_OPTIONS = [
   'Engineering',
-  'Healthcare',
   'IT & Technology',
+  'Healthcare & Medicine',
+  'Natural Sciences & Research',
+  'Business & Management',
+  'Accounting, Finance & Banking',
+  'Law, Legal & Justice',
+  'Education & Teaching',
+  'Arts, Media & Creative Industries',
+  'Languages & Literature',
+  'Humanities & Social Sciences',
+  'Environment, Agriculture & Food',
+  'Government, Public Policy & International Development',
+  'Architecture, Urban & Planning',
+  'Psychology & Behavioural Science',
+  'Public Health & Social Care',
+  'Hospitality, Tourism & Events',
+  'Logistics, Supply Chain & Operations',
+  'Human Resources & People',
+  'Marketing, Communications & Media',
+  'Healthcare',
   'Business & Finance',
   'Business',
   'Finance',
@@ -105,6 +123,8 @@ export const EDUCATION_FIELD_FILTER_OPTIONS = [
   'Property & Real Estate',
   'Facilities',
 ] as const
+
+export { WIE_STAGE_FILTER_OPTIONS } from './wieTrackerFilters'
 
 export const RECOMMENDATION_TYPE_OPTIONS = ['course_type', 'action_type', 'resource_type'] as const
 
@@ -135,6 +155,7 @@ export type OpportunityGoalOption = {
 /** Career engine / journey goals for opportunity planning */
 export const OPPORTUNITY_GOAL_OPTIONS: OpportunityGoalOption[] = [
   { goalKey: 'work_in_education', goalLabel: 'Work in my Education' },
+  { goalKey: 'work_in_profession', goalLabel: 'Work in My Profession' },
   { goalKey: 'work_in_experience', goalLabel: 'Work in my Experience' },
   { goalKey: 'start_new_career', goalLabel: 'Start a New Career' },
   { goalKey: 'grow_current_career', goalLabel: 'Grow in my Current Career' },

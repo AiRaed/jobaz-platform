@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 /**
  * Clean cover letter variant to remove greetings, closings, markdown, and section titles
@@ -135,6 +136,9 @@ export async function POST(req: Request) {
         ],
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'cover_letter', 'compare')
+    if (!usageGate.allowed) return usageGate.response
 
     // Build role/keywords context for prompt
     const position = role || roleTitle

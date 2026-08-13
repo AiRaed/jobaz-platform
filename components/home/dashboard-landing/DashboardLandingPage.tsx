@@ -18,6 +18,7 @@ import LatestJobsRow from './LatestJobsRow'
 import PopularCoursesRow from './PopularCoursesRow'
 import FeaturedOpportunitiesRow from './FeaturedOpportunitiesRow'
 import FeaturedPulseRow from './FeaturedPulseRow'
+import { Footer } from '@/components/Footer'
 import { LandingJobsProvider } from './LandingJobsContext'
 import { LandingCoursesProvider } from './LandingCoursesContext'
 import { dashboardSectionGap } from './layout'
@@ -85,6 +86,8 @@ function DashboardMain() {
               {contentTab === 'opportunities' && <FeaturedOpportunitiesRow />}
               {contentTab === 'pulse' && <FeaturedPulseRow />}
             </div>
+
+            <Footer />
           </div>
         </main>
       </div>

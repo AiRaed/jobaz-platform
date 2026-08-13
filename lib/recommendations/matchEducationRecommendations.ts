@@ -3,6 +3,14 @@ import type { AdminCourse } from '@/lib/admin/courses/types'
 import type { EducationPathAnswers, EducationPathResult } from '@/lib/career-engine/education-path/types'
 import { resolveSpecialisationLabel } from '@/lib/career-engine/education-path/educationSpecialisations'
 import {
+  classifyWieCourse,
+  isEligibleForWieRecommendation,
+  isTitleSafeForWorkInEducation,
+  buildWieMissingCourseTypeCards,
+  suggestCourseTypesForWieRoute,
+  wieMatchTierBoost,
+} from '@/lib/career-engine/work-in-education/course-alignment'
+import {
   anyPartialMatch,
   educationFieldLabelsForMatching,
   labelsOverlap,
@@ -27,6 +35,9 @@ export type EducationMatchInput = {
   /** Max cards shown in Career Coach (top matches only). */
   limit?: number
   minScore?: number
+  /** Optional free-text overrides (Career Knowledge Library field/specialism names). */
+  educationFieldLabelOverride?: string
+  specialisationLabelOverride?: string
 }
 
 function hasGoal(opp: CourseOpportunity, goalKey: string): boolean {
@@ -113,19 +124,39 @@ export function matchEducationRecommendations(input: EducationMatchInput): Recom
     goalKey = 'work_in_education',
     limit = 4,
     minScore = 38,
+    educationFieldLabelOverride,
+    specialisationLabelOverride,
   } = input
 
-  const fieldLabels = educationFieldLabelsForMatching(answers.education_field)
-  const specLabels = specialisationLabelsForMatching(
-    answers.education_field,
-    answers.education_specialisation,
-    answers.education_specialisation_other
-  )
-  const specDisplay = resolveSpecialisationLabel(
-    answers.education_field,
-    answers.education_specialisation,
-    answers.education_specialisation_other
-  )
+  const fieldLabels = educationFieldLabelOverride?.trim()
+    ? [normMatchLabel(educationFieldLabelOverride), ...educationFieldLabelsForMatching(answers.education_field)]
+    : educationFieldLabelsForMatching(answers.education_field)
+  const specLabels = specialisationLabelOverride?.trim()
+    ? [
+        normMatchLabel(specialisationLabelOverride),
+        ...specialisationLabelsForMatching(
+          answers.education_field,
+          answers.education_specialisation,
+          answers.education_specialisation_other
+        ),
+      ]
+    : specialisationLabelsForMatching(
+        answers.education_field,
+        answers.education_specialisation,
+        answers.education_specialisation_other
+      )
+  const specDisplay =
+    specialisationLabelOverride?.trim() ||
+    resolveSpecialisationLabel(
+      answers.education_field,
+      answers.education_specialisation,
+      answers.education_specialisation_other
+    )
+
+  const wieCtx = {
+    educationField: educationFieldLabelOverride?.trim() || fieldLabels.join(' ') || answers.education_field,
+    specialism: specialisationLabelOverride?.trim() || specDisplay || specLabels.join(' '),
+  }
 
   const scored: RecommendationCourseCardData[] = []
   const seen = new Set<string>()
@@ -138,9 +169,26 @@ export function matchEducationRecommendations(input: EducationMatchInput): Recom
     const visibility = resolveVisibilityForOpportunity(opp)
     if (visibility !== 'recommendation_only' && visibility !== 'public_listed') continue
 
+    // Work in My Education alignment + contamination gate
+    if (goalKey === 'work_in_education') {
+      if (!isTitleSafeForWorkInEducation(opp.courseName, wieCtx)) continue
+      const alignment = classifyWieCourse({
+        title: opp.courseName,
+        shortLabel: opp.shortLabel,
+        coursePurpose: opp.coursePurpose,
+        educationFields: opp.educationFields,
+        specialisations: opp.specialisations,
+        goalKeys: (opp.goals ?? []).map((g) => g.goalKey),
+        routeLabels: opp.routes.map((r) => r.routeLabel),
+        commercialStatus: opp.commercialStatus,
+        adminNotes: opp.adminNotes,
+      })
+      if (!isEligibleForWieRecommendation(alignment, wieCtx, opp.courseName)) continue
+    }
+
     const matchScore =
       scoreOpportunity(opp, fieldLabels, specLabels) +
-      courseTitleBoostForEducation(opp.title, answers as EducationPathAnswers & Record<string, string>)
+      courseTitleBoostForEducation(opp.courseName, answers as EducationPathAnswers & Record<string, string>)
     if (matchScore < minScore) continue
 
     if (opp.publishedCourseId) {
@@ -177,12 +225,33 @@ export function matchEducationRecommendations(input: EducationMatchInput): Recom
     if (course.status !== 'published' || !course.showInCareerHub) continue
     if (seen.has(course.id)) continue
 
+    if (goalKey === 'work_in_education' && !isTitleSafeForWorkInEducation(course.title, wieCtx)) {
+      continue
+    }
+
     const linkedOpp = opportunities.find((o) => o.publishedCourseId === course.id)
     let matchScore = 0
     if (linkedOpp) {
+      if (goalKey === 'work_in_education') {
+        const alignment = classifyWieCourse({
+          title: linkedOpp.courseName || course.title,
+          shortLabel: linkedOpp.shortLabel,
+          coursePurpose: linkedOpp.coursePurpose || course.coursePurpose,
+          educationFields: linkedOpp.educationFields,
+          specialisations: linkedOpp.specialisations,
+          goalKeys: (linkedOpp.goals ?? []).map((g) => g.goalKey),
+          routeLabels: linkedOpp.routes.map((r) => r.routeLabel),
+          commercialStatus: linkedOpp.commercialStatus,
+          adminNotes: linkedOpp.adminNotes,
+        })
+        if (!isEligibleForWieRecommendation(alignment, wieCtx, course.title)) continue
+      }
       matchScore =
         scoreOpportunity(linkedOpp, fieldLabels, specLabels) +
         courseTitleBoostForEducation(course.title, answers as EducationPathAnswers & Record<string, string>)
+    } else if (goalKey === 'work_in_education') {
+      // Without opportunity field mapping, do not promote merely because published/affiliate
+      continue
     }
 
     if (matchScore < minScore) continue
@@ -201,9 +270,54 @@ export function matchEducationRecommendations(input: EducationMatchInput): Recom
     }
   }
 
-  return scored
-    .sort((a, b) => b.matchScore - a.matchScore || b.priority - a.priority)
+  const ranked = scored
+    .sort(
+      (a, b) =>
+        wieMatchTierBoost(b) - wieMatchTierBoost(a) ||
+        b.matchScore - a.matchScore ||
+        b.priority - a.priority
+    )
     .slice(0, limit)
+
+  // No safe Course Library match — surface suggested course types (Coming soon), never unrelated affiliates
+  if (goalKey === 'work_in_education' && ranked.length === 0) {
+    const suggestions = suggestCourseTypesForWieRoute({
+      fieldName: wieCtx.educationField || answers.education_field || 'Education',
+      specialismName: wieCtx.specialism || specDisplay,
+      limit: Math.min(3, limit),
+    })
+    return buildWieMissingCourseTypeCards({
+      suggestions,
+      fieldName: wieCtx.educationField || answers.education_field || 'Your field',
+      specialismName: wieCtx.specialism || specDisplay,
+      coverageStatus: 'missing_course_coverage',
+      limit: Math.min(3, limit),
+    })
+  }
+
+  // Weak coverage: keep real matches, optionally top up with bridge suggestions (not primary)
+  if (goalKey === 'work_in_education' && ranked.length > 0 && ranked.length < Math.min(2, limit)) {
+    const suggestions = suggestCourseTypesForWieRoute({
+      fieldName: wieCtx.educationField || answers.education_field || 'Education',
+      specialismName: wieCtx.specialism || specDisplay,
+      limit: 2,
+    }).filter((s) => s.purpose === 'uk_workplace_bridge' || s.priority === 'high')
+    const gaps = buildWieMissingCourseTypeCards({
+      suggestions,
+      fieldName: wieCtx.educationField || answers.education_field || 'Your field',
+      specialismName: wieCtx.specialism || specDisplay,
+      coverageStatus: 'partially_covered',
+      limit: 1,
+    })
+    const seenTitles = new Set(ranked.map((c) => normMatchLabel(c.title)))
+    for (const g of gaps) {
+      if (seenTitles.has(normMatchLabel(g.title))) continue
+      ranked.push(g)
+      if (ranked.length >= limit) break
+    }
+  }
+
+  return ranked.slice(0, limit)
 }
 
 export function buildOtherSuggestionsFromResult(result: EducationPathResult): OtherSuggestion[] {

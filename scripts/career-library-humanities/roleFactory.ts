@@ -180,20 +180,45 @@ export function buildRoles(def: SpecDef): RoleSeed[] {
   switch (def.profile) {
     case 'social_research':
       ladder({
-        supportTitle: `${S} Research Admin Assistant`,
+        supportTitle: `Research Assistant (${S})`,
         supportDesc: `Supports ${S.toLowerCase()} projects with scheduling, data entry and participant logistics.`,
-        graduateTitle: `${S} Graduate Research Assistant`,
-        graduateDesc: `Graduate RA supporting ${S.toLowerCase()} surveys, fieldwork or evidence reviews.`,
-        practitionerTitle: `${S} Researcher / ${noun}`,
-        practitionerDesc: `Delivers applied ${S.toLowerCase()} research or analysis for public, voluntary or commercial clients.`,
-        experiencedTitle: `Experienced ${S} Specialist`,
+        graduateTitle: `Social Research Assistant (${S})`,
+        graduateDesc: `Graduate research assistant supporting ${S.toLowerCase()} surveys, fieldwork or evidence reviews.`,
+        practitionerTitle: `Policy Support Officer (${S})`,
+        practitionerDesc: `Delivers applied ${S.toLowerCase()} research or policy support for public, voluntary or commercial clients.`,
+        experiencedTitle: `Research Officer (${S})`,
         experiencedDesc: `Designs and delivers complex ${S.toLowerCase()} research or evaluation projects.`,
-        seniorTitle: `Senior ${S} Specialist`,
-        seniorDesc: `Leads major ${S.toLowerCase()} workstreams and mentors junior researchers.`,
-        leadTitle: `${S} Research / Programme Lead`,
+        seniorTitle: `Programme Coordinator (${S})`,
+        seniorDesc: `Coordinates major ${S.toLowerCase()} programmes and mentors junior researchers.`,
+        leadTitle: `Programme Lead (${S})`,
         leadDesc: `Leads ${S.toLowerCase()} research or programme teams and stakeholder delivery.`,
         execTitle: `Director of ${S} / Head of Research`,
         execDesc: `Director-level leadership of ${S.toLowerCase()} capability or research function.`,
+      })
+      // Extra natural UK practical routes (unique per specialism)
+      add(`Charity Project Assistant (${S})`, 'graduate_social_sciences_entry', `Supports charity or NGO project delivery using ${S.toLowerCase()} skills.`, {
+        professionalRegistrationRequirement: 'none',
+        eligibilityNote: note('Practical charity project support — no professional registration required.'),
+      })
+      add(`Community Engagement Officer (${S})`, 'professional_practitioner', `Delivers community engagement and outreach linked to ${S.toLowerCase()}.`, {
+        eligibilityNote: note('Community engagement officer — practical public/voluntary sector route.'),
+      })
+      add(`Project Coordinator (${S})`, 'professional_practitioner', `Coordinates projects and stakeholders in ${S.toLowerCase()}-related programmes.`, {
+        eligibilityNote: note('Project coordinator — practical delivery route.'),
+      })
+      add(`Public Sector Officer (${S})`, 'professional_practitioner', `Public sector officer supporting programmes informed by ${S.toLowerCase()}.`, {
+        eligibilityNote: note('Public sector officer — practical civil society / government route.'),
+      })
+      add(`NGO / Charity Administrator (${S})`, 'foundation_social_support', `Administers NGO or charity operations with ${S.toLowerCase()} context.`, {
+        academicRequirement: 'none',
+        professionalRegistrationRequirement: 'none',
+        eligibilityNote: note('Foundation NGO/charity admin — no professional registration required.'),
+      })
+      add(`Monitoring & Evaluation Officer (${S})`, 'experienced_specialist', `Delivers monitoring and evaluation for ${S.toLowerCase()}-related programmes.`, {
+        eligibilityNote: note('M&E officer — typically needs project experience.'),
+      })
+      add(`Policy Officer (${S})`, 'experienced_specialist', `Develops policy briefings and evidence products linked to ${S.toLowerCase()}.`, {
+        eligibilityNote: note('Policy officer — progression route with sector experience.'),
       })
       break
 
@@ -237,20 +262,30 @@ export function buildRoles(def: SpecDef): RoleSeed[] {
 
     case 'politics_policy':
       ladder({
-        supportTitle: `${S} Policy Admin Assistant`,
+        supportTitle: `Programme Assistant (${S})`,
         supportDesc: `Supports political, diplomatic or think-tank offices with admin linked to ${S.toLowerCase()}.`,
-        graduateTitle: `${S} Graduate Policy Assistant`,
-        graduateDesc: `Graduate policy assistant researching and drafting materials on ${S.toLowerCase()} topics.`,
-        practitionerTitle: `${S} Policy ${noun}`,
+        graduateTitle: `Policy Support Officer (${S})`,
+        graduateDesc: `Graduate policy support officer researching and drafting materials on ${S.toLowerCase()} topics.`,
+        practitionerTitle: `Public Sector Officer (${S})`,
         practitionerDesc: `Develops and communicates ${S.toLowerCase()} policy positions and briefings.`,
-        experiencedTitle: `${S} Policy Specialist`,
+        experiencedTitle: `Policy Officer (${S})`,
         experiencedDesc: `Owns complex ${S.toLowerCase()} dossiers and stakeholder engagement.`,
-        seniorTitle: `Senior ${S} Adviser`,
-        seniorDesc: `Senior adviser shaping organisational strategy on ${S.toLowerCase()} issues.`,
-        leadTitle: `${S} Policy Lead`,
+        seniorTitle: `Programme Coordinator (${S})`,
+        seniorDesc: `Coordinates organisational programmes on ${S.toLowerCase()} issues.`,
+        leadTitle: `Programme Lead (${S})`,
         leadDesc: `Leads ${S.toLowerCase()} policy teams and partnerships.`,
         execTitle: `Director of ${S} / Head of Policy`,
         execDesc: `Director-level leadership of ${S.toLowerCase()} policy or international affairs functions.`,
+      })
+      add(`Charity Project Assistant (${S})`, 'graduate_social_sciences_entry', `Supports NGO or advocacy project delivery on ${S.toLowerCase()} themes.`, {
+        professionalRegistrationRequirement: 'none',
+        eligibilityNote: note('Practical charity project support — no professional registration required.'),
+      })
+      add(`Community Engagement Officer (${S})`, 'professional_practitioner', `Delivers community and stakeholder engagement on ${S.toLowerCase()} issues.`, {
+        eligibilityNote: note('Community engagement — practical public/voluntary sector route.'),
+      })
+      add(`Project Coordinator (${S})`, 'professional_practitioner', `Coordinates projects linked to ${S.toLowerCase()} policy or programmes.`, {
+        eligibilityNote: note('Project coordinator — practical delivery route.'),
       })
       break
 

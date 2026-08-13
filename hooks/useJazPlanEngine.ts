@@ -32,16 +32,16 @@ type Result = {
   plan: JazActionPlanResult | null
   actionPlanId: string | null
   loading: boolean
-  updateStep: (stepKey: string, status: ActionPlanTaskStatus | 'skipped') => Promise<void>
+  updateStep: (stepKey: string, status: ActionPlanTaskStatus | 'skipped' | 'applied') => Promise<void>
   progress: JazActionPlanResult['progress_summary'] | null
 }
 
-function readLocalPlan(goalPath: string): JazActionPlanResult | null {
+function readLocalPlan(goalPath: string): (JazActionPlanResult & { _from_ca?: boolean }) | null {
   if (typeof window === 'undefined') return null
   try {
     const raw = localStorage.getItem(LOCAL_PLAN_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as JazActionPlanResult & { _goal?: string }
+    const parsed = JSON.parse(raw) as JazActionPlanResult & { _goal?: string; _from_ca?: boolean }
     if (parsed._goal && parsed._goal !== goalPath) return null
     if (!parsed.this_week_actions?.length) return null
     return parsed
@@ -50,10 +50,13 @@ function readLocalPlan(goalPath: string): JazActionPlanResult | null {
   }
 }
 
-function writeLocalPlan(plan: JazActionPlanResult, goalPath: string) {
+function writeLocalPlan(plan: JazActionPlanResult, goalPath: string, fromCa = false) {
   if (typeof window === 'undefined') return
   try {
-    localStorage.setItem(LOCAL_PLAN_KEY, JSON.stringify({ ...plan, _goal: goalPath }))
+    localStorage.setItem(
+      LOCAL_PLAN_KEY,
+      JSON.stringify({ ...plan, _goal: goalPath, ...(fromCa ? { _from_ca: true } : {}) })
+    )
   } catch {
     // ignore
   }
@@ -70,12 +73,12 @@ function buildInput(jobaz: JobAZPlan, signals: Signals): JazPlanGenerateInput {
     readiness: jobaz.route_summary.readiness_score,
     cv_focus: jobaz.cv_action,
     cv_target_role: jobaz.cv_target_role || jobaz.route_summary.current_target_role,
-    work_now_roles: jobaz.work_now.map((w) => ({ title: w.title, href: w.href })),
+    work_now_roles: (jobaz.work_now || []).map((w) => ({ title: w.title, href: w.href })),
     recommended_course_types: [
       ...(training
         ? [{ title: training.title, priority: 'primary' }]
         : []),
-      ...jobaz.optional_training.slice(0, 2).map((t) => ({
+      ...(jobaz.optional_training || []).slice(0, 2).map((t) => ({
         title: t.title,
         priority: 'optional',
       })),
@@ -91,7 +94,7 @@ function buildInput(jobaz: JobAZPlan, signals: Signals): JazPlanGenerateInput {
           },
         ]
       : [],
-    this_week_plan: jobaz.this_week_plan,
+    this_week_plan: jobaz.this_week_plan || [],
     signals: {
       has_base_cv: signals.hasBaseCv,
       cv_quality_score: signals.cvQualityScore,
@@ -114,39 +117,94 @@ export function useJazPlanEngine(
 
   useEffect(() => {
     if (!jobazPlan || generatingRef.current) return
-    const key = `${jobazPlan.source_path_id}|${jobazPlan.route_summary.route_title}|${signals.hasBaseCv}|${signals.appliedJobsCount}|${signals.savedJobsCount}`
+    const workKey = (jobazPlan.work_now || []).map((w) => w.title).join(',')
+    const trainKey = [
+      jobazPlan.training_next?.title || '',
+      ...(jobazPlan.optional_training || []).map((t) => t.title),
+    ].join(',')
+    const weekKey = (jobazPlan.this_week_plan || []).join('|')
+    const caKey = jobazPlan.ca_selection?.selected_at || ''
+    const key = `${jobazPlan.source_path_id}|${jobazPlan.route_summary?.route_title || ''}|${workKey}|${trainKey}|${weekKey}|${caKey}|${signals.hasBaseCv}|${signals.appliedJobsCount}|${signals.savedJobsCount}`
     if (key === lastKeyRef.current) return
 
     let cancelled = false
     generatingRef.current = true
     setLoading(true)
 
-    const cached = readLocalPlan(jobazPlan.source_path_id)
-    if (cached) setPlan(cached)
+    const run = async () => {
+      // Prefer Supabase active plan steps (cross-browser source of truth)
+      try {
+        const activeRes = await fetch('/api/jaz-plan/active', {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (!cancelled && activeRes.ok) {
+          const active = await activeRes.json()
+          if (active?.plan?.this_week_actions?.length) {
+            const next = active.plan as JazActionPlanResult
+            const fromCa =
+              active.source === 'career_assistant_selected_items' ||
+              Boolean(jobazPlan.ca_selection)
+            setPlan(next)
+            writeLocalPlan(next, jobazPlan.source_path_id, fromCa)
+            lastKeyRef.current = key
+            if (fromCa) {
+              generatingRef.current = false
+              setLoading(false)
+              return
+            }
+          }
+        }
+      } catch {
+        // fall through
+      }
 
-    const input = buildInput(jobazPlan, signals)
-    void fetch('/api/jaz-plan/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    })
-      .then(async (res) => {
-        const data = await res.json()
-        if (cancelled || !res.ok || !data.plan) return
+      if (cancelled) return
+
+      const cached = readLocalPlan(jobazPlan.source_path_id)
+      if (cached) setPlan(cached)
+
+      if (cached?._from_ca && jobazPlan.ca_selection) {
+        lastKeyRef.current = key
+        generatingRef.current = false
+        setLoading(false)
+        return
+      }
+
+      if (jobazPlan.ca_selection) {
+        // CA plan without server steps yet — keep local CA cache; skip generate overwrite
+        lastKeyRef.current = key
+        generatingRef.current = false
+        setLoading(false)
+        return
+      }
+
+      const input = buildInput(jobazPlan, signals)
+      try {
+        const res = await fetch('/api/jaz-plan/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        })
+        if (!res.ok) return
+        const data = await res.json().catch(() => null)
+        if (cancelled || !data?.plan) return
         const next = data.plan as JazActionPlanResult
         setPlan(next)
-        writeLocalPlan(next, jobazPlan.source_path_id)
+        writeLocalPlan(next, jobazPlan.source_path_id, Boolean(data.reused_active))
         lastKeyRef.current = key
-      })
-      .catch(() => {
+      } catch {
         // keep cached / legacy
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           generatingRef.current = false
           setLoading(false)
         }
-      })
+      }
+    }
+
+    void run()
 
     return () => {
       cancelled = true
@@ -161,24 +219,43 @@ export function useJazPlanEngine(
   ])
 
   const updateStep = useCallback(
-    async (stepKey: string, status: ActionPlanTaskStatus | 'skipped') => {
+    async (stepKey: string, status: ActionPlanTaskStatus | 'skipped' | 'applied') => {
       if (!plan) return
 
       // Local progress (existing First Action Plan store)
       if (status !== 'skipped') {
-        markActionPlanTask(stepKey, status, { manualDone: status === 'done', force: true })
+        const localStatus: ActionPlanTaskStatus =
+          status === 'applied' ? 'applied' : status === 'done' ? 'done' : status === 'in_progress' ? 'in_progress' : 'not_started'
+        markActionPlanTask(stepKey, localStatus, {
+          manualDone: status === 'done',
+          force: true,
+        })
       } else {
         markActionPlanTask(stepKey, 'not_started', { force: true })
       }
 
       const nextActions = plan.this_week_actions.map((a) =>
-        a.id === stepKey ? { ...a, status } : a
+        a.id === stepKey
+          ? {
+              ...a,
+              status:
+                status === 'applied'
+                  ? ('applied' as const)
+                  : status === 'skipped'
+                    ? ('skipped' as const)
+                    : status,
+            }
+          : a
       )
       const nextPlan: JazActionPlanResult = {
         ...plan,
         this_week_actions: nextActions,
         next_best_action:
-          nextActions.find((a) => a.status !== 'done' && a.status !== 'skipped') || null,
+          nextActions.find(
+            (a) => a.status !== 'done' && a.status !== 'skipped' && a.status !== 'applied'
+          ) ||
+          nextActions.find((a) => a.status !== 'done' && a.status !== 'skipped') ||
+          null,
       }
       setPlan(nextPlan)
       writeLocalPlan(nextPlan, plan.goal_path)

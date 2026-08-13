@@ -61,7 +61,15 @@ export type CareerBrainQuestion = {
   id: string
   text: string
   type: 'single' | 'multi'
-  options: Array<{ value: string; label: string; description?: string }>
+  options: Array<{
+    value: string
+    label: string
+    description?: string
+    /** Launch gating — option visible but not selectable */
+    disabled?: boolean
+    badge?: string
+    helperText?: string
+  }>
   max_select?: number
   allow_free_text?: boolean
 }

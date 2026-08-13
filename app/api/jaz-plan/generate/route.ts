@@ -1,6 +1,7 @@
 /**
  * POST /api/jaz-plan/generate
  * Generate + optionally persist a JAZ action plan. Fallback-first; never blocks UX.
+ * Does NOT replace an active Career Assistant selected plan.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -9,6 +10,7 @@ import { cookies } from 'next/headers'
 import {
   generateJazActionPlan,
   persistJazActionPlan,
+  loadActiveJazActionPlan,
   type JazPlanGenerateInput,
 } from '@/lib/jaz-plan-engine'
 import { trackJazEventServer } from '@/lib/analytics/jazTrackEvent'
@@ -45,13 +47,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid_body' }, { status: 400 })
     }
 
-    const userId = (await resolveUserId()) || body.user_id || null
+    const userId = await resolveUserId()
+
+    // Never overwrite Career Assistant selected active plan with a generic generate.
+    if (userId) {
+      const active = await loadActiveJazActionPlan({ userId })
+      if (
+        active.plan &&
+        (active.source === 'career_assistant_selected_items' || active.jobaz_plan?.ca_selection)
+      ) {
+        return NextResponse.json({
+          ok: true,
+          plan: active.plan,
+          jobaz_plan: active.jobaz_plan,
+          reused_active: true,
+          persist_warning: null,
+        })
+      }
+    }
+
     const plan = await generateJazActionPlan({ ...body, user_id: userId })
 
     const persist = await persistJazActionPlan({
       plan,
       userId,
       anonymousId: body.anonymous_id || null,
+      source: 'jaz_plan_generate',
     })
 
     const withId = { ...plan, action_plan_id: persist.action_plan_id }
@@ -70,6 +91,7 @@ export async function POST(req: NextRequest) {
         ai_provider: plan.ai_provider,
         engine_version: plan.engine_version,
         steps_count: plan.this_week_actions.length,
+        archived_previous: persist.archived_previous,
         persist_error: persist.error || null,
       },
     })

@@ -4,6 +4,7 @@ import { CvData } from '@/app/cv-builder-v2/page'
 import { hasSummaryGrammarOrSpellingIssues } from '@/lib/cv-summary-grammar-detect'
 import CvSummaryAssistant from '@/components/cv-builder-v2/CvSummaryAssistant'
 import type { ResolvedCvSuggestions } from '@/lib/cv-builder/suggestions'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 
 interface SummaryTabProps {
   summary: string
@@ -208,6 +209,8 @@ export default function SummaryTab({
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (data.ok && data.summary) {
         // Check if suggestion is too similar (only for non-keywords mode)
         if (mode !== 'keywords' && areSimilar(summary, data.summary)) {
@@ -309,6 +312,8 @@ Important: If there are NO grammar or spelling issues, return the EXACT same tex
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (data.ok && data.summary) {
         // Check if the text is identical (no grammar issues found)
         const isSame = summary.trim() === data.summary.trim()
@@ -358,6 +363,8 @@ Important: If there are NO grammar or spelling issues, return the EXACT same tex
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (data.ok && data.feedback) {
         setFeedback(data.feedback)
         setQualityStatus(data.status || 'good')

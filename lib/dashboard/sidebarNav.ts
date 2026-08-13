@@ -32,7 +32,7 @@ export type SidebarNavItem = {
   tabId?: DashboardTabId
   /**
    * Highlight when any workspace tab is active
-   * (Identity / My Plan / Documents / Saved Jobs / Saved Opportunities / Pulse Activity / Relay).
+   * (Identity / My Plan / Documents / Jobs For You / Saved Opportunities / Pulse Activity / Relay).
    */
   matchWorkspace?: boolean
 }
@@ -142,7 +142,7 @@ export const SIDEBAR_DASHBOARD_AREAS: SidebarNavItem[] = [
   },
   {
     href: '/dashboard?tab=jobs',
-    label: 'Saved Jobs',
+    label: 'Jobs For You',
     shortLabel: 'Jobs',
     icon: Briefcase,
     navLevel: 'child',

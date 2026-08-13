@@ -19,19 +19,24 @@ export function useCvBuilderCareerMode() {
   useEffect(() => {
     let cancelled = false
 
-    const refresh = (forceBundle = false) => {
+    const refresh = (forceBundle = false, isInitial = false) => {
       if (forceBundle) invalidateAssessmentBundleCache()
+      // Sync snapshot for logged-out / mirror users; async wins for Supabase.
       setPlan(loadCvCareerPlanContext())
-      void loadCvCareerPlanContextAsync().then((next) => {
-        if (!cancelled) setPlan(next)
-      })
+      void loadCvCareerPlanContextAsync()
+        .then((next) => {
+          if (!cancelled) setPlan(next)
+        })
+        .finally(() => {
+          // Mark ready only after first resolve so My Plan → CV Builder never flashes empty.
+          if (!cancelled && isInitial) setHydrated(true)
+        })
     }
 
-    refresh(false)
-    setHydrated(true)
+    refresh(false, true)
 
-    const onPlanUpdate = () => refresh(true)
-    const onSoftRefresh = () => refresh(false)
+    const onPlanUpdate = () => refresh(true, false)
+    const onSoftRefresh = () => refresh(false, false)
 
     window.addEventListener(CAREER_PLAN_UPDATED_EVENT, onPlanUpdate)
     window.addEventListener('jobaz-career-plan-generated-updated', onPlanUpdate)
@@ -54,5 +59,12 @@ export function useCvBuilderCareerMode() {
     [plan]
   )
 
-  return { hydrated, isCareerMode, plan, roleHeadline, mission }
+  return {
+    hydrated,
+    isLoadingPlanContext: !hydrated,
+    isCareerMode,
+    plan,
+    roleHeadline,
+    mission,
+  }
 }

@@ -17,9 +17,11 @@ export function jazActionsToMissions(actions: JazPlanAction[]): MissionItem[] {
         ? 'not_started'
         : a.status === 'done'
           ? 'done'
-          : a.status === 'in_progress'
-            ? 'in_progress'
-            : 'not_started',
+          : a.status === 'applied'
+            ? 'applied'
+            : a.status === 'in_progress'
+              ? 'in_progress'
+              : 'not_started',
     optional: a.priority === 'optional',
     actionLabel: a.cta_label,
     locked: false,

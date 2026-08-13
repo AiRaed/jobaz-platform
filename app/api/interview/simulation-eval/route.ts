@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { aiProvider } from '@/lib/jobaz-ai/providers'
+import { enforceAiUsageLimit } from '@/lib/ai-usage/guard'
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,6 +59,9 @@ export async function POST(req: NextRequest) {
         summary: 'Your simulation performance demonstrates good communication skills. Continue practicing to improve consistency and specificity across all answers.',
       })
     }
+
+    const usageGate = await enforceAiUsageLimit(req, 'interview_coach', 'simulation-eval')
+    if (!usageGate.allowed) return usageGate.response
 
     // Build prompt for Simulation Mode evaluation
     // The API evaluates how well the user performed across the entire interview simulation

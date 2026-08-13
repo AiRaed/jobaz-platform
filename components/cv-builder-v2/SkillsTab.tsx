@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X, Sparkles, CheckCircle2, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import SkillsAIModal from './SkillsAIModal'
 import CvPlanSuggestionChips from '@/components/cv-builder-v2/CvPlanSuggestionChips'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 
 interface SkillsTabProps {
   skills: string[]
@@ -107,6 +108,8 @@ export default function SkillsTab({
       })
 
       const data = await response.json()
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       
       if (data.ok && data.feedback) {
         setQualityFeedback(data.feedback)

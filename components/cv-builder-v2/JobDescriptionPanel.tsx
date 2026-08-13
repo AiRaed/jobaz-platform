@@ -3,6 +3,7 @@ import { Sparkles, Loader2, Target, FileText, FileEdit } from 'lucide-react'
 import { CvData } from '@/app/cv-builder-v2/page'
 import type { CvAiButtonHint } from '@/lib/cv-optimization'
 import AutoImproveCvPanel from '@/components/cv-builder-v2/AutoImproveCvPanel'
+import { aiLimitErrorFromResponse } from '@/lib/ai-usage/client'
 
 interface JobDescriptionPanelProps {
   cvData: CvData
@@ -103,9 +104,10 @@ export default function JobDescriptionPanel({
         body: JSON.stringify({ mode: 'analyze', jobDescription }),
       })
 
+      const data = await response.json().catch(() => ({}))
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-
-      const data = await response.json()
       if (data.ok && data.analysis) {
         setJdAnalysis(data.analysis)
       } else {
@@ -144,9 +146,10 @@ export default function JobDescriptionPanel({
         }),
       })
 
+      const data = await response.json().catch(() => ({}))
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-
-      const data = await response.json()
       if (data.ok && data.tailoredSummary) {
         onCvDataUpdate({ summary: data.tailoredSummary })
       } else {
@@ -179,9 +182,10 @@ export default function JobDescriptionPanel({
         body: JSON.stringify({ mode: 'experience', jobDescription, experience: cvData.experience }),
       })
 
+      const data = await response.json().catch(() => ({}))
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-
-      const data = await response.json()
       if (data.ok && data.tailoredExperience) {
         if (Array.isArray(data.tailoredExperience) && data.tailoredExperience.length > 0) {
           onCvDataUpdate({ experience: data.tailoredExperience })
@@ -214,9 +218,10 @@ export default function JobDescriptionPanel({
         body: JSON.stringify({ mode: 'skills', jobDescription, currentSkills: cvData.skills }),
       })
 
+      const data = await response.json().catch(() => ({}))
+      const limitErr = aiLimitErrorFromResponse(response, data)
+      if (limitErr) throw limitErr
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-
-      const data = await response.json()
       if (data.ok && data.suggestedSkills) {
         if (Array.isArray(data.suggestedSkills) && data.suggestedSkills.length > 0) {
           const message = `Suggested skills to add:\n\n${data.suggestedSkills.join('\n')}\n\nWould you like to add these to your skills list?`

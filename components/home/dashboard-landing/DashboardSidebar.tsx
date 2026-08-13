@@ -47,8 +47,8 @@ const LOGGED_IN_ACCOUNT: NavItem[] = [
 ]
 
 const HOW_IT_WORKS = [
-  'Choose your goal',
-  'Get your plan',
+  'Choose a goal or open a tool',
+  'Get a plan if you want one',
   'Improve your CV',
   'Apply or train',
 ] as const
@@ -208,7 +208,7 @@ function SidebarContent({
       aria-label="Landing navigation"
     >
       {/* Same inner rhythm as PlatformSidebar */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain py-3 px-2 space-y-5">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2 pt-3 pb-3 space-y-5">
         <div>
           <nav className="space-y-0.5" aria-label="Primary">
             {PRIMARY.map((item) => (

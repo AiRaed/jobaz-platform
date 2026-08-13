@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import JazEyeIcon from '@/components/ui/JazEyeIcon'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/toast'
 import {
   getGoalRedirect,
   LANDING_GOAL_OPTIONS,
@@ -16,14 +17,17 @@ type Message =
   | { id: string; role: 'user'; text: string }
 
 const GREETING =
-  "Hi! I'll help you find the fastest route to work in the UK."
+  "Hi! I'll help you find a practical route to work in the UK."
 const GOAL_PROMPT = 'What would you like to do today?'
+const COMING_SOON_TOAST =
+  'This career route is coming soon. Please choose another route for now.'
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
 export default function LandingJazPanel() {
+  const { addToast } = useToast()
   const [messages, setMessages] = useState<Message[]>([
     { id: uid(), role: 'assistant', text: GREETING },
     { id: uid(), role: 'assistant', text: GOAL_PROMPT },
@@ -31,13 +35,14 @@ export default function LandingJazPanel() {
   const [selectedGoal, setSelectedGoal] = useState<LandingGoalOption | null>(null)
   const [isTyping, setIsTyping] = useState(false)
   const [showGoals, setShowGoals] = useState(true)
+  const [comingSoonNotice, setComingSoonNotice] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
     })
-  }, [messages, isTyping, selectedGoal])
+  }, [messages, isTyping, selectedGoal, comingSoonNotice])
 
   const appendAssistant = useCallback((text: string) => {
     setMessages((prev) => [...prev, { id: uid(), role: 'assistant', text }])
@@ -46,6 +51,17 @@ export default function LandingJazPanel() {
   const handleGoalSelect = useCallback(
     (goal: LandingGoalOption) => {
       if (selectedGoal || isTyping) return
+      if (goal.disabled) {
+        setComingSoonNotice(COMING_SOON_TOAST)
+        addToast({
+          title: 'Coming Soon',
+          description: COMING_SOON_TOAST,
+          variant: 'default',
+          duration: 4000,
+        })
+        window.setTimeout(() => setComingSoonNotice(null), 4000)
+        return
+      }
 
       setShowGoals(false)
       setMessages((prev) => [...prev, { id: uid(), role: 'user', text: goal.label }])
@@ -57,7 +73,7 @@ export default function LandingJazPanel() {
         appendAssistant(goal.followUp)
       }, 750)
     },
-    [appendAssistant, isTyping, selectedGoal]
+    [addToast, appendAssistant, isTyping, selectedGoal]
   )
 
   return (
@@ -113,22 +129,53 @@ export default function LandingJazPanel() {
       {showGoals && !selectedGoal && (
         <div className="relative px-5 pb-5 pt-1 border-t border-slate-800/60">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {LANDING_GOAL_OPTIONS.map((goal) => (
-              <button
-                key={goal.id}
-                type="button"
-                disabled={isTyping}
-                onClick={() => handleGoalSelect(goal)}
-                className={cn(
-                  'text-left rounded-xl border border-slate-700/50 bg-slate-900/60 px-4 py-3 text-sm text-slate-200',
-                  'hover:border-violet-500/45 hover:bg-violet-950/30 hover:shadow-[0_0_24px_rgba(139,92,246,0.12)]',
-                  'transition-all duration-200 disabled:opacity-50'
-                )}
+            {LANDING_GOAL_OPTIONS.map((goal) => {
+              const isComingSoon = Boolean(goal.disabled)
+              return (
+                <button
+                  key={goal.id}
+                  type="button"
+                  disabled={isTyping && !isComingSoon}
+                  onClick={() => handleGoalSelect(goal)}
+                  aria-disabled={isComingSoon || undefined}
+                  className={cn(
+                    'text-left rounded-xl border px-4 py-3 text-sm transition-all duration-200',
+                    isComingSoon
+                      ? 'opacity-60 cursor-not-allowed border-slate-700/40 bg-slate-900/40 text-slate-400'
+                      : cn(
+                          'border-slate-700/50 bg-slate-900/60 text-slate-200',
+                          'hover:border-violet-500/45 hover:bg-violet-950/30 hover:shadow-[0_0_24px_rgba(139,92,246,0.12)]',
+                          'disabled:opacity-50'
+                        )
+                  )}
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span>
+                      <span className="mr-2">{goal.emoji}</span>
+                      {goal.label}
+                    </span>
+                    {isComingSoon ? (
+                      <span className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-100">
+                        {goal.badge || 'Coming Soon'}
+                      </span>
+                    ) : null}
+                  </span>
+                  {isComingSoon && (goal.helperText || 'Available in a future update.') ? (
+                    <span className="mt-1.5 block text-[11px] text-slate-500">
+                      {goal.helperText || 'Available in a future update.'}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
+            {comingSoonNotice ? (
+              <p
+                role="status"
+                className="sm:col-span-2 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-xs text-amber-100/90"
               >
-                <span className="mr-2">{goal.emoji}</span>
-                {goal.label}
-              </button>
-            ))}
+                {comingSoonNotice}
+              </p>
+            ) : null}
           </div>
         </div>
       )}

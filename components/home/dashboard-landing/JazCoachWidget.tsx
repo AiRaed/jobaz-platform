@@ -7,11 +7,11 @@ import UkCareerAssistantLink from '@/components/uk-career-assistant/UkCareerAssi
 /** Visual-only capability chips — not clickable CTAs on landing. */
 const GOAL_CHIPS = [
   'Education',
-  'Experience',
+  'Profession',
   'New career',
-  'Growth',
   'Extra income',
-  'Business',
+  'Growth · soon',
+  'Business · soon',
 ] as const
 
 export default function JazCoachWidget() {
@@ -38,7 +38,7 @@ export default function JazCoachWidget() {
                   </p>
                 </div>
                 <p className="jaz-coach-greeting text-sm text-slate-100 leading-snug mt-1 max-w-xl">
-                  Find your fastest practical route to work in the UK.
+                  Find a practical route to work in the UK.
                 </p>
                 <p className="text-[11px] text-slate-300/90 mt-0.5 leading-snug max-w-xl">
                   JAZ understands your goal, skills, experience and next step.

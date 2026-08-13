@@ -90,6 +90,12 @@ export type WorkInEducationProfile = {
   languages?: LanguageInput[]
   english_level?: string | null
   career_preferences?: CareerPreferencesInput
+  /** Canonical taxonomy (additive; preferred over education_level alone) */
+  qualification_group?: string | null
+  qualification_type?: string | null
+  equivalence_status?: string | null
+  /** Resolved snapshot — also recomputed during normalisation */
+  qualification?: import('../qualification-taxonomy').NormalizedQualification | null
 }
 
 export type NormalisedWorkInEducationProfile = {
@@ -127,6 +133,8 @@ export type NormalisedWorkInEducationProfile = {
     preferred_locations: string[]
   }
   alias_hits: string[]
+  /** Canonical qualification taxonomy (always resolved during normalisation) */
+  qualification: import('../qualification-taxonomy').NormalizedQualification
 }
 
 export type ResolvedEntityRef = {
@@ -204,6 +212,7 @@ export type RoleEligibilityResult = {
     registration_scope_match: ScopeMatch
   }
   gaps: EligibilityGap[]
+  /** Match strength 0–100 from Eligibility & Match Scoring v2 */
   match_score: number
   match_reasons: string[]
   warnings: string[]
@@ -212,6 +221,8 @@ export type RoleEligibilityResult = {
   relation_reason: string
   scope_gate: string
   professional_stage_gate: string
+  /** Canonical v2 evaluation (optional for older fixtures) */
+  evaluation?: import('../evaluate-role-match').RoleMatchEvaluation
 }
 
 export type MatchLimits = {
@@ -279,6 +290,11 @@ export type MatchOptions = {
   confidenceThreshold?: number
   maxRelatedSpecialisms?: number
   maxRolesPerSpecialism?: number
+  /**
+   * Clarification loop: force a specialism already returned as an allowed option.
+   * Never accept arbitrary IDs without prior clarification options.
+   */
+  forceSpecialismId?: string | null
 }
 
 /** In-memory knowledge rows used by deterministic matching (DB-backed). */

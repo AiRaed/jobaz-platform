@@ -27,7 +27,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, summary: mockContent })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'generate')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_summary')
     if (!usageGate.allowed) return usageGate.response
 
     // Extract information from input (excluding names)

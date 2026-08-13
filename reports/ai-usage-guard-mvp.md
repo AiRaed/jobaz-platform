@@ -18,11 +18,19 @@ No payment, no private-page change, no Career Assistant / My Plan / Jobs For You
 
 Guest categories are independent: 1 CV AI + 1 Cover AI + 1 Writing AI + 1 Interview AI is allowed.
 
-After guest limit:  
+**CV Builder exception:** CV Builder limits are counted per AI action type, not as one global CV Builder bucket. `toolCategory` stays `cv_builder`; `actionName` is the specific tool (`cv_summary`, `cv_skills`, …). Cover Letter, Writing Review, Interview Coach, Apply Assistant, JAZ, and local AI still count by category only.
+
+After guest limit (non-CV):  
 `Create a free account to continue using AI tools.`
 
-After logged-in daily limit:  
+After guest repeats the **same CV action**:  
+`Create a free account to continue using this AI tool.`
+
+After logged-in daily limit (non-CV):  
 `You’ve used today’s free AI limit for this tool. Try again tomorrow. Premium AI credits are coming soon.`
+
+After logged-in exceeds the **same CV action** daily limit:  
+`You’ve used today’s free AI limit for this CV tool. Try again tomorrow.`
 
 Apply Assistant:  
 `Apply Assistant is limited during the beta launch.`
@@ -57,21 +65,26 @@ Persistence: `ai_usage_events` (migration `supabase/migrations/20250813190000_ai
 
 ## Routes protected
 
-### cv_builder
-- `/api/generate`
-- `/api/cv/ai-summary`
-- `/api/cv/ai-tailor`
-- `/api/cv/experience-bullets`
-- `/api/cv/skills-suggest`
-- `/api/cv/improve-bullet`
-- `/api/cv/improve-publication`
-- `/api/cv/extract-role`
-- `/api/cv/grammar-check`
-- `/api/cv/check-bullet-quality`
-- `/api/cv/check-skills-quality`
-- `/api/cv/check-summary-quality`
-- `/api/cv/fix-bullet-grammar`
-- `/api/compare`
+### cv_builder (counted per `actionName`)
+
+| Route | actionName |
+| --- | --- |
+| `/api/generate` | `cv_summary` |
+| `/api/cv/ai-summary` | `cv_summary` |
+| `/api/compare` | `cv_summary` |
+| `/api/cv/skills-suggest` | `cv_skills` |
+| `/api/cv/experience-bullets` | `cv_experience_bullets` |
+| `/api/cv/improve-bullet` | `cv_improve_bullet` |
+| `/api/cv/ai-tailor` | `cv_tailor` |
+| `/api/cv/grammar-check` | `cv_grammar_check` |
+| `/api/cv/fix-bullet-grammar` | `cv_grammar_check` |
+| `/api/cv/check-skills-quality` | `cv_ats_check` |
+| `/api/cv/check-bullet-quality` | `cv_quality_check` |
+| `/api/cv/check-summary-quality` | `cv_quality_check` |
+| `/api/cv/extract-role` | `cv_role_extract` |
+| `/api/cv/improve-publication` | `cv_publication_improve` |
+
+A guest can use each of these action types once (e.g. Summary + Skills + Experience Bullets + Grammar Check). Repeating the same action is blocked. Logged-in users get 2 uses **per action type** per UTC day. Manual edit / preview / save / PDF / DOCX are not gated.
 
 ### cover_letter
 - `/api/cover`
@@ -139,6 +152,8 @@ Apply migration `20250813190000_ai_usage_events.sql` on Supabase so limits persi
 **Ship this guard for launch.** It stops unlimited public OpenAI use without hiding the marketing tools.
 
 `npm run build` passed after these changes.
+
+**13 August 2026 follow-up:** CV Builder limits are counted per AI action type, not as one global CV Builder bucket. Other tools unchanged.
 
 Still true after launch:
 - Apply the `ai_usage_events` migration before traffic.

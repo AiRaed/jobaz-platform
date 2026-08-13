@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, role: 'professional' })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'extract-role')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_role_extract')
     if (!usageGate.allowed) return usageGate.response
 
     // Build system prompt with domain detection hints

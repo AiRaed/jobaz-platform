@@ -101,7 +101,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'ai-summary')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_summary')
     if (!usageGate.allowed) return usageGate.response
 
     // Extract keywords if this is keyword generation

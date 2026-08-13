@@ -13,6 +13,7 @@ import {
   AI_LIMIT_ERROR,
   AI_LIMIT_MESSAGES,
   APPLY_ASSISTANT_DAILY_LIMIT,
+  CV_COUNTS_PER_ACTION,
   GUEST_COOKIE_NAME,
   GUEST_LIMIT_PER_CATEGORY,
   LOGGED_IN_DAILY_LIMIT_PER_CATEGORY,
@@ -122,10 +123,15 @@ function memoryIncrement(key: string, windowMs: number | null): void {
   row.count += 1
 }
 
+function countsPerAction(toolCategory: AiToolCategory): boolean {
+  return toolCategory === 'cv_builder' && CV_COUNTS_PER_ACTION
+}
+
 async function countStoredEvents(params: {
   userId?: string | null
   anonymousIds?: string[]
   toolCategory: AiToolCategory
+  actionName?: string | null
   sinceIso?: string | null
 }): Promise<number | null> {
   const supabase = getAdminCoursesSupabase()
@@ -136,6 +142,10 @@ async function countStoredEvents(params: {
       .from('ai_usage_events')
       .select('id', { count: 'exact', head: true })
       .eq('tool_category', params.toolCategory)
+
+    if (params.actionName && countsPerAction(params.toolCategory)) {
+      q = q.eq('action_name', params.actionName)
+    }
 
     if (params.userId) {
       q = q.eq('user_id', params.userId)
@@ -180,6 +190,8 @@ async function insertStoredEvent(params: {
 
 function limitMessage(reason: AiLimitReason | undefined, toolCategory: AiToolCategory): string {
   if (toolCategory === 'apply_assistant') return AI_LIMIT_MESSAGES.apply
+  if (toolCategory === 'cv_builder' && reason === 'daily_limit') return AI_LIMIT_MESSAGES.dailyCv
+  if (toolCategory === 'cv_builder' && reason === 'guest_limit') return AI_LIMIT_MESSAGES.guestCv
   if (reason === 'daily_limit') return AI_LIMIT_MESSAGES.daily
   return AI_LIMIT_MESSAGES.guest
 }
@@ -256,10 +268,16 @@ export async function checkAiUsageLimit(input: {
       toolCategory === 'apply_assistant'
         ? APPLY_ASSISTANT_DAILY_LIMIT
         : LOGGED_IN_DAILY_LIMIT_PER_CATEGORY
-    const memKey = memoryKey(['user', userId, toolCategory, dayStart])
+    const perAction = countsPerAction(toolCategory)
+    const memKey = memoryKey(
+      perAction
+        ? ['user', userId, toolCategory, actionName, dayStart]
+        : ['user', userId, toolCategory, dayStart]
+    )
     const stored = await countStoredEvents({
       userId,
       toolCategory,
+      actionName: perAction ? actionName : null,
       sinceIso: dayStart,
     })
     const used = stored ?? memoryCount(memKey, dayMs)
@@ -288,10 +306,16 @@ export async function checkAiUsageLimit(input: {
   }
 
   const max = GUEST_LIMIT_PER_CATEGORY
-  const memKey = memoryKey(['guest', primaryAnon || 'unknown', toolCategory])
+  const perAction = countsPerAction(toolCategory)
+  const memKey = memoryKey(
+    perAction
+      ? ['guest', primaryAnon || 'unknown', toolCategory, actionName]
+      : ['guest', primaryAnon || 'unknown', toolCategory]
+  )
   const stored = await countStoredEvents({
     anonymousIds,
     toolCategory,
+    actionName: perAction ? actionName : null,
   })
   const used = stored ?? memoryCount(memKey, null)
   if (used >= max) {

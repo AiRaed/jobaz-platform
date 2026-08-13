@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'compare')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_summary')
     if (!usageGate.allowed) return usageGate.response
 
     const prompt = content 

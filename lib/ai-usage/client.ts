@@ -24,6 +24,10 @@ export function messageFromAiLimitPayload(
   if (payload.toolCategory === 'apply_assistant' || payload.reason === 'login_required') {
     return AI_LIMIT_MESSAGES.apply
   }
+  if (payload.toolCategory === 'cv_builder' && payload.reason === 'daily_limit') {
+    return AI_LIMIT_MESSAGES.dailyCv
+  }
+  if (payload.toolCategory === 'cv_builder') return AI_LIMIT_MESSAGES.guestCv
   if (payload.reason === 'daily_limit') return AI_LIMIT_MESSAGES.daily
   return AI_LIMIT_MESSAGES.guest
 }

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'fix-bullet-grammar')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_grammar_check')
     if (!usageGate.allowed) return usageGate.response
 
     // Use AI to fix grammar and improve clarity

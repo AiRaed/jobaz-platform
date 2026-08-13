@@ -109,7 +109,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'skills-suggest')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_skills')
     if (!usageGate.allowed) return usageGate.response
 
     // Build context for the prompt

@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'improve-publication')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_publication_improve')
     if (!usageGate.allowed) return usageGate.response
 
     const isAcademic = mode === 'academic'

@@ -34,10 +34,17 @@ export const AI_LIMIT_ERROR = 'AI_LIMIT_REACHED'
 export const AI_LIMIT_MESSAGES = {
   guest:
     'Create a free account to continue using AI tools.',
+  guestCv:
+    'Create a free account to continue using this AI tool.',
   daily:
     'You’ve used today’s free AI limit for this tool. Try again tomorrow. Premium AI credits are coming soon.',
+  dailyCv:
+    'You’ve used today’s free AI limit for this CV tool. Try again tomorrow.',
   apply:
     'Apply Assistant is limited during the beta launch.',
 } as const
+
+/** CV Builder counts each action type separately (not one global CV bucket). */
+export const CV_COUNTS_PER_ACTION = true
 
 export const GUEST_COOKIE_NAME = 'jobaz_ai_anon'

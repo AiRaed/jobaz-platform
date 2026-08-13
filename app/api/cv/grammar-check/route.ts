@@ -273,7 +273,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'grammar-check')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_grammar_check')
     if (!usageGate.allowed) return usageGate.response
 
     // Build a structured text representation of the CV for AI analysis

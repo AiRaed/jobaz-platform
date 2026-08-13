@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', `ai-tailor-${mode || 'default'}`)
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_tailor')
     if (!usageGate.allowed) return usageGate.response
 
     switch (mode) {

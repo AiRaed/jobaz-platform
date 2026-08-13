@@ -79,7 +79,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'experience-bullets')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_experience_bullets')
     if (!usageGate.allowed) return usageGate.response
 
     // Build contextText for domain detection

@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'improve-bullet')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_improve_bullet')
     if (!usageGate.allowed) return usageGate.response
 
     // Determine tense based on whether role is current

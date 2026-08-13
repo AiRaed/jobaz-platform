@@ -29,7 +29,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'check-summary-quality')
+    const usageGate = await enforceAiUsageLimit(req, 'cv_builder', 'cv_quality_check')
     if (!usageGate.allowed) return usageGate.response
 
     // Use AI to analyze the summary quality

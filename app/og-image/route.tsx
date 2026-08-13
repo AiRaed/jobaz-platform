@@ -7,7 +7,7 @@ export async function GET() {
     (
       <div
         style={{
-          background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)',
+          background: 'linear-gradient(135deg, #020617 0%, #1e3a8a 55%, #2563eb 100%)',
           width: '100%',
           height: '100%',
           display: 'flex',
@@ -35,7 +35,7 @@ export async function GET() {
             maxWidth: 800,
           }}
         >
-          Redefine your Professional Presence with AI
+          Your UK career platform — plan, train, apply and grow.
         </div>
       </div>
     ),

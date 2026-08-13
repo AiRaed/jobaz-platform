@@ -10,9 +10,10 @@ const appUrl = JOBAZ_SITE_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
-  title: 'JobAZ — Find Work & Build Your Career in the UK',
+  applicationName: 'JobAZ',
+  title: 'JobAZ — UK Career Platform',
   description:
-    'Find UK jobs, explore career courses and licences, improve your CV, and get guided career recommendations — a free UK career platform.',
+    'Plan your UK career route, build your CV, find jobs, and discover relevant courses and licences.',
   keywords: [
     'UK career platform',
     'AI career assistant',
@@ -41,9 +42,9 @@ export const metadata: Metadata = {
     locale: 'en_GB',
     url: appUrl,
     siteName: 'JobAZ',
-    title: 'JobAZ — Find Work & Build Your Career in the UK',
+    title: 'JobAZ — UK Career Platform',
     description:
-      'Find UK jobs, explore courses and licences, improve your CV, and follow guided career recommendations.',
+      'Plan your UK career route, build your CV, find jobs, and discover relevant courses and licences.',
     images: [
       {
         url: `${appUrl}/og-image`,
@@ -56,7 +57,8 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'JobAZ — UK Career Platform',
-    description: 'Find UK jobs, explore courses and licences, and follow a guided career path.',
+    description:
+      'Plan your UK career route, build your CV, find jobs, and discover relevant courses and licences.',
     images: [`${appUrl}/og-image`],
     creator: '@jobaz',
     site: '@jobaz',
@@ -66,9 +68,10 @@ export const metadata: Metadata = {
       { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
     ],
     shortcut: '/favicon.ico',
-    apple: '/icon.svg',
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
   manifest: '/manifest.json',
   appleWebApp: {
@@ -85,11 +88,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning data-jobaz-theme="dark" className="dark">
       <head>
-        <meta name="theme-color" content="#7C3AED" />
+        <meta name="theme-color" content="#2563eb" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('jobaz-theme-v1')||'dark';if(t!=='day'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-jobaz-theme',t);document.documentElement.classList.toggle('dark',t==='dark');document.documentElement.style.colorScheme=t==='day'?'light':'dark';var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='day'?'#08122f':'#7C3AED');}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('jobaz-theme-v1')||'dark';if(t!=='day'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-jobaz-theme',t);document.documentElement.classList.toggle('dark',t==='dark');document.documentElement.style.colorScheme=t==='day'?'light':'dark';var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='day'?'#08122f':'#2563eb');}catch(e){}})();`,
           }}
         />
         <script
@@ -102,7 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   '@type': 'Organization',
                   name: 'JobAZ',
                   url: appUrl,
-                  logo: `${appUrl}/icon.svg`,
+                  logo: `${appUrl}/logo.png`,
                   description:
                     'UK career platform for jobs, courses, licences, CV tools, and guided career recommendations.',
                 },

@@ -437,6 +437,13 @@ body {
   height: 36px;
 }
 
+@media (max-width: 639px) {
+  .jobaz-theme-toggle--skeleton {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
 .jobaz-theme-toggle__btn {
   display: inline-flex;
   align-items: center;

@@ -41,11 +41,11 @@ export default function DashboardAppHeader({ onOpenMobileNav }: Props) {
   }, [])
 
   const accountActions = (
-    <div className="flex flex-wrap items-center gap-2 shrink-0">
+    <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 shrink-0">
       <JobazThemeToggle compact />
       <AdminNavLink />
       {isLoggedIn ? (
-        <Link href="/dashboard" className="jobaz-btn-primary jobaz-btn-primary-sm">
+        <Link href="/dashboard" className="jobaz-btn-primary jobaz-btn-primary-sm whitespace-nowrap">
           My Workspace
         </Link>
       ) : (
@@ -53,7 +53,10 @@ export default function DashboardAppHeader({ onOpenMobileNav }: Props) {
           <Link href="/auth?mode=login" className="jobaz-shell-chip hidden sm:inline-flex">
             Log in
           </Link>
-          <Link href="/auth?mode=signup" className="jobaz-btn-primary jobaz-btn-primary-sm">
+          <Link
+            href="/auth?mode=signup"
+            className="jobaz-btn-primary jobaz-btn-primary-sm whitespace-nowrap"
+          >
             Get started
           </Link>
         </>
@@ -62,7 +65,7 @@ export default function DashboardAppHeader({ onOpenMobileNav }: Props) {
   )
 
   return (
-    <header className="flex w-full min-h-[var(--jobaz-header-h,4.5rem)] items-stretch">
+    <header className="flex w-full min-w-0 min-h-[var(--jobaz-header-h,4.5rem)] items-stretch overflow-x-hidden">
       {/* Desktop: logo centered in sidebar-width column (matches nav below) */}
       <div className={cn(PLATFORM_SIDEBAR_BRAND, platformSidebarWidthClass(false))}>
         <Link href="/" className={PLATFORM_SIDEBAR_BRAND_LINK} aria-label="JobAZ home">
@@ -70,9 +73,9 @@ export default function DashboardAppHeader({ onOpenMobileNav }: Props) {
         </Link>
       </div>
 
-      <div className={cn(PLATFORM_HEADER_INNER, 'flex-1 min-w-0')}>
-        <div className="flex w-full items-center justify-between gap-3 min-w-0">
-          <div className="flex items-center gap-3 min-w-0">
+      <div className={cn(PLATFORM_HEADER_INNER, 'flex-1 min-w-0 max-sm:!px-3')}>
+        <div className="flex w-full min-w-0 items-center justify-between gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {onOpenMobileNav && (
               <button
                 type="button"
@@ -83,8 +86,12 @@ export default function DashboardAppHeader({ onOpenMobileNav }: Props) {
                 <Menu className="h-4 w-4" />
               </button>
             )}
-            <Link href="/" className="shrink-0 hover:opacity-90 transition-opacity lg:hidden">
-              <Logo className="h-8 md:h-9" />
+            <Link
+              href="/"
+              className="shrink-0 hover:opacity-90 transition-opacity lg:hidden"
+              aria-label="JobAZ home"
+            >
+              <Logo className="!h-8 md:!h-9 w-auto max-w-[7.5rem] sm:max-w-[9rem] object-contain" />
             </Link>
             <div className="min-w-0 hidden xl:block">
               <p className="jobaz-header-eyebrow text-[10px] uppercase tracking-widest font-semibold leading-none text-[#A5B4FC]">
